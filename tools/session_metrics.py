@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Analizor offline de consum de tokens pentru transcriptele Claude Code.
+"""Offline token-usage analyzer for Claude Code transcripts.
 
-Input: fisiere .jsonl de sesiune (~/.claude/projects/<slug>/<uuid>.jsonl) sau directoare.
-Output: --json (masina) si/sau --md (rezumat + tabel agregat). Doar stdlib.
+Input: session .jsonl files (~/.claude/projects/<slug>/<uuid>.jsonl) or directories.
+Output: --json (machine-readable) and/or --md (summary + aggregate table). Stdlib only.
 """
 
 import argparse
@@ -77,7 +77,7 @@ def blocks(msg):
 
 
 def text_len(value):
-    """Lungimea in caractere a unui content de tool_result (str sau lista de blocuri)."""
+    """Character length of a tool_result content (str or list of blocks)."""
     if isinstance(value, str):
         return len(value)
     if isinstance(value, list):
@@ -109,7 +109,7 @@ def add_usage(acc, usage):
 # ---------------------------------------------------------------- sessions
 
 def session_files(jsonl_path):
-    """Fisierul principal + transcriptele subagentilor (<uuid>/subagents/*.jsonl)."""
+    """Main transcript plus its subagent transcripts (<uuid>/subagents/*.jsonl)."""
     out = [(jsonl_path, None)]
     stem = jsonl_path[:-len(".jsonl")]
     subdir = os.path.join(stem, "subagents")
@@ -151,14 +151,14 @@ def analyze(jsonl_path, pricing):
     main = zeros()
     side = zeros()
     agents = {}
-    tool_names = {}          # tool_use_id -> nume tool
+    tool_names = {}          # tool_use_id -> tool name
     tool_results = []        # (chars, tool_use_id)
     reads = collections.Counter()
     first_ts = last_ts = None
 
     for path, label in session_files(jsonl_path):
-        # o reactie API e scrisa pe mai multe linii cu acelasi message.id: input/cache se repeta
-        # identic, dar output_tokens e CUMULATIV (1 -> 1 -> 163) -> se ia ultima valoare
+        # one API response spans several lines sharing a message.id: input/cache repeat
+        # identically, but output_tokens is CUMULATIVE (1 -> 1 -> 163) -> take the last value
         groups = collections.OrderedDict()
         for obj in read_lines(path):
             ts = obj.get("timestamp")
@@ -274,14 +274,14 @@ def markdown(sessions):
         out.append("## %s  (%s)" % (s["session"], s["project"]))
         out.append("")
         out.append("- interval: %s -> %s" % (s["started"] or "?", s["ended"] or "?"))
-        out.append("- mesaje assistant: %d (principal %d / sidechain %d)"
+        out.append("- assistant messages: %d (main %d / sidechain %d)"
                    % (t["messages"], s["main"]["messages"], s["sidechains"]["messages"]))
         out.append("- tokens: in %s | out %s | cache_read %s | cache_write %s"
                    % (fmt(t["input"]), fmt(t["output"]),
                       fmt(t["cache_read"]), fmt(t["cache_creation"])))
         out.append("- output in sidechains: %s (%.1f%%)"
                    % (fmt(s["sidechains"]["output"]), s["sidechain_output_pct"]))
-        out.append("- cost estimat: $%.2f" % t["cost_usd"])
+        out.append("- estimated cost: $%.2f" % t["cost_usd"])
         out.append("")
         out.append("| model | in | out | cache_read | cache_write | $ |")
         out.append("|---|---:|---:|---:|---:|---:|")
@@ -291,7 +291,7 @@ def markdown(sessions):
                           fmt(r["cache_creation"]), r["cost_usd"]))
         out.append("")
         if s["agents"]:
-            out.append("| agent | mesaje | output | raport final (car.) |")
+            out.append("| agent | messages | output | final report (chars) |")
             out.append("|---|---:|---:|---:|")
             for name, a in s["agents"].items():
                 out.append("| %s | %d | %s | %s |"
@@ -299,30 +299,30 @@ def markdown(sessions):
                               fmt(a["output_tokens"]), fmt(a["final_text_chars"])))
             out.append("")
         if s["top_tool_results"]:
-            out.append("Top 10 tool_result dupa marime:")
+            out.append("Top 10 tool_results by size:")
             out.append("")
-            out.append("| # | tool | caractere |")
+            out.append("| # | tool | chars |")
             out.append("|---:|---|---:|")
             for i, tr in enumerate(s["top_tool_results"], 1):
                 out.append("| %d | %s | %s |" % (i, tr["tool"], fmt(tr["chars"])))
             out.append("")
         if s["reread_files"]:
-            out.append("Fisiere citite de mai multe ori (Read):")
+            out.append("Files read more than once (Read):")
             out.append("")
             for r in s["reread_files"]:
                 out.append("- %dx %s" % (r["reads"], r["path"]))
             out.append("")
         if s["images"]:
-            out.append("Imagini citite:")
+            out.append("Images read:")
             out.append("")
             for im in s["images"]:
                 out.append("- %dx %s%s" % (im["reads"], im["path"],
-                                           "  [redusa -mic]" if im["is_mic"] else ""))
+                                           "  [downscaled]" if im["is_mic"] else ""))
             out.append("")
 
-    out.append("## Agregat")
+    out.append("## Aggregate")
     out.append("")
-    out.append("| sesiune | proiect | in | out | cache_read | cache_write | % out sidechain | $ |")
+    out.append("| session | project | in | out | cache_read | cache_write | % out sidechain | $ |")
     out.append("|---|---|---:|---:|---:|---:|---:|---:|")
     agg = zeros()
     agg_cost = 0.0
@@ -338,7 +338,7 @@ def markdown(sessions):
         agg_cost += t["cost_usd"]
         agg_side += s["sidechains"]["output"]
     pct = 100.0 * agg_side / (agg["output"] or 1)
-    out.append("| **TOTAL** | %d sesiuni | %s | %s | %s | %s | %.1f%% | %.2f |"
+    out.append("| **TOTAL** | %d sessions | %s | %s | %s | %s | %.1f%% | %.2f |"
                % (len(sessions), fmt(agg["input"]), fmt(agg["output"]),
                   fmt(agg["cache_read"]), fmt(agg["cache_creation"]), pct, agg_cost))
     out.append("")
@@ -350,10 +350,10 @@ def markdown(sessions):
 def main(argv=None):
     here = os.path.dirname(os.path.abspath(__file__))
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    ap.add_argument("paths", nargs="+", help="fisiere .jsonl sau directoare de sesiuni")
-    ap.add_argument("--json", action="store_true", help="iesire JSON")
-    ap.add_argument("--md", action="store_true", help="iesire Markdown")
-    ap.add_argument("--out", help="scrie in fisier in loc de stdout")
+    ap.add_argument("paths", nargs="+", help=".jsonl session files or directories")
+    ap.add_argument("--json", action="store_true", help="JSON output")
+    ap.add_argument("--md", action="store_true", help="Markdown output")
+    ap.add_argument("--out", help="write to a file instead of stdout")
     ap.add_argument("--pricing", default=os.path.join(here, "pricing.json"))
     args = ap.parse_args(argv)
 
