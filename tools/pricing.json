@@ -1,0 +1,36 @@
+{
+  "_note": "USD per 1.000.000 tokens. Cifrele se actualizeaza MANUAL — nimic nu le sincronizeaza automat. Conventie Anthropic: cache_read = 0.1 x input, cache_write (TTL 5 min) = 1.25 x input. Cheia 'default' se foloseste pentru orice model care nu apare aici (potrivire exacta, apoi prefix).",
+  "_updated": "2026-08-22",
+  "models": {
+    "claude-fable-5": {
+      "input": 10.0,
+      "output": 50.0,
+      "cache_read": 1.0,
+      "cache_write": 12.5
+    },
+    "claude-opus-5": {
+      "input": 5.0,
+      "output": 25.0,
+      "cache_read": 0.5,
+      "cache_write": 6.25
+    },
+    "claude-sonnet-5": {
+      "input": 3.0,
+      "output": 15.0,
+      "cache_read": 0.3,
+      "cache_write": 3.75
+    },
+    "claude-haiku-4-5-20251001": {
+      "input": 1.0,
+      "output": 5.0,
+      "cache_read": 0.1,
+      "cache_write": 1.25
+    },
+    "default": {
+      "input": 5.0,
+      "output": 25.0,
+      "cache_read": 0.5,
+      "cache_write": 6.25
+    }
+  }
+}
