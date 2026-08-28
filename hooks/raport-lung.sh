@@ -1,5 +1,5 @@
 #!/bin/bash
-# SubagentStop: the subagent's last message >2500 characters -> block ONCE, asking for a
+# SubagentStop: the subagent's last message >2000 characters -> block ONCE, asking for a
 # compressed report in the fixed format. Guarded on stop_hook_active so it cannot loop.
 input=$(cat)
 python3 - "$input" <<'PY'
@@ -27,8 +27,8 @@ try:
                 last = t
 except OSError:
     sys.exit(0)
-if len(last) <= 2500:
+if len(last) <= 2000:
     sys.exit(0)
 print(json.dumps({"decision": "block",
-    "reason": f"The final report is {len(last)} characters. The fixed format in your instructions allows at most 1,500. Send back ONLY the compressed report, in the fixed format, with no process narration."}))
+    "reason": f"The final report is {len(last)} characters. The fixed format in your instructions allows at most 1,500 (soft) / 2,000 (hard). Send back ONLY the compressed report, in the fixed format, with no process narration."}))
 PY

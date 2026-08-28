@@ -1,0 +1,7 @@
+{
+  "_note": "Workflow versions. A session belongs to the last version whose 'from' (local day, YYYY-MM-DD) is <= the session's start day. Sessions before the first 'from' are 'older'. Add a line for each new version.",
+  "versions": [
+    { "name": "v1.0", "from": "2026-08-27" },
+    { "name": "v1.1", "from": "2026-08-29" }
+  ]
+}

@@ -1,3 +1,5 @@
 metrics-local/
 __pycache__/
 *.pyc
+HANDOFF.md
+docs/DECIZII.md

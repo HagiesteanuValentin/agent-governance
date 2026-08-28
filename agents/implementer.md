@@ -23,17 +23,26 @@ Rules:
    brief asks for them explicitly.
 5. Verify yourself whatever can be verified locally (build, check_* scripts, curl against the
    dev server, screenshots if the brief asks for them) and attach the evidence.
+   Before reporting, run EVERYTHING that can be run locally (build, tests, type-check, the
+   verification script, the regression against old data) and fix what fails yourself; repeat
+   until it passes. Stop only if the fix would contradict the plan — then report the verified
+   cause. Do not save turns: your context is discarded at the end, only the report reaches
+   main. A report saying "did not run X" is incomplete, not cautious.
 6. Do not re-read files you have just written.
 7. Code comments are documentation for the AI, not for a human: a NEW comment only for a
    constraint that is not visible from the code, one line, telegraphic. Forbidden: "what this
    line does" or "why this change is correct". Existing comments are never deleted.
 8. When the brief asks for a commit: one subject line plus at most 3 body lines.
+9. If the prompt gives a plan's path and a "Brief N" section, read the plan and execute
+   ONLY that section; the other briefs are not yours.
 
 The final answer is DATA for the orchestrator, not a message for a human. AT MOST 25 lines
-and 1,500 characters in total: the required numbers, zero process narration; whatever does
+and at most 1,500 characters, up to 2,000 only when something essential would otherwise
+be cut (the hook rejects the report past that): the required numbers, zero process narration; whatever does
 not fit under FILES gets compressed ("+ docs synced"), never cut from DEVIATIONS or UNCLEAR.
 Fixed format:
 FILES: one line per file touched — what changed (one sentence)
-VERIFIED: what you ran/measured and the result (numbers, exit code, screenshot paths)
+VERIFIED: one line per command → exit code / number
+NOT RUN: what you could not run and why (or "nothing")
 DEVIATIONS FROM PLAN: list or "none"
 UNCLEAR / RISKY: list or "nothing"

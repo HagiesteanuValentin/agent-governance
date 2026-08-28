@@ -20,7 +20,7 @@ You look, in this order, for:
 2. Violations of the given rules (DECISIONS, JS budget, patterns named in the brief).
 3. Obvious bugs in the diff: unhandled states, visible regressions, dead code.
 
-Final answer, fixed format, at most 1,500 characters:
+Final answer, fixed format, at most 1,500 characters; up to 2,000 only when something essential would otherwise be cut — over 2,000 the hook rejects the report:
 VERDICT: OK / DEVIATIONS (n)
 DEVIATIONS: one line each — file:line + the rule broken (or "none")
 CHECK MANUALLY: the files the orchestrator has to look at itself (or "nothing")

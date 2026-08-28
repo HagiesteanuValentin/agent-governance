@@ -16,8 +16,8 @@ Two roles appear below:
   the session's model and burn the expensive quota. When you need a fact that is not in the
   sources of truth, or you want to keep the context clean (including in plan mode), launch
   `explorer` (cheap model, read-only) with a precise question. Allowed agents: `explorer`,
-  `implementer`, `implementer-max`, `scribe`, `auditor` — nothing else without the
-  operator's approval.
+  `implementer`, `implementer-max`, `scribe`, `auditor`, `design-lead` (only via `/polish`)
+  — nothing else without the operator's approval.
 - Do not re-read files you have just written.
 
 ## Orchestration (the orchestrator plans, the worker model executes)
@@ -27,40 +27,84 @@ Two roles appear below:
   delegation — a model delegating to an equally expensive model is waste.
 - The main session = planner + verifier. It does NOT write code directly except for tasks
   under ~20 lines in a single file.
+- After launching an agent: no text at all until its result notification; at the
+  notification, state the next action directly (no "waiting for the report"), one line.
+- Agent report: 1,500 soft cap / 2,000 hard cap — over 2,000 the hook rejects the report.
+- Quality rating: before closing a session that delivered a task, the operator runs
+  `/rate N [note]` (N = 1-5: 5 complete and correct on the first pass, zero fixes after
+  audit · 4 complete, one round of small fixes · 3 complete, 2+ rounds or a deviation the
+  operator caught · 2 partial, the operator fixed/relaunched it · 1 unusable — rate the
+  result, not the cost). If forgotten, rate it later with
+  `python3 tools/session_metrics.py --rate <session-name> N`.
 - The flow: (1) plan mode → the operator approves the plan; (2) send the plan to
   `implementer` as a BRIEF; (3) receive the report, audit the diff (on large diffs, through
   `auditor`) against the audit criteria (DECISIONS, definition of done, verifications);
-  (4) small repairs you do yourself, large ones go back with the deviation named; (5) only
-  then the final report.
-- Light tasks (docs, HANDOFF, renames, one-line fixes) → `scribe`.
-- `implementer` (medium effort) is the default. `implementer-max` (high effort) ONLY for
-  hard tasks — large refactor, difficult debugging, sprawling definition of done — with the
-  reason written in the brief.
+  (4) audit deviations all go, in a single message, to the same implementer via
+  SendMessage (its context is alive; ~0 bootstrap versus ~40-50k for a new run); you fix
+  directly only an isolated deviation, under ~20 lines in one file, when that is faster than
+  the message; (5) only then the final report.
+- Light tasks (docs, HANDOFF, renames, one-line fixes, typos) → `scribe`. The scribe gets
+  the target SECTIONS (heading name, maybe a line range), not whole files; it does not read
+  docs end to end.
+- `implementer-max` (high effort, 200 calls) is the DEFAULT for any brief with logic
+  (JS/TS/Python/SQL), a refactor, debugging, ≥4 items with separate acceptance criteria, or
+  one that touches a file delivered by an earlier brief in the same task. `implementer`
+  (medium effort) is only for simple briefs — CSS/text/config, trivial items — and for
+  parallel briefs. The agent's turns and tokens are NOT a cost to save: its context dies at
+  the end, only 1,500 characters reach main. A 200–300k token run that delivers complete is
+  a win; a short one that leaves checks unrun is a loss (the operator has to step in).
 - Screenshots are compared by the agent, in its own context; it reports numbers and a
   conclusion. The orchestrator reads at most 1–2 final screenshots for the verdict, in the
   downscaled `*-small.png` variant, as late in the session as possible — every image read is
   re-paid on every following message.
 - One agent at a time; wait for its result before any other step. The operator wants to see
   the plan and the conclusion, not the execution.
+  EXCEPTION: up to 3 agents in parallel ONLY when, at plan time, each brief has its own
+  file list and the lists do not overlap (shared tokens/config included), at most one runs
+  a build/browser (or each has its own port and `--out`), and none depends on another's
+  result. Audit after all of them finish, brief by brief. A
+  worktree (`isolation: worktree`) only when declared in the plan, for lists that cannot be
+  guaranteed disjoint or a risky delivery you want to be able to throw away: it costs the
+  dependencies installed on the copy + a merge you audit yourself; it does not solve
+  dependencies between briefs.
 - Default ceilings: at most 2 re-sends to `implementer` on the same task (3 runs total) and
-  at most 3 `explorer` runs per task, one at a time. An agent stopped by `maxTurns` is a
+  at most 3 `explorer` runs per task, one at a time; SendMessage messages to a live agent
+  are not re-sends — ceiling of 3 messages per agent. An agent stopped by `maxTurns` is a
   signal that the brief is too big; split it, do not relaunch it unchanged.
-- One brief = ONE verifiable delivery. If the definition of done has more than ~5
-  independent points, or the brief touches more than ~6 files → split it into sequential
-  briefs, with the diff read and audited between them. The split is decided AT PLAN TIME:
-  the approved plan already lists the briefs, one verifiable delivery each.
+- One brief = ONE verifiable delivery. The ceiling is on FILES and RISK, not on the item
+  count: CSS/text items in the same file, with the same verification, go 8–10 together.
+  Split when the brief touches more than ~6 files, mixes JS with CSS, or one item can break
+  another — sequential briefs, with the diff read and audited between them. Every agent
+  run costs ~40–50k tokens of bootstrap (docs + Playwright), so one extra run is more
+  expensive than a longer brief. The split is decided AT PLAN TIME: the approved plan
+  already lists the briefs, one verifiable delivery each.
 - Auditing: `git diff --stat` first, then the diff only on the relevant files. Never run
   `cat` on whole files next to a diff.
 - Never read files from `tool-results/` (you re-pay for a result you already saw); if a fact
   is missing, ask the explorer for it.
-- Audit: on diffs over ~200 lines, delegate to `auditor` (it reads the whole diff in its own
-  context and reports deviations in at most 1.5k characters). You read `git diff --stat` +
-  the report + only the files it flags. Small diffs you audit directly. The auditor dies
-  with the delivery; only a re-audit after repairs on the same task continues the same agent.
+- Audit, directly, 3 fixed commands: `git diff --stat` · diff against the deliveries of
+  EARLIER briefs on the same file (a brief that revisits an item can delete lines delivered
+  before) · one grep/screenshot per "unclear/risky" line in the agent's report. In main,
+  `git diff` ONLY with `--stat`; the diff content ALWAYS goes to `auditor` (not only past
+  200 lines / JS) — it reads the whole diff in its own context and reports deviations in at
+  most 1.5k characters; you read `git diff --stat` + the report + only the files it flags.
+  Plans under `docs/polish/*.md` are not read in main; the human-facing summary comes from
+  the design-lead's report. The auditor dies with the delivery; only a re-audit after
+  repairs on the same task continues the same agent.
 - Never run commands with large output (build, full test scripts, whole diffs): the agent
   runs them in its own context and reports exit code and numbers.
 - The BRIEF gives paths and criteria, not pasted code: do not read files in order to write
   the brief; the implementer reads its own code from the paths you give.
+- Copy the relevant prohibitions (from DECISIONS/PATTERNS/phase docs) into the brief, in
+  full, and write explicitly: "Do NOT read DECISIONS/PATTERNS/RECIPES in full; from the
+  docs read only the sections named here" (heading names). Every agent that re-reads
+  whole docs burns ~10–20k tokens on the same facts.
+- A task with several briefs on the same target: the reusable verification script is
+  delivered by the design-lead (in /polish) or by brief 1 (otherwise):
+  `scripts/verify-<target>.mjs` — one browser, downscaled screenshots at the widths from
+  CLAUDE.md, batch measurements, `browser.close()` in `finally`. Later briefs get its path
+  and ONLY run it — no ad-hoc screenshots. Fixes after the verdict run the same script;
+  the "before" numbers come from the design-lead's plan, not from a worktree.
 - Above a ceiling (a wide audit, research across several areas, 2+ explorers in parallel):
   do NOT break the task and do NOT decide alone — ask the operator: how many agents, which
   model, what each one looks for, why the ceiling is not enough. The approval applies to
@@ -71,6 +115,12 @@ Two roles appear below:
   is verified (commands, measurements, screenshots) · what it must NOT do
   (commit/push/deploy/seed/real services). Write the rules out in full; do not reference a
   skill. Without a complete brief, nothing gets delegated.
+- Task with plan mode: the plan (`~/.claude/plans/<slug>.md`) contains the complete briefs
+  as `## Brief N — <title>` sections, each with every required element above. When
+  delegating, the Agent prompt is ≤10 lines: the plan's path + "execute ONLY section
+  «Brief N»" + the commit/push ban; do not rewrite the brief in the prompt. Plan = ≤10
+  lines of context + briefs + verification; no alternatives, no narrative (every character
+  is paid twice: once to write, once as ExitPlanMode's echo).
 
 ## Final report (after any task)
 

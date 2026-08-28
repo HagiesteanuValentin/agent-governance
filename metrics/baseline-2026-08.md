@@ -92,7 +92,7 @@ snapshot taken 30 minutes before.
 | largest `Read` tool_result | 15,645 chars |
 
 The final figure for this session is captured automatically by the `SessionEnd` hook into
-`metrics-local/<session-id>.json`. This file gets updated from that capture; until then the
+`metrics-local/<date>-s<N>-<project>.json`. This file gets updated from that capture; until then the
 session-total row is provisional.
 
 ## Honest caveats
