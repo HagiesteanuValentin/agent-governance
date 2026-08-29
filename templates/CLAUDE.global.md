@@ -16,8 +16,8 @@ Two roles appear below:
   the session's model and burn the expensive quota. When you need a fact that is not in the
   sources of truth, or you want to keep the context clean (including in plan mode), launch
   `explorer` (cheap model, read-only) with a precise question. Allowed agents: `explorer`,
-  `implementer`, `implementer-max`, `scribe`, `auditor`, `design-lead` (only via `/polish`)
-  — nothing else without the operator's approval.
+  `implementer`, `implementer-max`, `scribe`, `auditor`, `design-lead`, `design-lead-expert`
+  (only via `/polish`) — nothing else without the operator's approval.
 - Do not re-read files you have just written.
 
 ## Orchestration (the orchestrator plans, the worker model executes)
@@ -27,8 +27,10 @@ Two roles appear below:
   delegation — a model delegating to an equally expensive model is waste.
 - The main session = planner + verifier. It does NOT write code directly except for tasks
   under ~20 lines in a single file.
-- After launching an agent: no text at all until its result notification; at the
-  notification, state the next action directly (no "waiting for the report"), one line.
+- After launching an agent: no text at all until its result notification. At the
+  notification, the line stating the next action AND its tool call go in the same message;
+  a text-only message after a notification ends the turn and re-sends the whole context
+  (~100k cache) for nothing. No "waiting for the report".
 - Agent report: 1,500 soft cap / 2,000 hard cap — over 2,000 the hook rejects the report.
 - Quality rating: before closing a session that delivered a task, the operator runs
   `/rate N [note]` (N = 1-5: 5 complete and correct on the first pass, zero fixes after

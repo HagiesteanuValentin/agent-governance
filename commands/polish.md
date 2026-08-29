@@ -1,26 +1,41 @@
 Polish the target: $ARGUMENTS
-Format: /polish <component | section | site> [dev-url]. No arguments → ask for the target.
+Format: /polish <component | section | site> [dev-url] [lead=opus|expert]. No arguments →
+ask for the target.
 
 You (the orchestrator) do NOT read the target's code and do NOT propose items off the top of
 your head. The flow, in order:
 
 1. Preparation (no agents). Plan path: `docs/polish/<target-slug>.md`. If the file already
-   exists → this is round 2: skip to step 6. Gather for the brief: the target exactly as the
+   exists → this is round 2: skip to step 6; exception: `lead=` given explicitly (stay here).
+   "Different direction" goes to step 6 FIRST, which renames the plan to `.v<n>.md` (otherwise
+   the second design-lead overwrites v1), then comes back here with signal (c).
+   Gather for the brief: the target exactly as the
    operator said it, the URL, the paths of the sources of truth that exist (CLAUDE.md,
    docs/DECISIONS.md, PATTERNS.md, docs/RECIPES.md), the breakpoints from CLAUDE.md if you
    know them.
-   The target's paths: get them cheaply, without reading code (`ls`, `grep -rl <name>` — file
-   lists only). ≤ ~6 clear files → they go straight into the brief. The target is "site" /
-   "the whole site" OR the grep does not give a clear list → ONE `explorer` for a map ("the
-   list of pages, sections and shared components, with paths and one line on what each is");
-   the map goes into the brief. The explorer brings PATHS, not content: the design-lead reads
+   Choosing the design lead, BEFORE any explorer. `lead=` forces it. Otherwise
+   `design-lead-expert` (Fable) on ≥1 signal: (a) the target is a site / whole page or the
+   request is about direction ("premium", "identity", "atmosphere", "I don't like it"), with
+   no concrete defect named; (b) material, texture, image, blend, mask; (c) round 2 after
+   "different direction"; (d) ≤1 relevant section found in DECISIONS/PATTERNS (the target is
+   not constrained). `design-lead` (opus) on: component/section with existing patterns;
+   objective defects named by the operator (contrast, spacing, overflow, states, a11y). Mixed
+   signals → opus. Write one line: "Design lead: <opus|expert> — <reason>"; the reason goes
+   into the brief, on the `Lead:` line.
+   Then choosing the ROUTE: the long route (2a-2c) when the lead is expert OR the target is a
+   site / whole page / the grep does not give a clear list of paths; the short route (step 2,
+   as today) only for opus on a component/section with ≤6 clear files.
+   The target's paths — ONLY on the short route (on the long route step 2a pulls them):
+   get them cheaply, without reading code (`ls`, `grep -rl <name>` — file
+   lists only) and go straight into the brief; the design-lead reads
    the code itself, so that it has file:line evidence. You are also the one who names in the
    brief the relevant SECTIONS from DECISIONS / PATTERNS / RECIPES (the headings); the
    design-lead does not read the docs in full.
    If the target does not name the page ("this page", "here", a component without a page) →
    ask for the page with AskUserQuestion IMMEDIATELY, before any agent.
-2. Design-lead: a single run of the `design-lead` agent. Brief: the goal in one sentence, the
-   target, the paths (or the map), the plan path, the sections from the sources (headings),
+2. Design lead. Two routes, per the choice from step 1. Either way: a single design lead.
+   SHORT ROUTE — a single run of the `design-lead` agent. Brief: the goal in one sentence, the
+   target, the paths, the plan path, the sections from the sources (headings),
    the URL, breakpoints. The design-lead does not have the Agent tool and does not delegate.
    Ask it for the file in its fixed format. Do not ask it for code. Ceilings in the brief:
    screenshots at 3 widths (the mandatory ones from CLAUDE.md, e.g. 320/390/1200), the states
@@ -35,6 +50,22 @@ your head. The flow, in order:
    image retouching, filter) gets a 5-minute PROOF on the real file, with the result in the
    item; otherwise the item is marked "feasibility unproven" and the orchestrator treats it
    as a question, not as an item.
+   LONG ROUTE — three agents in series, no text from you between them:
+   2a. `explorer` → writes `docs/polish/<slug>.dossier.md` (≤3,000 characters): the target's
+       paths with line counts, direct imports (one level), for every relevant section from
+       CLAUDE.md / DECISIONS / PATTERNS / RECIPES a `file:from-to`, the path of tokens/theme,
+       URL, breakpoints, the screenshot recipe (the range from RECIPES). Paths and ranges
+       only, zero copied content. Reports the path + 3 lines.
+   2b. `implementer` → writes `scripts/verify-<slug>.mjs` (the "Task with several briefs" rule
+       from CLAUDE.md), runs it, writes `docs/polish/<slug>.measurements.md` (≤3,000: numbers
+       at each width — positions, dimensions, contrasts, overflow — and the paths of the
+       three `-small.png` screenshots). Takes the selectors from the dossier. Does not
+       propose items. No URL → just the script with the screenshot part commented out and a
+       "no live" line in the measurements.
+   2c. the design lead chosen in step 1 (`design-lead` opus or `design-lead-expert`) → the
+       brief on the long route is the same for both: the goal, the target, the paths of the
+       two files, the plan path, the reason from `Lead:`, breakpoints. You do not give it code
+       paths and do not copy sections in — they are in the dossier.
 3. Adversarial review (you). Read the plan file ONCE. Against:
    DECISIONS (rejected items reintroduced? ceilings?), the JS/CSS budget, the scope the
    operator asked for, the dimensions checklist (a dimension marked "OK" without evidence →
@@ -42,22 +73,29 @@ your head. The flow, in order:
    MERGE / ADD (same format, with acceptance). Rewrite vague items with measurable
    acceptance. Edit the file directly with Edit, change "State: v2 orchestrator".
    Do not launch a second design-lead for this.
-   Every numeric acceptance also gets an aesthetic guard in words ("no drawn outline", "not
-   darker than the wall") — an item with only a number does not pass; the metric alone
-   produced a 0.94 rim that read as a drawn line.
+   The aesthetic guard is required by the design-lead's format, you do not add it: verify
+   that every numeric acceptance has a guard in words; missing → ask for it in one
+   SendMessage to the live design-lead.
+   Plan from `design-lead-expert`: the review is ONLY against DECISIONS / budget / the
+   operator's scope / missing dimensions — you do not rewrite taste items. On the long route
+   (either lead), `READ BEYOND DOSSIER` non-empty → note it in the final report: the dossier
+   was incomplete, fix the explorer's brief next time.
 4. The operator's OK. You do NOT read `docs/polish/<target-slug>.md` (no `cat`, `sed`, or
    `wc`) to produce this summary. Show the operator, verbatim, the SUMMARY FOR THE OPERATOR
    section from the design-lead's own report — it already groups the items by visible element
    (button, card, menu, section spacing…), one line per element in plain language with the
    item numbers in brackets, MUST/SHOULD/COULD as group headings, no technical terms, at most
    15 lines — plus its CUT/ADDED BY YOU line and the plan path.
+   After its summary add ONE line of your own: "Cut/added by the orchestrator: P<n> (reason) /
+   none".
    Wait for: approve all / cut / add. Their changes go into the file before step 5 (ask an
    `explorer` with the item number to apply a change if you need to check the item first;
    never read the plan yourself).
 5. Implementation. Split the approved items into sequential briefs under the normal rules
    (ceiling on files and risk, not on count: CSS items in the same file go 8–10 at a time;
    ≤6 files; JS separate from CSS; MUST first). The verification script comes from the
-   design-lead (step 2); every brief runs it, none redo the screenshots.
+   design-lead (short route) or from implementer 2b (long route); every brief runs it,
+   none redo the screenshots.
    The prohibitions: as in CLAUDE.md ("The relevant prohibitions"). The brief gives: the plan
    path + the item numbers (the implementer reads its own acceptance criteria from the plan;
    you do not copy them in, you do not read the plan) + the verification (build, screenshots
@@ -70,7 +108,8 @@ your head. The flow, in order:
    audited by you).
    For texture/material targets (subjective ones): brief 1 is a PROOF PAGE with 2–3 variants
    side by side (e.g. rim 0.94 / 0.86 / none), the operator's verdict on it, then the
-   implementation — a proof costs less than a re-send.
+   implementation — a proof costs less than a re-send. Take the variants from the item's
+   `Variants` line, do not invent them.
    A PERFORMANCE criterion is mandatory when the items add SVG filters / `feTurbulence` /
    multiple masks / `mix-blend-mode`: the verification script measures the render time at 390
    with the CPU throttled 4× (Playwright CDP `Emulation.setCPUThrottlingRate`), before/after;
@@ -80,8 +119,13 @@ your head. The flow, in order:
    mark it in the plan `✔ <date>`.
 6. Live verification (the operator). After the last brief, tell them, per element and in the
    same plain style as step 4, what changed and where to look. What they report as incomplete is NOT redesigned: reopen the item or add
-   a new one in the SAME file and go straight to step 5. The design-lead is relaunched only
+   a new one in the SAME file and go straight to step 5. The design lead is relaunched only
    if the operator asks for a different design direction, not for remaining items.
+   "Different direction" → rename the plan to `docs/polish/<slug>.v<n>.md`, then step 1 with
+   signal (c) active. The dossier and measurements are reused if the target is the same —
+   you do not relaunch 2a/2b.
 
-Ceilings per /polish: 1 design-lead, ≤2 explorers, ≤3 implementation briefs without a new OK
-from the operator. Final report as usual.
+Ceilings per /polish: 1 design lead (`design-lead` or `design-lead-expert`); the long route
+= explorer + implementer + the chosen lead, not counted in the 3 implementation briefs; ≤2
+explorers total; ≤3 implementation briefs without a new OK from the operator. Final report
+as usual.

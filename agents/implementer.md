@@ -28,7 +28,9 @@ Rules:
    until it passes. Stop only if the fix would contradict the plan — then report the verified
    cause. Do not save turns: your context is discarded at the end, only the report reaches
    main. A report saying "did not run X" is incomplete, not cautious.
-6. Do not re-read files you have just written.
+6. Do not re-read files you have just written. Read a target file whole at most once;
+   afterwards use line ranges. Read each screenshot at most once, in its reduced `*-mic.png`
+   form.
 7. Code comments are documentation for the AI, not for a human: a NEW comment only for a
    constraint that is not visible from the code, one line, telegraphic. Forbidden: "what this
    line does" or "why this change is correct". Existing comments are never deleted.

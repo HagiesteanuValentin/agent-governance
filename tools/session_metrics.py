@@ -25,6 +25,8 @@ READ_CMD_RE = re.compile(r"(?:^|[|;&(\n]\s*)(cat|bat|head|tail|less|sed\s+-n)\b"
 GREP_WC_RE = re.compile(r"(?:^|[|;&(\n]\s*)(grep\s+-[A-Za-z]*n|wc)\b")
 HEREDOC_RE = re.compile(r"python3?\s+-\s*<<")
 GIT_LS_RE = re.compile(r"^(git|ls)\b")
+# harness tag on the user message that carries an async agent's result back into main
+TASK_NOTIFICATION_RE = re.compile(r"<task-notification>")
 
 BROWSER_TOOL_PREFIX = "mcp__claude-in-chrome__"
 BROWSER_THRESHOLD_DEFAULT = 0.5  # share of main tool calls above which the session is not workflow
@@ -55,8 +57,8 @@ THRESHOLDS = {
     "cache_churn_pct": 25.0,         # cache_creation / (cache_read + cache_creation), main
     "context_drop_pct": 30.0,        # drop between two consecutive main calls
     "flag_examples": 5,              # per code, per scope: how many are listed one by one
-    "main_read_chars": 2000,         # wc/grep -n output in main that counts as reading
-    "narration_calls": 4,            # main API calls with no tool_use and almost no text
+    "main_read_chars": 2000,         # any Bash read in main under this is a targeted lookup
+    "narration_avoidable_calls": 2,  # narration calls after a notification or a plain result
     "narration_text_chars": 300,     # under this, an answer is narration, not work
     "batchable_calls": 3,            # consecutive one-Bash API calls that could be one
     "batchable_chars": 2000,         # ...and together return less than this
@@ -79,8 +81,9 @@ FLAG_TEXT = {
     "agent_no_report": "worker ended without a final report",
     "agent_reread_own_write": "worker re-read a file it had just written",
     "main_read_files": "main read files through Bash instead of delegating",
-    "narration_turns": "main API calls that only narrate; wasted = cache_read / 10 "
-                       "(input-equivalent, the cached context re-sent for nothing)",
+    "narration_turns": "main ended a turn on a note after a result instead of continuing; "
+                       "wasted = cache_read / 10 (input-equivalent, the cached context "
+                       "re-sent for nothing); launch-structural calls are counted, not taxed",
     "batchable_bash": "consecutive Bash calls that fit in one call",
     "plan_echo": "plan echoed back into main as a tool_result",
 }
@@ -127,7 +130,8 @@ RECOMMENDATION = {
     "agent_reread_own_write": "{detail} - the write already succeeded; do not read it back.",
     "main_read_files": "{detail} - delegate the reading; an audit is `git diff --stat` "
                        "plus a targeted grep.",
-    "narration_turns": "{detail} - one line per wait, not one per poll.",
+    "narration_turns": "{detail} - after a notification, the one-line note and the next "
+                       "tool call go in the same message.",
     "batchable_bash": "{detail} - one Bash call chained with `;` / `&&`.",
     "plan_echo": "{detail} - keep the plan under 8k; briefs go in the plan file, the prompt "
                  "is path + section.",
@@ -574,10 +578,25 @@ def slash_name(content):
     return None
 
 
+def human_side_kind(obj, msg, agent_call_ids):
+    """What the human side sent before an API call: a prompt, a notification, or a result."""
+    ids = [b.get("tool_use_id") for b in blocks(msg) if b.get("type") == "tool_result"]
+    if ids:
+        if any(isinstance(i, str) and i in agent_call_ids for i in ids):
+            return "agent_result"
+        return "tool_result"
+    content = msg.get("content")
+    txt = content if isinstance(content, str) else text_of(content)
+    if TASK_NOTIFICATION_RE.search(txt or ""):
+        return "notification"
+    return "user"
+
+
 def parse_file(path, label, tool_names, tool_inputs):
     """One pass over a transcript; usage grouping identical to the original analyze()."""
     doc = new_doc(path, label)
     groups = doc["groups"]
+    last_human = "user"
     for obj in read_lines(path):
         ts = obj.get("timestamp")
         if isinstance(ts, str):
@@ -602,6 +621,8 @@ def parse_file(path, label, tool_names, tool_inputs):
                     doc["slash"].append(name)
 
         if kind == "user":
+            if not obj.get("isSidechain"):
+                last_human = human_side_kind(obj, msg, doc["agent_call_ids"])
             content = msg.get("content")
             if isinstance(content, str) and not obj.get("isMeta"):
                 stripped = content.strip()
@@ -687,6 +708,7 @@ def parse_file(path, label, tool_names, tool_inputs):
                 "agent": obj.get("agentName") or label or "sidechain",
                 "texts": [], "tools": [], "tool_ids": [],
                 "at": ts,
+                "prev_human": last_human,
             }
         else:
             grp["usage"]["output_tokens"] = max(grp["usage"].get("output_tokens") or 0,
@@ -719,6 +741,7 @@ def parse_file(path, label, tool_names, tool_inputs):
             "cache_creation": usage.get("cache_creation_input_tokens") or 0,
             "output": usage.get("output_tokens") or 0,
             "has_tool_use": bool(grp["tools"]),
+            "prev_human": grp.get("prev_human") or "user",
             "text_chars": sum(len(t) for t in grp["texts"]),
             "tool_names": list(grp["tools"]),
             "tool_ids": list(grp["tool_ids"]),
@@ -812,8 +835,11 @@ def main_call_flags(scope, doc, rows):
         hit = bool(READ_CMD_RE.search(cmd))
         if not hit and HEREDOC_RE.search(cmd) and cmd.count("\n") > 5:
             hit = True
-        if not hit and GREP_WC_RE.search(cmd) and r["chars"] > THRESHOLDS["main_read_chars"]:
+        if not hit and GREP_WC_RE.search(cmd):
             hit = True
+        # a targeted lookup that comes back small is allowed, whatever the command
+        if hit and r["chars"] <= THRESHOLDS["main_read_chars"]:
+            hit = False
         if hit:
             reads.append({"cmd": " ".join(cmd.split())[:60], "chars": r["chars"]})
     reads.sort(key=lambda r: -r["chars"])
@@ -821,15 +847,22 @@ def main_call_flags(scope, doc, rows):
               lambda r: "`%s` returned %s chars" % (r["cmd"], fmt(r["chars"])),
               lambda r: r["chars"] / 4.0)
 
+    # an answer to the user is not narration; after a launch the turn has to end anyway
     narr = [c for c in calls if not c["has_tool_use"]
-            and c["text_chars"] < THRESHOLDS["narration_text_chars"]]
+            and c["text_chars"] < THRESHOLDS["narration_text_chars"]
+            and c["prev_human"] != "user"]
+    structural = [c for c in narr if c["prev_human"] == "agent_result"]
+    avoidable = [c for c in narr if c["prev_human"] != "agent_result"]
     narr_cache = sum(c["cache_read"] for c in narr)
-    if len(narr) > THRESHOLDS["narration_calls"]:
+    avoid_cache = sum(c["cache_read"] for c in avoidable)
+    if len(avoidable) > THRESHOLDS["narration_avoidable_calls"]:
         flags.append(flag("narration_turns", scope,
-                          "%d calls with no tool use (%s cache_read re-sent)"
-                          % (len(narr), tok(narr_cache)),
-                          {"calls": len(narr), "cache_read": narr_cache},
-                          int(narr_cache / 10.0)))
+                          "%d avoidable narration calls (%s cache_read re-sent) · "
+                          "%d structural after agent launches"
+                          % (len(avoidable), tok(avoid_cache), len(structural)),
+                          {"calls": len(narr), "avoidable": len(avoidable),
+                           "structural": len(structural), "cache_read": avoid_cache},
+                          int(avoid_cache / 10.0)))
 
     runs, i = [], 0
     while i < len(calls):
@@ -878,7 +911,10 @@ def main_call_flags(scope, doc, rows):
         "hands_on_calls": hands_on,
         "hands_on_ratio": round(hands_on / float(tool_calls or 1), 3),
         "narration_calls": len(narr),
+        "narration_avoidable": len(avoidable),
+        "narration_structural": len(structural),
         "narration_cache_read": narr_cache,
+        "narration_avoidable_cache_read": avoid_cache,
         "main_read_calls": len(reads),
         "main_read_chars": sum(r["chars"] for r in reads),
         "main_read_examples": [r["cmd"] for r in reads[:2]],
@@ -1491,15 +1527,23 @@ def postmortem_lines(s):
                     round(100 * pm["hands_on_ratio"]), pm["delegations"]))
     out.append("Delegable work in main: " + " · ".join(parts))
     ctx = s["context"]
+    if "narration_avoidable" in pm:
+        narr = ("narration-only calls %d (%d avoidable · %d structural, ~%s cache_read "
+                "≈ %s input-equiv.)"
+                % (pm.get("narration_calls", 0), pm["narration_avoidable"],
+                   pm.get("narration_structural", 0),
+                   tok(pm.get("narration_avoidable_cache_read", 0)),
+                   tok(pm.get("narration_avoidable_cache_read", 0) // 10)))
+    else:  # record analyzed before the avoidable/structural split: keep its old figures
+        narr = ("narration-only calls %d (~%s cache_read ≈ %s input-equiv.; old format)"
+                % (pm.get("narration_calls", 0), tok(pm.get("narration_cache_read", 0)),
+                   tok(pm.get("narration_cache_read", 0) // 10)))
     out.append("Context: main end %s (peak %s) · biggest inputs: plan echo %s chars · "
-               "Bash %s · agent reports %s · images %d · narration-only calls %d "
-               "(~%s cache_read ≈ %s input-equiv.)"
+               "Bash %s · agent reports %s · images %d · %s"
                % (tok(ctx["main_end_tokens"]), tok(ctx["main_peak_tokens"]),
                   tok(pm.get("plan_echo_chars", 0)), tok(pm.get("main_read_chars", 0)),
                   tok(pm.get("agent_report_chars_in_main", 0)),
-                  pm.get("images_in_main", 0), pm.get("narration_calls", 0),
-                  tok(pm.get("narration_cache_read", 0)),
-                  tok(pm.get("narration_cache_read", 0) // 10)))
+                  pm.get("images_in_main", 0), narr))
     out.append("Turns: %d API calls in main · %d narration-only · %d batchable Bash runs "
                "(%d calls) · %d delegations (%s)"
                % (pm.get("main_api_calls", 0), pm.get("narration_calls", 0),
@@ -2015,10 +2059,46 @@ def read_record(path):
     return rec if isinstance(rec, dict) else None
 
 
+def write_record(out_dir, name, rec):
+    """Rewrite <name>.json and, if present, <name>.md from one session record."""
+    with open(os.path.join(out_dir, name + ".json"), "w", encoding="utf-8") as fh:
+        fh.write(json.dumps([rec], indent=2, ensure_ascii=False) + "\n")
+    md_path = os.path.join(out_dir, name + ".md")
+    if os.path.isfile(md_path):
+        try:
+            text = markdown([rec], aggregate=False) + "\n"
+        except (KeyError, TypeError, ValueError):
+            text = None
+        if text:
+            with open(md_path, "w", encoding="utf-8") as fh:
+                fh.write(text)
+
+
+def refresh_versions(directory, versions):
+    """Editing versions.json moves boundaries: put the recomputed version back into each
+    session's .json/.md so the files agree with TRENDS.md. Returns how many changed."""
+    changed = 0
+    for fname in sorted(os.listdir(directory)):
+        if not fname.endswith(".json"):
+            continue
+        rec = read_record(os.path.join(directory, fname))
+        if rec is None or "started" not in rec:
+            continue
+        new = version_of(rec.get("started"), versions)
+        if rec.get("version") != new:
+            rec["version"] = new
+            write_record(directory, fname[:-5], rec)
+            changed += 1
+    return changed
+
+
 def write_trends(directory, versions, threshold):
     if not os.path.isdir(directory):
         print("nu e director: %s" % directory, file=sys.stderr)
         return 2
+    refreshed = refresh_versions(directory, versions)
+    if refreshed:
+        print("versiune actualizata in %d sesiuni" % refreshed, file=sys.stderr)
     sessions, skipped = load_session_dir(directory)
     if not sessions:
         print("niciun raport de sesiune in %s" % directory, file=sys.stderr)
@@ -2042,17 +2122,7 @@ def rate_session(out_dir, name, score, note, versions, threshold):
     rec["quality"] = {"score": score, "note": note,
                       "rated_at": datetime.datetime.now(datetime.timezone.utc)
                       .strftime("%Y-%m-%dT%H:%M:%SZ")}
-    with open(path, "w", encoding="utf-8") as fh:
-        fh.write(json.dumps([rec], indent=2, ensure_ascii=False) + "\n")
-    md_path = os.path.join(out_dir, name + ".md")
-    if os.path.isfile(md_path):
-        try:
-            text = markdown([rec], aggregate=False) + "\n"
-        except (KeyError, TypeError, ValueError):
-            text = None
-        if text:
-            with open(md_path, "w", encoding="utf-8") as fh:
-                fh.write(text)
+    write_record(out_dir, name, rec)
     print("%s: quality %d/5" % (name, score), file=sys.stderr)
     return write_trends(out_dir, versions, threshold)
 

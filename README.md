@@ -44,7 +44,7 @@ runs a mandatory self-verify loop (build/tests/type-check/regression as applicab
 lists anything it could not run, and why, on a `NOT RUN` line of the fixed report.
 
 **2. Enforcement — hooks, not good intentions.**
-A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,500
+A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000
 characters, demanding the compressed fixed format. A `PreToolUse` hook on `Read` warns when
 the orchestrator reads a 300+ line file without `offset`/`limit`. Another on `Agent` warns
 when a brief exceeds 7,000 characters — the signal that one brief is really three.
@@ -95,6 +95,14 @@ report. The `auditor` agent is only used above ~200 diff lines, on the 3rd brief
 file, or when JS is touched. Findings go back to the still-alive implementer via
 `SendMessage` — one message, near-zero bootstrap — instead of spawning a new run.
 
+**/polish (v1.1)**: design-lead writes the plan to a file (≤8k chars), orchestrator reads
+only its ≤1.5k report; a router picks the lead — `design-lead` (expensive model) for
+components with clear paths, `design-lead-expert` (orchestrator-tier model) for targets
+needing direction/taste; large or taste targets take the long route: explorer writes a
+dossier (paths + line ranges), implementer writes and runs the measurement script, the lead
+reads only the dossier, the numbers and 3 small screenshots, with at most 5 extra reads
+reported back — so the expensive lead never reads whole files or writes Playwright.
+
 ## Measured results
 
 From `metrics/baseline-2026-08.md`. `project-a` is a 36-session frontend project that ran
@@ -112,7 +120,7 @@ does not drift.
 | auditor | no auditor role existed | **1,586** |
 | worst hand-logged report | 11,756 chars | — |
 
-Both governed reports land under the 2,500-character threshold the `SubagentStop` hook
+Both governed reports land under the 2,000-character threshold the `SubagentStop` hook
 enforces. The before corpus totals 4,638,329 output tokens against 717M cache-read tokens
 (~$687 estimated), and **22 of its 36 sessions show 0% subagent output** — all the work done
 in the orchestrator's own context.
@@ -130,7 +138,7 @@ floor of $15.78 and a realistic Fable-only estimate of $30.55 — ×1.3–×2.5.
 sessions kept (`metrics-local/TRENDS.md`; 18 older + 7 v1.0, 3 excluded — 1 browser, 2
 empty), actual cost sums to $521.13 ($335.60 older + $185.53 v1.0) against a realistic
 Fable-only sum of $2,106.36, mean ratio ×2.9 realistic for older and ×4.2 for v1.0.
-Sessions are grouped by workflow version (`tools/versions.json`); from v1.1 (2026-08-29)
+Sessions are grouped by workflow version (`tools/versions.json`); from v1.1 (2026-08-28)
 each session also gets a manual 1–5 quality rating (`/rate`) so versions compare on
 outcome, not just cost. This is a cost counterfactual computed from the real per-call
 usage (same calls and outputs, worker bootstrap removed, worker content stacked on the
@@ -198,8 +206,8 @@ session data never leaves the machine.
 
 ```
 agents/     the agent definitions (explorer, implementer, implementer-max,
-            scribe, auditor, design-lead) — model, effort, maxTurns, allowed
-            tools, fixed report format
+            scribe, auditor, design-lead, design-lead-expert) — model, effort,
+            maxTurns, allowed tools, fixed report format
 commands/   slash commands (polish, rate) — mirrors ~/.claude/commands/
 hooks/      the five enforcement hooks + settings.example.json
 templates/  CLAUDE.global.md (orchestration policy) and CLAUDE.project.md
