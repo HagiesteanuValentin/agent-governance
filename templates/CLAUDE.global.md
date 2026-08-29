@@ -16,8 +16,8 @@ Two roles appear below:
   the session's model and burn the expensive quota. When you need a fact that is not in the
   sources of truth, or you want to keep the context clean (including in plan mode), launch
   `explorer` (cheap model, read-only) with a precise question. Allowed agents: `explorer`,
-  `implementer`, `implementer-max`, `scribe`, `auditor`, `design-lead`, `design-lead-expert`
-  (only via `/polish`) — nothing else without the operator's approval.
+  `implementer`, `implementer-max`, `implementer-sonnet`, `scribe`, `auditor`, `design-lead`,
+  `design-lead-expert` (only via `/polish`) — nothing else without the operator's approval.
 - Do not re-read files you have just written.
 
 ## Orchestration (the orchestrator plans, the worker model executes)
@@ -55,6 +55,13 @@ Two roles appear below:
   parallel briefs. The agent's turns and tokens are NOT a cost to save: its context dies at
   the end, only 1,500 characters reach main. A 200–300k token run that delivers complete is
   a win; a short one that leaves checks unrun is a loss (the operator has to step in).
+- `implementer-sonnet` (Sonnet 5, high effort, 200 calls) ONLY for briefs with a cheap
+  verifier (a `verifica-*.mjs` script, build, test, a grep that catches failure), no
+  debugging and no multi-file JS/TS logic: CSS, markup, config, docs, mechanical items,
+  verification scripts. Chosen AT PLAN TIME and written into the brief. Logic deviations at
+  audit → re-send to `implementer-max` (not a second Sonnet run); SendMessage to Sonnet only
+  for mechanical deviations (text/CSS/config). v1.3 test: cost, re-runs and `/rate` per run,
+  decision at ≥5 sessions.
 - Screenshots are compared by the agent, in its own context; it reports numbers and a
   conclusion. The orchestrator reads at most 1–2 final screenshots for the verdict, in the
   downscaled `*-small.png` variant, as late in the session as possible — every image read is
@@ -72,7 +79,8 @@ Two roles appear below:
 - Default ceilings: at most 2 re-sends to `implementer` on the same task (3 runs total) and
   at most 3 `explorer` runs per task, one at a time; SendMessage messages to a live agent
   are not re-sends — ceiling of 3 messages per agent. An agent stopped by `maxTurns` is a
-  signal that the brief is too big; split it, do not relaunch it unchanged.
+  signal that the brief is too big; split it, do not relaunch it unchanged. One
+  `implementer-sonnet` run per brief, counted in the 3 runs.
 - One brief = ONE verifiable delivery. The ceiling is on FILES and RISK, not on the item
   count: CSS/text items in the same file, with the same verification, go 8–10 together.
   Split when the brief touches more than ~6 files, mixes JS with CSS, or one item can break
@@ -87,9 +95,11 @@ Two roles appear below:
 - Audit, directly, 3 fixed commands: `git diff --stat` · diff against the deliveries of
   EARLIER briefs on the same file (a brief that revisits an item can delete lines delivered
   before) · one grep/screenshot per "unclear/risky" line in the agent's report. In main,
-  `git diff` ONLY with `--stat`; the diff content ALWAYS goes to `auditor` (not only past
-  200 lines / JS) — it reads the whole diff in its own context and reports deviations in at
-  most 1.5k characters; you read `git diff --stat` + the report + only the files it flags.
+  `git diff` ONLY with `--stat`; Threshold: `git diff --stat` with ≤150 changed lines
+  (added+removed) AND ≤3 files AND no `.js/.ts/.mjs/.astro` file with new logic → the
+  orchestrator reads the diff itself, ONCE, no re-reading; anything else → `auditor`. It
+  reads the whole diff in its own context and reports deviations in at most 1.5k characters;
+  you read `git diff --stat` + the report + only the files it flags.
   Plans under `docs/polish/*.md` are not read in main; the human-facing summary comes from
   the design-lead's report. The auditor dies with the delivery; only a re-audit after
   repairs on the same task continues the same agent.

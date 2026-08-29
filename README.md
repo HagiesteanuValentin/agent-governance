@@ -32,10 +32,14 @@ The orchestrator plans, writes briefs, audits diffs, reports. It does not write 
 else runs in a disposable subagent context on the cheapest model that can do the job. Only
 conclusions cross back.
 
-There are two executors. `implementer-max` (Opus, high effort, 200 calls) is the DEFAULT
+There are three executors. `implementer-max` (Opus, high effort, 200 calls) is the DEFAULT
 for any brief with logic, a refactor, or debugging. `implementer` (Opus, medium effort, 100
 calls) is for simple briefs — CSS, text, config — and for parallel briefs, up to 3 at once
-with disjoint file lists. Worker turns and tokens are not a cost to save: the worker's
+with disjoint file lists. `implementer-sonnet` (Sonnet 5, high effort, 200 calls) is chosen
+at plan time only for briefs with a cheap checker (a `verifica-*.mjs` script, build, test, a
+grep that catches failure) and no cross-file JS/TS debugging; a logic deviation at audit goes
+back to `implementer-max`, not a second Sonnet run. Worker turns and tokens are not a cost to
+save: the worker's
 context dies at the end of the run and only a ≤1,500-character report reaches the
 orchestrator. The plan file holds the briefs as `## Brief N` sections; the `Agent` prompt
 sent to the worker is ≤10 lines — the path to the plan file, "execute only section N," no
@@ -94,8 +98,9 @@ about it is a page.
 
 Audit itself is 3 fixed commands run by the orchestrator: `git diff --stat`, a diff against
 the earlier briefs on the same file, and one grep per "unclear/risky" line in the worker's
-report. The `auditor` agent is only used above ~200 diff lines, on the 3rd brief touching a
-file, or when JS is touched. Findings go back to the still-alive implementer via
+report. The `auditor` agent is used above a threshold — `git diff --stat` over 150 lines
+changed, more than 3 files, or any `.js/.ts/.mjs/.astro` file with new logic; below it the
+orchestrator reads the diff itself, once, no re-reading. Findings go back to the still-alive implementer via
 `SendMessage` — one message, near-zero bootstrap — instead of spawning a new run.
 
 **/polish (v1.2)**: design-lead writes the plan to a file (≤8k chars), orchestrator reads
@@ -214,13 +219,14 @@ session data never leaves the machine.
 
 ```
 agents/     the agent definitions (explorer, implementer, implementer-max,
-            scribe, auditor, design-lead, design-lead-expert) — model, effort,
-            maxTurns, allowed tools, fixed report format
+            implementer-sonnet, scribe, auditor, design-lead, design-lead-expert) — model,
+            effort, maxTurns, allowed tools, fixed report format
 commands/   slash commands (polish, rate) — mirrors ~/.claude/commands/
 hooks/      the five enforcement hooks + settings.example.json
 templates/  CLAUDE.global.md (orchestration policy) and CLAUDE.project.md
             (the sources-of-truth pattern for a project)
-tools/      session_metrics.py, the offline transcript analyzer, pricing.json, and
+tools/      session_metrics.py, the offline transcript analyzer, pricing.json (prices
+            re-checked 2026-08-30, cache write = 2× input, 1h TTL), and
             versions.json (workflow versions: name + start day or local minute; TRENDS.md groups
             sessions by version so you can compare before/after a workflow change;
             sessions before the first version are `older`)

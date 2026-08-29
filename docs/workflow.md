@@ -17,8 +17,9 @@ project has its own HANDOFF / PATTERNS / DECISIONS.
   | `explorer` | cheap | medium | 40 | read-only, brings facts with path:line |
   | `implementer` | expensive | medium | 100 | simple / parallel briefs |
   | `implementer-max` | expensive | high | 200 | default for any brief with logic |
+  | `implementer-sonnet` | cheap (sonnet) | high | 200 | briefs with a cheap checker only, no cross-file JS/TS debugging |
   | `scribe` | cheap | low | 40 | docs, renames, one-line fixes |
-  | `auditor` | expensive | high | 60 | read-only, diffs over ~200 lines |
+  | `auditor` | expensive | high | 60 | read-only, diffs over 150 lines / 3 files / new JS logic |
   | `design-lead` | expensive | high | 60 | read-only + one plan file; gets paths and section headings, does not delegate; only via /polish |
   | `design-lead-expert` | expensive (opus) | xhigh | 50 | read-only + one plan file; two phases: concepts without data, then synthesis with measurements; gets a dossier (paths + line ranges) from an explorer and measurements from an implementer; reads fragments only; chosen by the router in /polish |
 
@@ -61,7 +62,8 @@ Two design notes:
 1. A ceiling on agent reports: 25 lines AND 1,500 characters, plus the `raport-lung.sh` hook.
 2. New comments only for constraints that are invisible in the code; existing ones stay.
 3. Briefs give paths, not pasted code; split into phases above ~5 points / ~6 files.
-4. Auditing: `git diff --stat` first; over ~200 lines → the auditor agent; no `cat` on whole
+4. Auditing: `git diff --stat` first; over 150 lines, or over 3 files, or new `.js/.ts/.mjs/.astro`
+   logic → the auditor agent; otherwise the orchestrator reads the diff itself, once; no `cat` on whole
    files; no Read on `tool-results/`.
 5. `implementer` maxTurns lowered 200 → 100.
 6. `/polish` post-mortem (Aug 2026): design-lead and scribe get file paths and section
