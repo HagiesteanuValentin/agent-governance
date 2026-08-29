@@ -45,7 +45,10 @@ lists anything it could not run, and why, on a `NOT RUN` line of the fixed repor
 
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000
-characters, demanding the compressed fixed format. A `PreToolUse` hook on `Read` warns when
+characters, demanding the compressed fixed format — but the hook only fires for foreground
+agents; agents launched in the background (the default here) bypass it — measured
+2026-08-29, a 3.2k report went through untouched — so the cap is enforced by the brief's
+report format, and the metric (`long_agent_report`) shows how often it holds. A `PreToolUse` hook on `Read` warns when
 the orchestrator reads a 300+ line file without `offset`/`limit`. Another on `Agent` warns
 when a brief exceeds 7,000 characters — the signal that one brief is really three.
 
@@ -120,8 +123,8 @@ does not drift.
 | auditor | no auditor role existed | **1,586** |
 | worst hand-logged report | 11,756 chars | — |
 
-Both governed reports land under the 2,000-character threshold the `SubagentStop` hook
-enforces. The before corpus totals 4,638,329 output tokens against 717M cache-read tokens
+Both governed reports land under the 2,000-character cap set by the brief's report format.
+The before corpus totals 4,638,329 output tokens against 717M cache-read tokens
 (~$687 estimated), and **22 of its 36 sessions show 0% subagent output** — all the work done
 in the orchestrator's own context.
 
