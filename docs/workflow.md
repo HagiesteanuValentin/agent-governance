@@ -143,7 +143,7 @@ It reports, per session: input/output/cache tokens per model, estimated cost fro
 `tools/pricing.json`, the share of output produced in sidechains (subagents), a per-agent
 table with the final-report length in characters, the largest `tool_result` payloads, files
 read more than once, and images read. `tools/versions.json` holds workflow versions (name +
-start day); `TRENDS.md` groups sessions by version so you can compare before/after a
+start day, or a local minute `YYYY-MM-DDTHH:MM`); `TRENDS.md` groups sessions by version so you can compare before/after a
 workflow change, and sessions before the first version are `older`. Moving a boundary in
 `versions.json` and re-running `--trends` also rewrites the `version` field in every session's
 `.json`/`.md`, so the files stay consistent with `TRENDS.md`.

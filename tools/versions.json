@@ -1,5 +1,5 @@
 {
-  "_note": "Workflow versions. A session belongs to the last version whose 'from' (local day, YYYY-MM-DD) is <= the session's start day. Sessions before the first 'from' are 'older'. Add a line for each new version.",
+  "_note": "Workflow versions. A session belongs to the last version whose 'from' <= the session's local start. 'from' is a local day (YYYY-MM-DD) or a local minute (YYYY-MM-DDTHH:MM) when a version starts mid-day. Sessions before the first 'from' are 'older'. Add a line for each new version.",
   "versions": [
     {
       "name": "v1.0",
@@ -11,7 +11,7 @@
     },
     {
       "name": "v1.2",
-      "from": "2026-08-29"
+      "from": "2026-08-29T09:20"
     }
   ]
 }

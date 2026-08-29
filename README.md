@@ -213,7 +213,7 @@ hooks/      the five enforcement hooks + settings.example.json
 templates/  CLAUDE.global.md (orchestration policy) and CLAUDE.project.md
             (the sources-of-truth pattern for a project)
 tools/      session_metrics.py, the offline transcript analyzer, pricing.json, and
-            versions.json (workflow versions: name + start day; TRENDS.md groups
+            versions.json (workflow versions: name + start day or local minute; TRENDS.md groups
             sessions by version so you can compare before/after a workflow change;
             sessions before the first version are `older`)
 docs/       workflow.md — architecture, thresholds, what is measured, how

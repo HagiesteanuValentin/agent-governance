@@ -206,13 +206,17 @@ def load_versions(path):
 
 
 def version_of(started, versions):
-    """Last version whose 'from' <= the session's local start day; 'older' before the first."""
+    """Last version whose 'from' <= the session's local start; 'older' before the first.
+    'from' is a local day (YYYY-MM-DD) or a local minute (YYYY-MM-DDTHH:MM) for a version
+    that starts mid-day, so the session that wrote the rules stays in the previous one."""
     day = local_day(started)
     if day == "?":
         return VERSION_OLDER
+    minute = local_str(started, "%Y-%m-%dT%H:%M")
     name = VERSION_OLDER
     for v in versions:
-        if day >= v["from"]:
+        key = minute if "T" in v["from"] else day
+        if key >= v["from"]:
             name = v["name"]
         else:
             break
