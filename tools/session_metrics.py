@@ -578,12 +578,19 @@ def slash_name(content):
     return None
 
 
+ASYNC_LAUNCH_RE = re.compile(r"Async agent launched|Resuming agent|running in the background|will be notified")
+
+
 def human_side_kind(obj, msg, agent_call_ids):
     """What the human side sent before an API call: a prompt, a notification, or a result."""
-    ids = [b.get("tool_use_id") for b in blocks(msg) if b.get("type") == "tool_result"]
-    if ids:
-        if any(isinstance(i, str) and i in agent_call_ids for i in ids):
-            return "agent_result"
+    results = [b for b in blocks(msg) if b.get("type") == "tool_result"]
+    if results:
+        for b in results:
+            # only a launch that returned immediately forces main to end its turn; a
+            # synchronous agent (background: false) returns its report like any tool
+            if (isinstance(b.get("tool_use_id"), str) and b["tool_use_id"] in agent_call_ids
+                    and ASYNC_LAUNCH_RE.search(text_of(b.get("content")) or "")):
+                return "agent_result"
         return "tool_result"
     content = msg.get("content")
     txt = content if isinstance(content, str) else text_of(content)
