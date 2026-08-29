@@ -98,18 +98,18 @@ report. The `auditor` agent is only used above ~200 diff lines, on the 3rd brief
 file, or when JS is touched. Findings go back to the still-alive implementer via
 `SendMessage` — one message, near-zero bootstrap — instead of spawning a new run.
 
-**/polish (v1.1)**: design-lead writes the plan to a file (≤8k chars), orchestrator reads
+**/polish (v1.2)**: design-lead writes the plan to a file (≤8k chars), orchestrator reads
 only its ≤1.5k report; a router picks the lead — `design-lead` (expensive model) for
-components with clear paths, `design-lead-expert` (orchestrator-tier model) for targets
-needing direction/taste; large or taste targets take the long route: explorer writes a
-dossier (paths + line ranges), implementer writes and runs the measurement script, the lead
-reads only the dossier, the numbers and 3 small screenshots, with at most 5 extra reads
-reported back — so the expensive lead never reads whole files or writes Playwright.
-
-**v1.2**: `design-lead-expert` moved to Opus 5 xhigh, in two phases: concepts without data
-(3 fixed concepts, ≤6k chars), then synthesis with measurements (one backbone concept plus
-borrowed parts, plan ≤10k chars). Phase A runs in parallel with the implementer's
-measurement script; Phase B resumes the same agent via `SendMessage`, no second launch.
+components with clear paths, `design-lead-expert` (orchestrator-tier model, Opus 5 xhigh)
+for targets needing direction/taste. The long route (2a explorer → 2b implementer ∥ 2c
+expert Phase A → 2d SendMessage Phase B): explorer writes a dossier (paths + line ranges);
+implementer writes and runs the measurement script, in parallel with the expert's Phase A,
+which writes 3 fixed concepts without data (C1/C2/C3, so "safe" is not an option); Phase B
+resumes the same agent via `SendMessage` (no second launch) for synthesis — a backbone
+concept plus borrowed parts, with numbers from the measurement script. The orchestrator
+reviews the plan against DECISIONS/budget and does the steering by text, not the design.
+History: v1.1 (2026-08-28) added the router and the long route; v1.2 (2026-08-29) moved
+the expert to Opus 5 xhigh and split it into the two phases above.
 
 ## Measured results
 
