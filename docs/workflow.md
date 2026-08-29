@@ -20,7 +20,7 @@ project has its own HANDOFF / PATTERNS / DECISIONS.
   | `scribe` | cheap | low | 40 | docs, renames, one-line fixes |
   | `auditor` | expensive | high | 60 | read-only, diffs over ~200 lines |
   | `design-lead` | expensive | high | 60 | read-only + one plan file; gets paths and section headings, does not delegate; only via /polish |
-  | `design-lead-expert` | orchestrator-tier | high | 40 | read-only + one plan file; gets a dossier (paths + line ranges) from an explorer and measurements from an implementer; reads fragments only; chosen by the router in /polish |
+  | `design-lead-expert` | expensive (opus) | xhigh | 50 | read-only + one plan file; two phases: concepts without data, then synthesis with measurements; gets a dossier (paths + line ranges) from an explorer and measurements from an implementer; reads fragments only; chosen by the router in /polish |
 
 - The auditor dies with the delivery and is respawned for the next one. The exception: a
   re-audit after repairs on the SAME task continues the same agent, which already has the
@@ -85,6 +85,12 @@ Two design notes:
    cut/added note after the operator summary; a "different direction" verdict renames the
    plan to `.v<n>.md` and reuses the dossier/measurements. The long route is chosen by target
    size (site / unclear paths) or by the expert lead.
+10. `design-lead-expert` moved to Opus 5 xhigh, in two phases: Phase A writes 3 concepts
+   without data (concepts run alongside the measurements, in parallel with implementer 2b);
+   Phase B, triggered by a `SendMessage` (no new agent launch), reads the measurements and
+   synthesizes one backbone concept plus borrowed parts into the plan. Motivated by a
+   post-mortem: anti-safe requests still produced 5-9 item, delta-only plans on the previous
+   single-phase flow.
 
 ## What gets measured
 

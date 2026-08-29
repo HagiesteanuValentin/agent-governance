@@ -12,9 +12,10 @@ your head. The flow, in order:
    Gather for the brief: the target exactly as the
    operator said it, the URL, the paths of the sources of truth that exist (CLAUDE.md,
    docs/DECISIONS.md, PATTERNS.md, docs/RECIPES.md), the breakpoints from CLAUDE.md if you
-   know them.
+   know them. Concepts path: `docs/polish/<target-slug>.concepts.md` (only the expert uses
+   it).
    Choosing the design lead, BEFORE any explorer. `lead=` forces it. Otherwise
-   `design-lead-expert` (Fable) on ≥1 signal: (a) the target is a site / whole page or the
+   `design-lead-expert` (Opus 5 xhigh, two phases) on ≥1 signal: (a) the target is a site / whole page or the
    request is about direction ("premium", "identity", "atmosphere", "I don't like it"), with
    no concrete defect named; (b) material, texture, image, blend, mask; (c) round 2 after
    "different direction"; (d) ≤1 relevant section found in DECISIONS/PATTERNS (the target is
@@ -50,7 +51,7 @@ your head. The flow, in order:
    image retouching, filter) gets a 5-minute PROOF on the real file, with the result in the
    item; otherwise the item is marked "feasibility unproven" and the orchestrator treats it
    as a question, not as an item.
-   LONG ROUTE — three agents in series, no text from you between them:
+   LONG ROUTE — 2a, then 2b ∥ 2c, then 2d; no text from you between them:
    2a. `explorer` → writes `docs/polish/<slug>.dossier.md` (≤3,000 characters): the target's
        paths with line counts, direct imports (one level), for every relevant section from
        CLAUDE.md / DECISIONS / PATTERNS / RECIPES a `file:from-to`, the path of tokens/theme,
@@ -62,10 +63,24 @@ your head. The flow, in order:
        three `-small.png` screenshots). Takes the selectors from the dossier. Does not
        propose items. No URL → just the script with the screenshot part commented out and a
        "no live" line in the measurements.
-   2c. the design lead chosen in step 1 (`design-lead` opus or `design-lead-expert`) → the
-       brief on the long route is the same for both: the goal, the target, the paths of the
-       two files, the plan path, the reason from `Lead:`, breakpoints. You do not give it code
-       paths and do not copy sections in — they are in the dossier.
+   2c. ONLY when the lead is the expert: `design-lead-expert`, Phase A, launched in the SAME
+       message as 2b. Brief: the goal, the target, the dossier path, the path of
+       `docs/polish/<slug>.concepts.md`, the plan path, the reason from `Lead:`, breakpoints.
+       No measurements, no code paths, no copied sections — they are in the dossier. The
+       exception to "one agent at a time" is declared here: the files are disjoint
+       (implementer: `scripts/verify-<slug>.mjs`, `measurements.md`, screenshots; expert:
+       `.concepts.md`), only the implementer runs a browser, neither depends on the other's
+       result. On the first result notification write one line, no action; on the second move
+       to 2d, in the same message.
+   2d. `SendMessage` to the expert, on the agentId from launch 2c, ≤5 lines: "Phase B", the
+       `measurements.md` path, the plan path. A finished subagent resumes automatically on
+       `SendMessage`, with its full context (docs "Resume subagents"); do NOT launch a second
+       `design-lead-expert` — that was yesterday's mistake (2 launches, 0 SendMessage).
+       When the lead is `design-lead` (opus): 2a → 2b → then the design lead, in series, a
+       single phase, no concepts; brief: the goal, the target, the paths of the two files, the
+       plan path, the reason from `Lead:`, breakpoints.
+       No URL: the implementer delivers the script with the screenshot part commented out and
+       "no live" in the measurements; Phase B runs without screenshots.
 3. Adversarial review (you). Read the plan file ONCE. Against:
    DECISIONS (rejected items reintroduced? ceilings?), the JS/CSS budget, the scope the
    operator asked for, the dimensions checklist (a dimension marked "OK" without evidence →
@@ -77,20 +92,29 @@ your head. The flow, in order:
    that every numeric acceptance has a guard in words; missing → ask for it in one
    SendMessage to the live design-lead.
    Plan from `design-lead-expert`: the review is ONLY against DECISIONS / budget / the
-   operator's scope / missing dimensions — you do not rewrite taste items. On the long route
-   (either lead), `READ BEYOND DOSSIER` non-empty → note it in the final report: the dossier
-   was incomplete, fix the explorer's brief next time.
+   operator's scope / missing dimensions — you do not rewrite taste items. Plus four
+   objective checks (not taste): a `## Synthesis` section exists; the backbone concept is not
+   "the page as it is + fixes"; at least one MUST has `From:` = the backbone concept; every
+   element from "What looks different" of the backbone that survived synthesis has an item
+   (otherwise it goes to "Rejected", with a reason). Missing one → a `SendMessage` to the
+   live expert (counts in the 3-messages-per-agent ceiling).
+   On the long route (either lead), `READ BEYOND DOSSIER` non-empty → note it in the final
+   report: the dossier was incomplete, fix the explorer's brief next time.
 4. The operator's OK. You do NOT read `docs/polish/<target-slug>.md` (no `cat`, `sed`, or
-   `wc`) to produce this summary. Show the operator, verbatim, the SUMMARY FOR THE OPERATOR
-   section from the design-lead's own report — it already groups the items by visible element
-   (button, card, menu, section spacing…), one line per element in plain language with the
-   item numbers in brackets, MUST/SHOULD/COULD as group headings, no technical terms, at most
-   15 lines — plus its CUT/ADDED BY YOU line and the plan path.
+   `wc`) to produce this summary. Plan from the expert: before the summary show the 3
+   `SYNTHESIS:` lines from the report. Show the operator, verbatim, the SUMMARY FOR THE
+   OPERATOR section from the design-lead's own report — it already groups the items by
+   visible element (button, card, menu, section spacing…), one line per element in plain
+   language with the item numbers in brackets, MUST/SHOULD/COULD as group headings, no
+   technical terms, at most 15 lines — plus its CUT/ADDED BY YOU line and the plan path.
    After its summary add ONE line of your own: "Cut/added by the orchestrator: P<n> (reason) /
    none".
    Wait for: approve all / cut / add. Their changes go into the file before step 5 (ask an
    `explorer` with the item number to apply a change if you need to check the item first;
-   never read the plan yourself).
+   never read the plan yourself). Direction-level replies ("more from C3", "make the backbone
+   C2", "cut X") go to the SAME live expert via `SendMessage` → it rewrites the plan; you do
+   not launch another lead. Ceiling: 2 such messages per /polish (a 3rd is the CLAUDE.md
+   ceiling).
 5. Implementation. Split the approved items into sequential briefs under the normal rules
    (ceiling on files and risk, not on count: CSS items in the same file go 8–10 at a time;
    ≤6 files; JS separate from CSS; MUST first). The verification script comes from the
@@ -122,10 +146,13 @@ your head. The flow, in order:
    a new one in the SAME file and go straight to step 5. The design lead is relaunched only
    if the operator asks for a different design direction, not for remaining items.
    "Different direction" → rename the plan to `docs/polish/<slug>.v<n>.md`, then step 1 with
-   signal (c) active. The dossier and measurements are reused if the target is the same —
-   you do not relaunch 2a/2b.
+   signal (c) active. The dossier, measurements, and `.concepts.md` are reused if the target
+   is the same — you do not relaunch 2a/2b. The new expert starts directly in Phase B, with
+   the backbone named by the operator (or the remaining concept); Phase A is only redone if
+   the operator asks for new concepts.
 
 Ceilings per /polish: 1 design lead (`design-lead` or `design-lead-expert`); the long route
-= explorer + implementer + the chosen lead, not counted in the 3 implementation briefs; ≤2
-explorers total; ≤3 implementation briefs without a new OK from the operator. Final report
-as usual.
+= explorer + implementer + the chosen lead (the expert in two phases, one launch, at most 3
+`SendMessage`), not counted in the 3 implementation briefs; ≤2 agents in parallel on the long
+route; ≤2 explorers total; ≤3 implementation briefs without a new OK from the operator. Final
+report as usual.

@@ -106,6 +106,11 @@ dossier (paths + line ranges), implementer writes and runs the measurement scrip
 reads only the dossier, the numbers and 3 small screenshots, with at most 5 extra reads
 reported back — so the expensive lead never reads whole files or writes Playwright.
 
+**v1.2**: `design-lead-expert` moved to Opus 5 xhigh, in two phases: concepts without data
+(3 fixed concepts, ≤6k chars), then synthesis with measurements (one backbone concept plus
+borrowed parts, plan ≤10k chars). Phase A runs in parallel with the implementer's
+measurement script; Phase B resumes the same agent via `SendMessage`, no second launch.
+
 ## Measured results
 
 From `metrics/baseline-2026-08.md`. `project-a` is a 36-session frontend project that ran

@@ -63,7 +63,7 @@ Dimensions (mandatory checklist):
 Plan format (the file):
 # Polish — <target> — <date>
 State: v1 design-lead
-Lead: opus|fable — <the reason for the choice, one line; you get it in the brief>
+Lead: opus|expert — <the reason for the choice, one line; you get it in the brief>
 Target: <exact files, URL>
 Sources read: <DECISIONS sections, PATTERNS, screenshots + breakpoints>
 Script: `scripts/verify-<slug>.mjs`
