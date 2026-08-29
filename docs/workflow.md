@@ -46,7 +46,7 @@ Registered in `settings.json` (see `hooks/settings.example.json`).
 | `session-start.sh` | SessionStart | — | injects `HANDOFF*.md` from the project root |
 | `read-mare.sh` | PreToolUse / Read | >300 lines, or an image without `-small` | reminder, does not block |
 | `brief-mare.sh` | PreToolUse / Agent | brief >7,000 characters | reminder: "split it into phases" |
-| `raport-lung.sh` | SubagentStop | final report >2,000 characters | blocks once, asks for compression (foreground agents only; background agents bypass it) |
+| `raport-lung.sh` | SubagentStop | final report >2,000 characters | blocks once, asks for compression (background agents too — verified 2026-08-30 after switching the output to `hookSpecificOutput` + `last_assistant_message`) |
 | `session-metrics.sh` | SessionEnd | — | runs the offline analyzer, zero tokens |
 
 Two design notes:
