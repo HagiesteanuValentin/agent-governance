@@ -6,7 +6,12 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/session-start.sh",
+            "command": "$HOME/.claude/hooks/session-start.sh rules",
+            "statusMessage": "Injecting orchestration"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/session-start.sh handoff",
             "statusMessage": "Reading HANDOFF.md"
           }
         ]
