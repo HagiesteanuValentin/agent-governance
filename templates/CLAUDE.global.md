@@ -16,8 +16,9 @@ Two roles appear below:
   the session's model and burn the expensive quota. When you need a fact that is not in the
   sources of truth, or you want to keep the context clean (including in plan mode), launch
   `explorer` (cheap model, read-only) with a precise question. Allowed agents: `explorer`,
-  `implementer`, `implementer-max`, `implementer-sonnet`, `scribe`, `auditor`, `design-lead`,
-  `design-lead-expert` (only via `/polish`) — nothing else without the operator's approval.
+  `implementer`, `implementer-max`, `implementer-sonnet`, `scripter`, `scripter-complex`,
+  `scribe`, `auditor`, `design-lead`, `design-lead-expert` (only via `/polish`) — nothing
+  else without the operator's approval.
 - Do not re-read files you have just written.
 
 ## Orchestration (the orchestrator plans, the worker model executes)
@@ -73,6 +74,22 @@ Two roles appear below:
   (a) a re-send after a failed audit on the same brief, or (b) debugging declared at plan
   time with a written reason. It carries the same context thresholds as any brief —
   maxTurns 120 is not an exemption from the 150k/220k hook.
+- Scripter before repetitive work: at plan time, if a brief has ≥8 changes with the same
+  pattern across ≥4 files, screenshots/measurements across ≥3 states or widths, or a check
+  that will run in ≥2 briefs → the first brief goes to `scripter` (cheap model, high
+  effort, maxTurns 80): it writes the script under `scripts/`, runs it (dry-run → one-file
+  proof → full run → idempotency check), and adds a row to `scripts/SCRIPTS.md`.
+  `scripter-complex` (worker model, medium effort, maxTurns 100) when the transform needs
+  parsing (AST, multiline regex, frontmatter/JSON), per-file conditions, multi-file JS/TS
+  logic, or a verifier that is not a simple exit code. Before writing the brief, read
+  `scripts/SCRIPTS.md` (≤40 lines): a script marked "adaptability: easy" means the brief
+  asks for adapting it, not writing a new one. The scripter brief gives ≥2 before/after
+  examples and the definition of done in numbers (n files, m matches). The implementer that
+  follows gets the script's path plus only the non-mechanical leftovers. A failed verifier
+  after a SendMessage goes to `implementer-max`, not a second scripter run. A scripter run
+  counts toward the 3-run cap per task. Reason (one day's transcripts): 6 repetitive runs
+  cost $79 — manual find/replace ×38 on one CSS file by hand, a verifier run by hand ×21
+  times, a script rebuilt from 24 incremental edits.
 - Screenshots are compared by the agent, in its own context; it reports numbers and a
   conclusion. The orchestrator reads at most 1–2 final screenshots for the verdict, in the
   downscaled `*-small.png` variant, as late in the session as possible — every image read is

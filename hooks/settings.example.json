@@ -32,7 +32,7 @@
         ]
       },
       {
-        "_note": "implementer* sub-agents only: warns once at 150000 tokens of context, denies every tool except Bash at 220000",
+        "_note": "implementer*/scripter* sub-agents only: warns once at 150000 tokens of context, denies every tool except Bash at 220000",
         "matcher": "*",
         "hooks": [
           {

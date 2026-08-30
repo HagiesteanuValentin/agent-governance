@@ -159,6 +159,11 @@ case("implementer-max warned too", CTX_HOOK,
 case("implementer-sonnet 230k Edit -> deny", CTX_HOOK,
      ctx_in(SUB[230000], "a-%s-4" % RUN, "implementer-sonnet", "Edit"), "deny",
      "Context >=220k")
+case("scripter-complex 230k Edit -> deny", CTX_HOOK,
+     ctx_in(SUB[230000], "a-%s-4b" % RUN, "scripter-complex", "Edit"), "deny",
+     "Context >=220k")
+case("scripter 100k Edit -> allow", CTX_HOOK,
+     ctx_in(SUB[100000], "a-%s-4c" % RUN, "scripter", "Edit"), "allow")
 case("230k Read -> deny", CTX_HOOK,
      ctx_in(SUB[230000], "a-%s-5" % RUN, "implementer", "Read"), "deny", "only Bash")
 case("230k Bash -> allowed (warning first)", CTX_HOOK,

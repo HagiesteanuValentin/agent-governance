@@ -127,6 +127,14 @@ reviews the plan against DECISIONS/budget and does the steering by text, not the
 History: v1.1 (2026-08-28) added the router and the long route; v1.2 (2026-08-29) moved
 the expert to Opus 5 xhigh and split it into the two phases above.
 
+**Scripter before repetitive work (v1.4b)**: when a brief has the same edit repeated across
+many files, or a check that will run more than once, the first brief goes to `scripter`
+(cheap model, high effort) instead of straight to `implementer`. It writes a script under
+`scripts/`, runs it dry-run → one-file proof → full run → idempotency check, and logs it in
+`scripts/SCRIPTS.md` so the next brief can reuse or adapt it instead of writing a new one.
+Motive: one day's transcripts showed 6 repetitive runs costing $79 — manual find/replace
+by hand across a CSS file, and a verification script run by hand 21 times in one brief.
+
 ## Measured results
 
 From `metrics/baseline-2026-08.md`, regenerated 2026-08-30 over 51 kept sessions
@@ -231,12 +239,13 @@ session data never leaves the machine.
 
 ```
 agents/     the agent definitions (explorer, implementer, implementer-max,
-            implementer-sonnet, scribe, auditor, design-lead, design-lead-expert) — model,
-            effort, maxTurns, allowed tools, fixed report format
+            implementer-sonnet, scripter, scripter-complex, scribe, auditor, design-lead,
+            design-lead-expert) — model, effort, maxTurns, allowed tools, fixed report format
 commands/   slash commands (polish, rate) — mirrors ~/.claude/commands/
 hooks/      the six enforcement hooks + settings.example.json
-templates/  CLAUDE.global.md (orchestration policy) and CLAUDE.project.md
-            (the sources-of-truth pattern for a project)
+templates/  CLAUDE.global.md (orchestration policy), CLAUDE.project.md
+            (the sources-of-truth pattern for a project), and SCRIPTS.md (the
+            per-project reusable-script log the scripter agent keeps current)
 tools/      session_metrics.py, the offline transcript analyzer, pricing.json (prices
             re-checked 2026-08-30, cache write = 2× input, 1h TTL), and
             versions.json (workflow versions: name + start day or local minute; TRENDS.md groups

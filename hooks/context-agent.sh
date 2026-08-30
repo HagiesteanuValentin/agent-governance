@@ -1,5 +1,5 @@
 #!/bin/bash
-# PreToolUse in implementer* sub-agents only: reads the worker's own context size from the
+# PreToolUse in implementer*/scripter* sub-agents only: reads the worker's own context size from the
 # last assistant line of its transcript and wraps the run up before quality degrades
 # (measured v1.1-v1.2: tool_result errors 0.9% -> 5.1% and $/call doubled between the first
 # and the last quarter of the big runs).
@@ -19,7 +19,7 @@ MARKER_DIR = sys.argv[4]
 agent_id = d.get("agent_id")
 agent_type = d.get("agent_type") or ""
 # main has no agent_id; explorer/scribe/auditor/design-lead have their own budgets
-if not agent_id or not agent_type.startswith("implementer"):
+if not agent_id or not agent_type.startswith(("implementer", "scripter")):
     sys.exit(0)
 tp = d.get("transcript_path") or ""
 if not tp or not os.path.exists(tp):
