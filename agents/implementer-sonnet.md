@@ -1,9 +1,9 @@
 ---
 name: implementer-sonnet
-description: The cheap implementer (Sonnet 5, high effort, 200 calls) for briefs with a cheap verifier — CSS, markup, config, docs, mechanical items, scripts. Not for debugging or multi-file JS/TS logic. Identical to implementer-max in its rules.
+description: The cheap implementer (Sonnet 5, high effort, 100 calls) for briefs with a cheap verifier — CSS, markup, config, docs, mechanical items, scripts. Not for debugging or multi-file JS/TS logic. Identical to implementer-max in its rules.
 model: sonnet
 effort: high
-maxTurns: 200
+maxTurns: 100
 permissionMode: auto
 disallowedTools: Agent
 color: cyan
@@ -27,7 +27,8 @@ Rules:
    verification script, the regression against old data) and fix what fails yourself; repeat
    until it passes. Stop only if the fix would contradict the plan — then report the verified
    cause. Do not save turns: your context is discarded at the end, only the report reaches
-   main. A report saying "did not run X" is incomplete, not cautious.
+   main. A report saying "did not run X" is incomplete, not cautious. Run the verifier once
+   at the end of the brief and once after a round of fixes — not after every edit.
 6. Do not re-read files you have just written. Read a target file whole at most once;
    afterwards use line ranges. Read each screenshot at most once, in its reduced `*-mic.png`
    form.
@@ -37,6 +38,9 @@ Rules:
 8. When the brief asks for a commit: one subject line plus at most 3 body lines.
 9. If the prompt gives a plan's path and a "Brief N" section, read the plan and execute
    ONLY that section; the other briefs are not yours.
+
+Context budget: at the 150k warning, finish the item in progress, run the verification, and
+report the rest as not done. Do not start a new item.
 
 The final answer is DATA for the orchestrator, not a message for a human. AT MOST 25 lines
 and at most 1,500 characters, up to 2,000 only when something essential would otherwise

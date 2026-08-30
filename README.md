@@ -32,14 +32,14 @@ The orchestrator plans, writes briefs, audits diffs, reports. It does not write 
 else runs in a disposable subagent context on the cheapest model that can do the job. Only
 conclusions cross back.
 
-There are three executors. `implementer-max` (Opus, high effort, 200 calls) is the DEFAULT
-for any brief with logic, a refactor, or debugging. `implementer` (Opus, medium effort, 100
-calls) is for simple briefs — CSS, text, config — and for parallel briefs, up to 3 at once
-with disjoint file lists. `implementer-sonnet` (Sonnet 5, high effort, 200 calls) is chosen
+There are three executors. `implementer` (Opus, medium effort, 100 calls) is the DEFAULT for
+any brief, logic included. `implementer-sonnet` (Sonnet 5, high effort, 100 calls) is chosen
 at plan time only for briefs with a cheap checker (a `verifica-*.mjs` script, build, test, a
-grep that catches failure) and no cross-file JS/TS debugging; a logic deviation at audit goes
-back to `implementer-max`, not a second Sonnet run. Worker turns and tokens are not a cost to
-save: the worker's
+grep that catches failure) and no cross-file JS/TS debugging. `implementer-max` (Opus, high
+effort, 120 calls) is an escalation, not a default: only a re-send after a failed audit on
+the same brief, or debugging declared at plan time with a written reason; a logic deviation
+at audit on Sonnet work goes to `implementer-max`, not a second Sonnet run. Worker turns and
+tokens are not a cost to save: the worker's
 context dies at the end of the run and only a ≤1,500-character report reaches the
 orchestrator. The plan file holds the briefs as `## Brief N` sections; the `Agent` prompt
 sent to the worker is ≤10 lines — the path to the plan file, "execute only section N," no
@@ -49,9 +49,12 @@ lists anything it could not run, and why, on a `NOT RUN` line of the fixed repor
 
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000
-characters, demanding the compressed fixed format — it fires for background agents too (verified 2026-08-30; the earlier version was silently ignored because it emitted a top-level `decision` instead of `hookSpecificOutput`); the cap is enforced by the brief's report format, and the metric (`long_agent_report`) shows how often it holds. A `PreToolUse` hook on `Read` warns when
-the orchestrator reads a 300+ line file without `offset`/`limit`. Another on `Agent` warns
-when a brief exceeds 7,000 characters — the signal that one brief is really three.
+characters, demanding the compressed fixed format — it fires for background agents too (verified 2026-08-30; the earlier version was silently ignored because it emitted a top-level `decision` instead of `hookSpecificOutput`); the cap is enforced by the brief's report format, and the metric (`long_agent_report`) shows how often it holds. A `PreToolUse` hook on `Read`
+denies re-reading a file already read in main, and denies a 300+ line read without
+`offset`/`limit` (plans and images stay a warning). Another on `Agent` warns
+when a brief exceeds 7,000 characters — the signal that one brief is really three. A third,
+`context-agent.sh`, tracks a subagent's own context: a reminder at 150k to wrap up, a deny
+on every tool but `Bash` at 220k.
 
 **3. Telemetry — offline, zero tokens.**
 A `SessionEnd` hook runs a plain-Python analyzer over the session's JSONL transcript and
@@ -97,7 +100,9 @@ Audit itself is 3 fixed commands run by the orchestrator: `git diff --stat`, a d
 the earlier briefs on the same file, and one grep per "unclear/risky" line in the worker's
 report. The `auditor` agent is used above a threshold — `git diff --stat` over 150 lines
 changed, more than 3 files, or any `.js/.ts/.mjs/.astro` file with new logic; below it the
-orchestrator reads the diff itself, once, no re-reading. Findings go back to the still-alive implementer via
+orchestrator reads the diff itself, once, no re-reading. The auditor fixes mechanical
+deviations directly (≤20 lines/file, ≤3 files, no new logic) and reports them as `FIXED`
+with the hunk; the rest go back to the still-alive implementer via
 `SendMessage` — one message, near-zero bootstrap — instead of spawning a new run.
 
 **/polish (v1.2)**: design-lead writes the plan to a file (≤8k chars), orchestrator reads
@@ -216,7 +221,7 @@ agents/     the agent definitions (explorer, implementer, implementer-max,
             implementer-sonnet, scribe, auditor, design-lead, design-lead-expert) — model,
             effort, maxTurns, allowed tools, fixed report format
 commands/   slash commands (polish, rate) — mirrors ~/.claude/commands/
-hooks/      the five enforcement hooks + settings.example.json
+hooks/      the six enforcement hooks + settings.example.json
 templates/  CLAUDE.global.md (orchestration policy) and CLAUDE.project.md
             (the sources-of-truth pattern for a project)
 tools/      session_metrics.py, the offline transcript analyzer, pricing.json (prices

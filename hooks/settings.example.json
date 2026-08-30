@@ -30,6 +30,16 @@
             "command": "$HOME/.claude/hooks/brief-mare.sh"
           }
         ]
+      },
+      {
+        "_note": "implementer* sub-agents only: warns once at 150000 tokens of context, denies every tool except Bash at 220000",
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/context-agent.sh"
+          }
+        ]
       }
     ],
     "SubagentStop": [

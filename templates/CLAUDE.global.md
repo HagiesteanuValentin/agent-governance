@@ -41,27 +41,38 @@ Two roles appear below:
 - The flow: (1) plan mode → the operator approves the plan; (2) send the plan to
   `implementer` as a BRIEF; (3) receive the report, audit the diff (on large diffs, through
   `auditor`) against the audit criteria (DECISIONS, definition of done, verifications);
-  (4) audit deviations all go, in a single message, to the same implementer via
-  SendMessage (its context is alive; ~0 bootstrap versus ~40-50k for a new run); you fix
+  (4) the auditor fixes mechanical deviations directly (≤20 lines/file, ≤3 files, no new
+  logic) and reports them as `FIXED` with the hunk; the rest all go, in a single message, to
+  the same implementer via SendMessage (its context is alive; ~0 bootstrap versus ~40-50k
+  for a new run) — the first re-send after a failed audit goes to `implementer-max`; you fix
   directly only an isolated deviation, under ~20 lines in one file, when that is faster than
   the message; (5) only then the final report.
 - Light tasks (docs, HANDOFF, renames, one-line fixes, typos) → `scribe`. The scribe gets
   the target SECTIONS (heading name, maybe a line range), not whole files; it does not read
   docs end to end.
-- `implementer-max` (high effort, 200 calls) is the DEFAULT for any brief with logic
-  (JS/TS/Python/SQL), a refactor, debugging, ≥4 items with separate acceptance criteria, or
-  one that touches a file delivered by an earlier brief in the same task. `implementer`
-  (medium effort) is only for simple briefs — CSS/text/config, trivial items — and for
-  parallel briefs. The agent's turns and tokens are NOT a cost to save: its context dies at
-  the end, only 1,500 characters reach main. A 200–300k token run that delivers complete is
-  a win; a short one that leaves checks unrun is a loss (the operator has to step in).
-- `implementer-sonnet` (Sonnet 5, high effort, 200 calls) ONLY for briefs with a cheap
+- `implementer` (Opus, medium effort, maxTurns 100) is the DEFAULT for any brief, logic
+  included. A brief ≈ ≤150k of the agent's context ≈ ≤~60 calls; the hook wraps it up at
+  150k and blocks at 220k — split oversized briefs AT PLAN TIME; run the verifier once at
+  the end of the brief and once after a round of fixes, not after every edit, screenshots
+  only if the brief asks for them (12% of verifications led to a fix; 41% of the agent's
+  output is verification); up to 3 in parallel with
+  disjoint file lists. The agent's turns and tokens are NOT a cost to save: its context dies
+  at the end, only 1,500 characters reach main. A run that delivers complete under 150k is a
+  win; a short one that leaves checks unrun is a loss (the operator has to step in) — but past
+  150k the hook closes out the brief, so length is decided at plan time, not mid-run.
+  Reason (numbers from 30.08): tool_result errors 0.9%→5.1% and $/call doubling between Q1
+  and Q4 on large runs; Anthropic: medium is −2 points at half the cost of high, and
+  "low/medium + re-run on failure" matches high's success rate.
+- `implementer-sonnet` (Sonnet 5, high effort, maxTurns 100) ONLY for briefs with a cheap
   verifier (a `verifica-*.mjs` script, build, test, a grep that catches failure), no
   debugging and no multi-file JS/TS logic: CSS, markup, config, docs, mechanical items,
   verification scripts. Chosen AT PLAN TIME and written into the brief. Logic deviations at
   audit → re-send to `implementer-max` (not a second Sonnet run); SendMessage to Sonnet only
-  for mechanical deviations (text/CSS/config). v1.3 test: cost, re-runs and `/rate` per run,
-  decision at ≥5 sessions.
+  for mechanical deviations (text/CSS/config).
+- `implementer-max` (Opus, high effort, maxTurns 120) is an ESCALATION, not a default: ONLY
+  (a) a re-send after a failed audit on the same brief, or (b) debugging declared at plan
+  time with a written reason. It carries the same context thresholds as any brief —
+  maxTurns 120 is not an exemption from the 150k/220k hook.
 - Screenshots are compared by the agent, in its own context; it reports numbers and a
   conclusion. The orchestrator reads at most 1–2 final screenshots for the verdict, in the
   downscaled `*-small.png` variant, as late in the session as possible — every image read is
@@ -76,7 +87,8 @@ Two roles appear below:
   guaranteed disjoint or a risky delivery you want to be able to throw away: it costs the
   dependencies installed on the copy + a merge you audit yourself; it does not solve
   dependencies between briefs.
-- Default ceilings: at most 2 re-sends to `implementer` on the same task (3 runs total) and
+- Default ceilings: at most 2 re-sends to `implementer` on the same task (3 runs total; the
+  first re-send after a failed audit goes to `implementer-max`) and
   at most 3 `explorer` runs per task, one at a time; SendMessage messages to a live agent
   are not re-sends — ceiling of 3 messages per agent. An agent stopped by `maxTurns` is a
   signal that the brief is too big; split it, do not relaunch it unchanged. One

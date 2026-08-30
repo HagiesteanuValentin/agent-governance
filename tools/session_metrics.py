@@ -63,6 +63,9 @@ THRESHOLDS = {
     "batchable_calls": 3,            # consecutive one-Bash API calls that could be one
     "batchable_chars": 2000,         # ...and together return less than this
     "plan_echo_chars": 8000,         # ExitPlanMode result echoed back into main
+    "agent_peak_ctx": 200000,        # worker context past the measured degradation band
+    "sterile_verify_calls": 6,       # verification runs below which the ratio says nothing
+    "sterile_verify_ratio": 0.2,     # share of verifications that led to a fix
 }
 
 FLAG_TEXT = {
@@ -86,6 +89,8 @@ FLAG_TEXT = {
                        "re-sent for nothing); launch-structural calls are counted, not taxed",
     "batchable_bash": "consecutive Bash calls that fit in one call",
     "plan_echo": "plan echoed back into main as a tool_result",
+    "sterile_verification": "worker re-ran the checker without it catching anything",
+    "agent_ctx_high": "worker context past the degradation threshold",
 }
 
 # base gravity per code; wasted tokens can only push it up (see severity_of)
@@ -96,6 +101,7 @@ SEVERITY_BASE = {
     "agent_max_turns": "high",
     "agent_no_report": "high",
     "too_many_runs": "high",
+    "agent_ctx_high": "high",
     "big_tool_result_main": "medium",
     "reread": "medium",
     "main_read_files": "medium",
@@ -103,6 +109,7 @@ SEVERITY_BASE = {
     "cache_churn_main": "medium",
     "long_brief": "medium",
     "plan_echo": "medium",
+    "sterile_verification": "medium",
 }
 
 SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
@@ -135,6 +142,10 @@ RECOMMENDATION = {
     "batchable_bash": "{detail} - one Bash call chained with `;` / `&&`.",
     "plan_echo": "{detail} - keep the plan under 8k; briefs go in the plan file, the prompt "
                  "is path + section.",
+    "sterile_verification": "{detail} - run the checker once at the end and once after "
+                            "fixes, not after every edit.",
+    "agent_ctx_high": "{detail} - split the brief at plan time; the hook wraps the agent "
+                      "up at 150k.",
 }
 
 
@@ -764,6 +775,32 @@ def parse_file(path, label, tool_names, tool_inputs):
 
 # ---------------------------------------------------------------- derived
 
+# a Bash command that runs the brief's checker rather than exploring the code
+VERIFY_TOKENS = ("build", "test", "verifica", "playwright", "screenshot", "lint", "tsc",
+                 "astro check", "gzip", "wc -c", "npm run", "pnpm", "node scripts/", ".mjs")
+FIX_TOOLS = ("Edit", "Write", "NotebookEdit")
+
+
+def verification_calls(doc, tool_inputs, window=4):
+    """(runs of the checker, runs followed by a fix within `window` tool calls)."""
+    seq = []
+    for c in doc["calls"]:
+        for name, tid in zip(c["tool_names"], c["tool_ids"]):
+            inp = tool_inputs.get(tid) if tid else None
+            seq.append((name, inp if isinstance(inp, dict) else {}))
+    hits = []
+    for i, (name, inp) in enumerate(seq):
+        if name != "Bash":
+            continue
+        cmd = (inp.get("command") or "").lower()
+        if any(t in cmd for t in VERIFY_TOKENS):
+            hits.append(i)
+    fixed = sum(1 for i in hits
+                if any(seq[j][0] in FIX_TOOLS
+                       for j in range(i + 1, min(i + 1 + window, len(seq)))))
+    return len(hits), fixed
+
+
 def resolve_results(doc, tool_names, tool_inputs):
     out = []
     for r in doc["results"]:
@@ -1298,6 +1335,8 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
                 model = mc[0][0] if mc else "?"
             rows = resolve_results(doc, tool_names, tool_inputs)
         limit = turns_limit_for(wtype, agents_dir)
+        wctx = [c["ctx"] for c in doc["calls"]] if doc else []
+        vcalls, vfixed = verification_calls(doc, tool_inputs) if doc else (0, 0)
         api_calls = len(doc["calls"]) if doc else 0
         report_chars = len(doc["final_text"]) if doc else 0
         # a run killed by maxTurns never gets to write its report; saturation alone is not it
@@ -1316,6 +1355,10 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             "final_report_chars": report_chars,
             "tool_calls": len(rows),
             "reads": sum(doc["reads"].values()) if doc else 0,
+            "verify_calls": vcalls,
+            "verify_with_fix": vfixed,
+            "peak_ctx": max(wctx) if wctx else 0,
+            "ctx_at_end": wctx[-1] if wctx else 0,
             "max_turns_hit": bool(launch_id and launch_id in main_doc["max_turns_ids"])
                               or saturated,
             "transcript": path,
@@ -1436,6 +1479,20 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         if w["max_turns_hit"]:
             flags.append(flag("agent_max_turns", w["scope"],
                               "stopped by maxTurns - brief too large", None, 0))
+        if w["peak_ctx"] >= THRESHOLDS["agent_peak_ctx"]:
+            flags.append(flag("agent_ctx_high", w["scope"],
+                              "peak context %s (end %s)" % (tok(w["peak_ctx"]),
+                                                            tok(w["ctx_at_end"])),
+                              {"peak_ctx": w["peak_ctx"], "ctx_at_end": w["ctx_at_end"]}, 0))
+        if (w["type"].startswith("implementer")
+                and w["verify_calls"] >= THRESHOLDS["sterile_verify_calls"]
+                and w["verify_with_fix"] / float(w["verify_calls"])
+                < THRESHOLDS["sterile_verify_ratio"]):
+            flags.append(flag("sterile_verification", w["scope"],
+                              "%d verification runs, %d led to a fix"
+                              % (w["verify_calls"], w["verify_with_fix"]),
+                              {"verify_calls": w["verify_calls"],
+                               "verify_with_fix": w["verify_with_fix"]}, 0))
         if w["transcript"] and w["final_report_chars"] == 0 and not w["max_turns_hit"]:
             flags.append(flag("agent_no_report", w["scope"],
                               "ended without a final report", None, 0))
@@ -1657,15 +1714,19 @@ def session_report(s):
     if s["workers"]:
         out.append("## Workers")
         out.append("")
-        out.append("| # | type | model | start | dur | calls/limit | out tok | $ | brief | report | flags |")
-        out.append("|---:|---|---|---|---:|---:|---:|---:|---:|---:|---|")
+        out.append("| # | type | model | start | dur | calls/limit | peak ctx | verify | "
+                   "out tok | $ | brief | report | flags |")
+        out.append("|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|")
         for w in s["workers"]:
             codes = sorted(set(f["code"] for f in flags_by_scope(s, w["scope"])))
             calls = "%d/%s" % (w["api_calls"], w.get("turns_limit") or "?")
-            out.append("| %d | %s | %s | %s | %s | %s | %s | %.2f | %s | %s | %s |"
+            out.append("| %d | %s | %s | %s | %s | %s | %s | %d/%d | %s | %.2f | %s | %s "
+                       "| %s |"
                        % (w["n"], w["type"], short_model(w["model"]),
                           local_str(w["started"], "%H:%M"), dur(w["duration_s"]),
-                          calls, tok(w["output_tokens"]), w["cost_usd"],
+                          calls, tok(w.get("peak_ctx", 0)),
+                          w.get("verify_with_fix", 0), w.get("verify_calls", 0),
+                          tok(w["output_tokens"]), w["cost_usd"],
                           fmt(w["brief_chars"]), fmt(w["final_report_chars"]),
                           ", ".join(codes) or "-"))
         out.append("")

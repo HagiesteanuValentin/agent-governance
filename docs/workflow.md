@@ -15,11 +15,11 @@ project has its own HANDOFF / PATTERNS / DECISIONS.
   | agent | model | effort | maxTurns | role |
   |---|---|---|---|---|
   | `explorer` | cheap | medium | 40 | read-only, brings facts with path:line |
-  | `implementer` | expensive | medium | 100 | simple / parallel briefs |
-  | `implementer-max` | expensive | high | 200 | default for any brief with logic |
-  | `implementer-sonnet` | cheap (sonnet) | high | 200 | briefs with a cheap checker only, no cross-file JS/TS debugging |
+  | `implementer` | expensive | medium | 100 | default for any brief, logic included |
+  | `implementer-max` | expensive | high | 120 | escalation only: re-send after a failed audit, or debugging declared at plan time |
+  | `implementer-sonnet` | cheap (sonnet) | high | 100 | briefs with a cheap checker only, no cross-file JS/TS debugging |
   | `scribe` | cheap | low | 40 | docs, renames, one-line fixes |
-  | `auditor` | expensive | high | 60 | read-only, diffs over 150 lines / 3 files / new JS logic |
+  | `auditor` | expensive | high | 60 | diffs over 150 lines / 3 files / new JS logic; reads, plus mechanical fixes via Edit |
   | `design-lead` | expensive | high | 60 | read-only + one plan file; gets paths and section headings, does not delegate; only via /polish |
   | `design-lead-expert` | expensive (opus) | xhigh | 50 | read-only + one plan file; two phases: concepts without data, then synthesis with measurements; gets a dossier (paths + line ranges) from an explorer and measurements from an implementer; reads fragments only; chosen by the router in /polish |
 
@@ -44,16 +44,19 @@ Registered in `settings.json` (see `hooks/settings.example.json`).
 | hook | event | threshold | effect |
 |---|---|---|---|
 | `session-start.sh` | SessionStart | — | injects `HANDOFF*.md` from the project root |
-| `read-mare.sh` | PreToolUse / Read | >300 lines, or an image without `-small` | reminder, does not block |
+| `read-mare.sh` | PreToolUse / Read | main only: re-read of a file already read this session, or >300 lines without `offset`/`limit` | denies (image without `-small`, plans, and short `.md` stay a reminder) |
 | `brief-mare.sh` | PreToolUse / Agent | brief >7,000 characters | reminder: "split it into phases" |
+| `context-agent.sh` | PreToolUse / * | sub-agent only (`implementer*`): its own context ≥150k / ≥220k | ≥150k: reminder to wrap up (once); ≥220k: denies every tool but `Bash` |
 | `raport-lung.sh` | SubagentStop | final report >2,000 characters | blocks once, asks for compression (background agents too — verified 2026-08-30 after switching the output to `hookSpecificOutput` + `last_assistant_message`) |
 | `session-metrics.sh` | SessionEnd | — | runs the offline analyzer, zero tokens |
 
-Two design notes:
+Three design notes:
 
-- `read-mare.sh` and `brief-mare.sh` skip subagents (their transcript path contains
-  `subagent`). Reading a lot is exactly what a subagent is *for*; the rule targets the
-  orchestrator.
+- `read-mare.sh` and `brief-mare.sh` skip subagents (`agent_id` present in the hook input).
+  Reading a lot is exactly what a subagent is *for*; the rule targets the orchestrator.
+- `context-agent.sh` is the mirror: it skips main (no `agent_id`) and only watches
+  `implementer`/`implementer-sonnet`/`implementer-max` — the escalation carries the same
+  thresholds, maxTurns is not an exemption.
 - `raport-lung.sh` guards on `stop_hook_active`, so a stubborn agent cannot get stuck in a
   block/retry loop. It blocks at most once per stop.
 
