@@ -51,6 +51,7 @@ THRESHOLDS = {
     "long_agent_report": 2000,       # chars of a worker's final message
     "long_brief": 7000,              # chars of Agent.input.prompt
     "max_implementer_runs": 3,       # implementer + implementer-max + implementer-sonnet + scripter + scripter-complex per session
+    "max_live_agents": 4,             # hard cap on concurrently running sub-agents; over it = parallel_over_cap
     "max_explorer_runs": 3,
     "fable_code_lines": 20,          # lines written by Edit/Write in main
     "high_context_end": 150000,      # main context at the last API call
@@ -76,6 +77,7 @@ FLAG_TEXT = {
     "long_agent_report": "worker final report over budget",
     "long_brief": "brief over budget",
     "too_many_runs": "agent run cap exceeded",
+    "parallel_over_cap": "too many sub-agents running at once",
     "fable_wrote_code": "main model wrote code instead of delegating",
     "read_tool_results_main": "tool-results/ re-read in the main context",
     "high_context_end": "main context high at the end of the session",
@@ -110,6 +112,7 @@ SEVERITY_BASE = {
     "long_brief": "medium",
     "plan_echo": "medium",
     "sterile_verification": "medium",
+    "parallel_over_cap": "medium",
 }
 
 SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
@@ -146,6 +149,8 @@ RECOMMENDATION = {
                             "fixes, not after every edit.",
     "agent_ctx_high": "{detail} - split the brief at plan time; the hook wraps the agent "
                       "up at 150k.",
+    "parallel_over_cap": "{detail} - launch at most 4 agents at once; parallel beyond that "
+                         "only multiplies reports and audits landing in main together.",
 }
 
 
@@ -1517,6 +1522,11 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
                           "cache rewritten on %.1f%% of the context reads"
                           % context["cache_write_pct"],
                           {"pct": context["cache_write_pct"]}, 0))
+    if max_concurrent > THRESHOLDS["max_live_agents"]:
+        flags.append(flag("parallel_over_cap", "main",
+                          "main: %d sub-agents running at once (cap %d)"
+                          % (max_concurrent, THRESHOLDS["max_live_agents"]),
+                          {"max_concurrent": max_concurrent}, 0))
 
     postmortem = postmortem_block(main_doc, workers, flags, main, by_type)
     cf = counterfactual_block(main_doc, [(sc, d) for sc, d, _r in worker_scopes],
@@ -1890,6 +1900,7 @@ WASTE_FAMILIES = {
     "fable_wrote_code": "discipline",
     "too_many_runs": "discipline",
     "high_context_end": "discipline",
+    "parallel_over_cap": "discipline",
 }
 FAMILY_ORDER = ("reads", "agent overhead", "orchestration turns", "discipline", "other")
 

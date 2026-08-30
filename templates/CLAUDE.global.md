@@ -94,19 +94,25 @@ Two roles appear below:
   conclusion. The orchestrator reads at most 1–2 final screenshots for the verdict, in the
   downscaled `*-small.png` variant, as late in the session as possible — every image read is
   re-paid on every following message.
-- One agent at a time; wait for its result before any other step. The operator wants to see
-  the plan and the conclusion, not the execution.
-  EXCEPTION: up to 3 agents in parallel ONLY when, at plan time, each brief has its own
-  file list and the lists do not overlap (shared tokens/config included), at most one runs
-  a build/browser (or each has its own port and `--out`), and none depends on another's
-  result. Audit after all of them finish, brief by brief. A
+- Parallelism: one agent at a time by default, but launch several in a single message when
+  it saves wall-clock time without risk: (a) `explorer` runs with questions on different
+  sources/topics, none depending on another's answer — no need to ask first; (b) up to 3
+  `implementer*`/`scripter*` ONLY when, at plan time, each brief has its own file list and
+  the lists do not overlap (shared tokens/config included), at most one runs a
+  build/browser (or each has its own port and `--out`), and none depends on another's
+  result; (c) `auditor` on Brief N while the implementer runs Brief N+1, ONLY if N+1 does
+  not touch N's files and does not depend on its verdict — declared in the plan; (d) an
+  `explorer` while an implementer runs, only on areas the brief does not touch (otherwise
+  it reads files being modified). HARD CAP: at most 4 live agents at once, any type — the
+  analyzer flags `parallel_over_cap` above 4. The operator wants to see the plan and the
+  conclusion, not the execution. Audit after parallel runs: brief by brief. A
   worktree (`isolation: worktree`) only when declared in the plan, for lists that cannot be
   guaranteed disjoint or a risky delivery you want to be able to throw away: it costs the
   dependencies installed on the copy + a merge you audit yourself; it does not solve
   dependencies between briefs.
 - Default ceilings: at most 2 re-sends to `implementer` on the same task (3 runs total; the
   first re-send after a failed audit goes to `implementer-max`) and
-  at most 3 `explorer` runs per task, one at a time; SendMessage messages to a live agent
+  at most 3 `explorer` runs per task (can run in parallel); SendMessage messages to a live agent
   are not re-sends — ceiling of 3 messages per agent. An agent stopped by `maxTurns` is a
   signal that the brief is too big; split it, do not relaunch it unchanged. One
   `implementer-sonnet` run per brief, counted in the 3 runs.
@@ -146,7 +152,7 @@ Two roles appear below:
   CLAUDE.md, batch measurements, `browser.close()` in `finally`. Later briefs get its path
   and ONLY run it — no ad-hoc screenshots. Fixes after the verdict run the same script;
   the "before" numbers come from the design-lead's plan, not from a worktree.
-- Above a ceiling (a wide audit, research across several areas, 2+ explorers in parallel):
+- Above a ceiling (a wide audit, a 4th explorer, a 4th implementer run, more than 4 live agents):
   do NOT break the task and do NOT decide alone — ask the operator: how many agents, which
   model, what each one looks for, why the ceiling is not enough. The approval applies to
   the current task only.
