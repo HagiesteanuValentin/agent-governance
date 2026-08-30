@@ -47,6 +47,15 @@ commit — so the orchestrator writes the brief once, not twice. Before reportin
 runs a mandatory self-verify loop (build/tests/type-check/regression as applicable) and
 lists anything it could not run, and why, on a `NOT RUN` line of the fixed report.
 
+History: v1.3 (2026-08-30 00:55) added `implementer-sonnet`; v1.4 (2026-08-30 08:53) moved
+the default to `implementer` at medium effort and capped a brief at ~150k agent context, on
+evidence from 10 large runs (tool errors 0.9% → 5.1% from the first to the last quarter of a
+run, cost per call doubled) and Anthropic's published effort curve (medium ≈ −2 points at
+half the cost on long-horizon coding); the auditor now fixes mechanical deviations itself
+(35/37 audits reported deviations, median fix 526 characters); verification runs once at the
+end (12% of 507 verification calls led to a fix). Expected effect: measured on ≥5 v1.4
+sessions against v1.2's $23.13/session, not claimed in advance.
+
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000
 characters, demanding the compressed fixed format — it fires for background agents too (verified 2026-08-30; the earlier version was silently ignored because it emitted a top-level `decision` instead of `hookSpecificOutput`); the cap is enforced by the brief's report format, and the metric (`long_agent_report`) shows how often it holds. A `PreToolUse` hook on `Read`
