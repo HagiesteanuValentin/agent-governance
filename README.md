@@ -115,45 +115,42 @@ the expert to Opus 5 xhigh and split it into the two phases above.
 
 ## Measured results
 
-From `metrics/baseline-2026-08.md`. `project-a` is a 36-session frontend project that ran
-without governance; `governance-repo` is this repo's first governed session.
+From `metrics/baseline-2026-08.md`, regenerated 2026-08-30 over 51 kept sessions
+(`metrics-local/TRENDS.md`): 18 from before any rule set existed ("older"), down to 12 on
+the latest version with ≥5 sessions ("v1.2").
 
-The comparable metric is the **agent final report** — the payload that crosses from a
-disposable subagent context into the orchestrator's permanent one. It is the same slot in
-the same workflow regardless of project, and it is fixed the moment an agent stops, so it
-does not drift.
-
-| agent report slot | before (project-a, 36 sessions) | after (governed) |
+| metric | older (18 sessions) | v1.2 (12 sessions) |
 |---|---:|---:|
-| implementer / implementer-max | 2,691 – 5,303 chars | **1,640** |
-| explorer | up to 11,091 chars | — |
-| auditor | no auditor role existed | **1,586** |
-| worst hand-logged report | 11,756 chars | — |
+| $ actual/session | 20.69 | 25.37 |
+| main output % | 46.1% | 81.7% |
+| issues/session (H/M/L) | 14.6 (2.2/8.3/4.2) | 10.4 (1.2/5.6/3.7) |
+| est. wasted/session | 73.4k tokens | 120.8k tokens |
+| quality (mean · rated/n) | — · 0/18 | 4.3 · 7/12 |
 
-Both governed reports land under the 2,000-character cap set by the brief's report format.
-The before corpus totals 4,638,329 output tokens against 717M cache-read tokens
-(~$687 estimated), and **22 of its 36 sessions show 0% subagent output** — all the work done
-in the orchestrator's own context.
+The comparable structural metric is the **agent final report** — the payload that crosses
+from a disposable subagent context into the orchestrator's permanent one. Medians by slot,
+older vs v1.2: implementer/implementer-max 2,578/3,140 → 2,130/2,378 chars; auditor
+1,776 → 2,134; explorer 4,532 → 2,133; scribe 678 → 614. Full max/median-by-agent-type
+tables are in the baseline doc.
 
-Not a controlled experiment: the two projects are different workloads, and the *after*
-session was still running when this was written, so its session totals are an interim
-snapshot rather than a result. Both caveats, the hand-logged versus analyzer-measured
-distinction, and the raw numbers are written out in
-[`metrics/baseline-2026-08.md`](metrics/baseline-2026-08.md).
+Not a controlled experiment: `older`'s 18 kept sessions span 4 projects, v1.2's 12 span
+5 — the project mix did not shrink. Two numbers moved the wrong way: `$ actual/session` rose
+(20.69 → 25.37) instead of fell, and so did `est. wasted/session` (73.4k → 120.8k). Sidechain
+share of output fell 54% → 18% (`main output %` 46.1% → 81.7%) — less work is landing in
+disposable subagent contexts, not more. All caveats, the historical hand-logged figures, and
+full per-version tables are in [`metrics/baseline-2026-08.md`](metrics/baseline-2026-08.md).
 
 ### Fable-only counterfactual
 
-For session `2026-08-26-s2-agent-governance`, actual cost was $12.00 against a Fable-only
-floor of $15.78 and a realistic Fable-only estimate of $30.55 — ×1.3–×2.5. Across the 25
-sessions kept (`metrics-local/TRENDS.md`; 18 older + 7 v1.0, 3 excluded — 1 browser, 2
-empty), actual cost sums to $521.13 ($335.60 older + $185.53 v1.0) against a realistic
-Fable-only sum of $2,106.36, mean ratio ×2.9 realistic for older and ×4.2 for v1.0.
-Sessions are grouped by workflow version (`tools/versions.json`); from v1.1 (2026-08-28)
-each session also gets a manual 1–5 quality rating (`/rate`) so versions compare on
-outcome, not just cost. This is a cost counterfactual computed from the real per-call
-usage (same calls and outputs, worker bootstrap removed, worker content stacked on the
-main context, everything cached); it is not a quality claim — usage data carries no
-quality signal, and the 35% context threshold is the operator's, not Anthropic's.
+Across the same 51 kept sessions, actual cost sums to **$1,315.45** against a realistic
+Fable-only counterfactual of **$5,552.26** — sum ratio **×4.22** (Σ realistic / Σ actual);
+the mean per-session ratio across those 51 sessions is **×3.34**. Sessions are grouped by
+workflow version (`tools/versions.json`); from v1.1 (2026-08-28) each session also gets a
+manual 1–5 quality rating (`/rate`) so versions compare on outcome, not just cost. This is
+a cost counterfactual computed from the real per-call usage (same calls and outputs,
+worker bootstrap removed, worker content stacked on the main context, everything cached);
+it is not a quality claim — usage data carries no quality signal, and the 35% context
+threshold is the operator's, not Anthropic's.
 
 ## Reproduce it
 

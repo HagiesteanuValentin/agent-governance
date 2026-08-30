@@ -1,127 +1,172 @@
 # Baseline — August 2026
 
-Numbers produced by `tools/session_metrics.py` over local Claude Code transcripts.
+Numbers produced by `tools/session_metrics.py --trends metrics-local` over local Claude
+Code transcripts, regenerated 2026-08-30 with the current `tools/pricing.json`
+(Sonnet 5 $2/$10, cache-write 2×). All 59 sessions in `metrics-local/` were re-run through
+the analyzer in the same batch, so every number below comes from one consistent price
+table — no mix of old and new rates.
 
-Labels are anonymised:
+## Labels
 
-- **project-a** — a long-running frontend project, 36 recorded sessions. All of it predates
-  the governance rules, so it is the *before* corpus.
-- **governance-repo** — this repository. Its first session ran with the full rule set and
-  all five hooks active, so it is the *after* sample.
-
-Session ids are truncated to 8 characters.
+- The corpus spans several client projects plus this repo (`agent-governance`) itself.
+  Client project names are not published: they're grouped only by workflow version, or
+  called **project-a/b/c/d** when a distinction matters. No local filesystem paths appear
+  below.
+- **older** — every session recorded before the `v1.0` rule set existed (2026-08-22 to
+  2026-08-26). The 18 kept sessions span 4 projects (a 5th project's only session is the one
+  excluded for browser share). This includes the earliest sessions of this very repo,
+  already running draft versions of the governance rules before they were formalized as
+  `v1.0`.
+- **v1.0 / v1.1 / v1.2 / v1.3** — sessions grouped by the workflow version active at their
+  start, per `tools/versions.json`. `v1.3` (from 2026-08-30T00:55) has 0 sessions yet.
+- Session ids, where one is named individually, are truncated to 8 characters.
 
 ## Method
 
-- Input: `~/.claude/projects/<project-dir>/*.jsonl`, one JSON object per line.
-- Output tokens are summed from `.message.usage.output_tokens` on assistant lines,
-  **including subagent (sidechain) turns** — a subagent's output is billed too, and it is
-  the part that governance targets.
-- Deduplication on `.message.id`: the same assistant message appears on several transcript
-  lines (streaming and tool-result attachment), so a naive sum double-counts.
-- "Final report (chars)" is the length of the last text-only assistant message in a
-  subagent's turn — the thing that actually crosses back into the orchestrator's context.
-- Cost is an estimate from `tools/pricing.json`, not a bill.
+- Input: one jsonl transcript per session, from `~/.claude/projects/<project-dir>/`.
+- Output tokens are summed from assistant turns, **including subagent (sidechain) turns**,
+  deduplicated on `message.id` (the same assistant message can appear on several transcript
+  lines).
+- Cost is computed from `tools/pricing.json` (`_updated: 2026-08-30`), which prices
+  cache-write at 2× input (1-hour TTL, matching Claude Code's own convention) and Sonnet 5
+  at $2/$10 per million input/output tokens.
+- Sessions are grouped by workflow version from `tools/versions.json`: a session belongs to
+  the last version whose `from` timestamp is ≤ its local start time.
+- Excluded from all tables below: sessions where browser tool calls are ≥50% of main tool
+  calls, and sessions with no recorded work. Corpus after exclusion: **51 sessions kept
+  (2026-08-22 → 2026-08-30) · older 18 / v1.0 8 / v1.1 13 / v1.2 12 / v1.3 0 · excluded: 8
+  (browser 1 · empty 7)**.
 
-## Before — project-a, five representative sessions
+## Versions
 
-(The three heaviest, plus two more from the same range. Sessions 549b0aad at 271,624 and
-33ed8d91 at 232,917 output tokens also sit above the last row; the table is a sample, not
-a top-5.)
+| version | sessions | $ actual | $ actual/session | $ fable-only realistic/session | mean ratio realistic | main output % | hands-on ratio | issues/session (H/M/L) | est. wasted/session | peak ctx | quality (mean · rated/n) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| older | 18 | 372.39 | 20.69 | 72.56 | ×2.8 | 46.1% | 326/607 (54%) | 14.6 (2.2/8.3/4.2) | 73.4k | 144.0k | — · 0/18 |
+| v1.0 | 8 | 269.76 | 33.72 | 151.20 | ×4.1 | 50.0% | 175/290 (60%) | 15.9 (1.0/10.4/4.5) | 85.4k | 158.1k | — · 0/8 |
+| v1.1 | 13 | 368.90 | 28.38 | 123.41 | ×3.7 | 75.9% | 217/419 (52%) | 10.9 (0.8/6.0/4.1) | 58.4k | 124.0k | 4.5 · 4/13 |
+| v1.2 | 12 | 304.40 | 25.37 | 119.36 | ×3.3 | 81.7% | 205/434 (47%) | 10.4 (1.2/5.6/3.7) | 120.8k | 132.6k | 4.3 · 7/12 |
+| v1.3 | 0 | 0.00 | 0.00 | 0.00 | ×0.0 | 0.0% | 0/0 (0%) | 0.0 (0.0/0.0/0.0) | 0 | 0 | — · 0/0 |
 
-| session | output tokens | output in sidechains | est. cost | agent final reports (chars) |
-|---|---:|---:|---:|---|
-| 012d7594 | 502,859 | 81.5% | $74.01 | implementer 3,343 · scribe 839 |
-| bca4ed8b | 412,703 | 79.1% | $51.73 | implementer 3,096 · implementer-max 3,869 · scribe 1,147 |
-| 2d02e45a | 341,235 | 73.2% | $40.39 | implementer 3,396 · implementer-max 4,076 · scribe 678 |
-| f0ce0336 | 247,374 | 71.3% | $34.47 | implementer-max 3,369 · implementer 2,691 · explorer 7,080 |
-| e43d1a60 | 219,539 | 69.6% | $25.18 | implementer-max 5,303 · explorer 10,965 |
+Δ v1.0 vs older: $ actual/session +63% · ratio +46% · main output % +9% · hands-on % +12% · issues/session +9% · wasted/session +16%
+Δ v1.1 vs older: $ actual/session +37% · ratio +33% · main output % +65% · hands-on % -4% · issues/session -25% · wasted/session -20%
+Δ v1.2 vs older: $ actual/session +23% · ratio +19% · main output % +77% · hands-on % -12% · issues/session -29% · wasted/session +65%
 
-Worst final report per agent across the whole 36-session corpus: explorer **11,091** ·
-implementer-max **5,303** · implementer **5,126** · scribe **1,639**.
+Column definitions (from `tools/session_metrics.py`):
 
-Corpus total, all 36 sessions: **4,638,329 output tokens · 717,007,257 cache-read tokens ·
-$687.45 estimated**. Cache reads are ~155× the output tokens — that ratio is the whole
-argument: what sits in the orchestrator's context is re-paid on every message.
+- **main output %** — `round(100.0 * main["output"] / (totals["output"] or 1), 1)`: main's
+  output tokens as % of all output, main plus every subagent (line ~1389).
+- **hands-on ratio** — `hands_on / float(tool_calls or 1)`, where `hands_on` counts
+  `Read`/`Edit`/`Write` calls plus any `Bash` call whose command does NOT match
+  `^(git|ls)\b` (`GIT_LS_RE`), out of all main tool calls (lines ~908–923).
+- **$ fable-only realistic/session** — `realistic_usd`, a counterfactual that replays a
+  session's real per-call tokens as if every subagent turn ran directly in main's own
+  growing context (worker bootstrap dropped, worker content stacked onto main, priced at
+  cache-read/cache-write/output rates) (lines ~1098–1127).
+- **mean ratio realistic** — mean of `realistic_usd / actual_usd` per session.
+- **issues/session (H/M/L)** — mean flagged inefficiencies per session, by severity.
+- **est. wasted/session** — mean of summed `est_wasted_tokens` across a session's flags.
+- **peak ctx** — mean peak context-window tokens per session.
+- **quality (mean · rated/n)** — mean manual `/rate` score, over `rated/n` sessions rated.
 
-Worst individual payloads logged by hand before the analyzer existed:
+## Recurring inefficiencies, older vs latest version with ≥5 sessions (v1.2)
 
-- agent final reports of **4,807 / 5,249 / 4,121** characters in one session, and
-  **11,756 / 6,053 / 5,745** in another;
-- one `Bash` tool_result of **21,000** characters (a `git diff` and a `cat` of a whole file
-  in the same command);
-- one `Read` of **31,000** characters against a `tool-results/` directory — re-reading a
-  result the orchestrator had already paid for once.
+`v1.3` has 0 sessions yet, so `v1.2` is still the latest comparison point.
 
-The nominal instruction at the time was "max 25 lines (~2,000 characters)". It was ignored
-systematically, because nothing enforced it.
+Same code, older's 18 sessions next to v1.2's 12 (sessions-hit and est. wasted tokens each):
 
-## After — governance-repo, session bad03f47
+| code | severity | older: sessions · wasted | v1.2: sessions · wasted |
+|---|---|---:|---:|
+| main_read_files | medium | 14/18 · 88.5k | 10/12 · 35.4k |
+| long_agent_report | medium→low | 14/18 · 18.4k | 11/12 · 4.7k |
+| reread | high | 13/18 · 269.4k | 9/12 · 414.2k |
+| full_read_big_file | medium | 12/18 · 234.8k | 4/12 · 68.7k |
+| big_tool_result_main | high | 10/18 · 617.8k | 6/12 · 477.9k |
+| agent_reread_own_write | low | 8/18 · 0 | 3/12 · 0 |
+| high_context_end | medium | 8/18 · 0 | 4/12 · 0 |
+| fable_wrote_code | high | 7/18 · 0 | not recurring |
+| too_many_runs | high | 6/18 · 0 | 2/12 · 0 |
+| plan_echo | medium | 5/18 · 16.9k | 5/12 · 13.7k |
+| batchable_bash | medium | 3/18 · 75.4k | 5/12 · 225.8k |
+| long_brief | medium | 3/18 · 384 | not recurring |
+| narration_turns | medium | not recurring | 2/12 · 209.2k |
 
-### The stable metric: agent final-report length
+`main_read_files`, `long_agent_report` and `full_read_big_file` dropped sharply (88.5k→35.4k,
+18.4k→4.7k, 234.8k→68.7k estimated wasted). `fable_wrote_code` disappeared from the recurring
+list entirely. But `reread` got *worse* (269.4k→414.2k) and `big_tool_result_main` is still
+the single largest category in both eras (617.8k→477.9k) — the two things the rules have not
+fixed yet. `batchable_bash` also grew (75.4k→225.8k).
 
-These are the numbers that matter, and the only ones that are already final. A delivery's
-report is fixed the moment the agent stops; it does not change afterwards.
+## The stable metric — agent final-report length
 
-| slot | before (project-a, 36 sessions) | after (governed deliveries) |
-|---|---:|---:|
-| implementer / implementer-max report | 2,691 – 5,303 chars | **1,640** |
-| auditor report | no auditor role existed | **1,586** |
-| explorer report | up to **11,091** chars | — |
-| hand-logged worst case | 11,756 chars | — |
+A subagent's final report is fixed the moment it stops; it is the payload that actually
+crosses into the orchestrator's permanent context. Figures below are `max` and `median`
+character counts, per version and per agent type, read from the `workers[].final_report_chars`
+field of each session's JSON (excluding aborted/never-launched worker slots, which record 0).
 
-Both governed reports sit above the 1,500-character target but comfortably under the
-2,500-character threshold enforced by `raport-lung.sh`. In the *before* corpus, every
-implementer report exceeded 2,500 and the worst explorer report was 11,091 — roughly 7×
-what the same slot costs now.
+| version | agent type | n reports | max chars | median chars |
+|---|---|---:|---:|---:|
+| older | explorer | 12 | 10,965 | 4,532 |
+| older | implementer-max | 7 | 5,303 | 3,140 |
+| older | implementer | 36 | 4,514 | 2,578 |
+| older | auditor | 3 | 2,060 | 1,776 |
+| older | design-lead | 2 | 1,567 | 1,411 |
+| older | scribe | 21 | 1,540 | 678 |
+| v1.0 | implementer-max | 18 | 3,543 | 2,303 |
+| v1.0 | explorer | 3 | 3,860 | 2,578 |
+| v1.0 | auditor | 8 | 2,780 | 2,282 |
+| v1.0 | design-lead | 5 | 2,268 | 2,029 |
+| v1.0 | implementer | 3 | 2,273 | 1,919 |
+| v1.0 | scribe | 11 | 1,152 | 864 |
+| v1.1 | implementer-max | 22 | 4,902 | 1,925 |
+| v1.1 | explorer | 10 | 4,063 | 752 |
+| v1.1 | scribe | 19 | 3,310 | 706 |
+| v1.1 | auditor | 19 | 2,552 | 2,125 |
+| v1.1 | design-lead-expert | 7 | 2,479 | 2,228 |
+| v1.1 | implementer | 9 | 2,428 | 2,035 |
+| v1.2 | implementer-max | 19 | 4,676 | 2,378 |
+| v1.2 | explorer | 10 | 4,487 | 2,133 |
+| v1.2 | auditor | 18 | 3,321 | 2,134 |
+| v1.2 | design-lead-expert | 2 | 2,313 | 2,289 |
+| v1.2 | implementer | 4 | 2,379 | 2,130 |
+| v1.2 | scribe | 18 | 1,563 | 614 |
 
-### Session totals — interim snapshot, session still open at commit time
-
-Snapshot taken **2026-08-22T13:26Z**, while session `bad03f47` was still running. Treat
-these as a partial reading, not a result: they were already ~75% higher than an earlier
-snapshot taken 30 minutes before.
-
-| metric | value at snapshot |
-|---|---:|
-| output tokens | 100,895 |
-| output in sidechains | 71.5% |
-| cache-read tokens | 5,947,509 |
-| est. cost | $10.42 |
-| largest `tool_result` | Bash, 28,336 chars |
-| second largest | Bash, 18,365 chars |
-| largest `Read` tool_result | 15,645 chars |
-
-The final figure for this session is captured automatically by the `SessionEnd` hook into
-`metrics-local/<date>-s<N>-<project>.json`. This file gets updated from that capture; until then the
-session-total row is provisional.
+Reports still routinely exceed the 1,500-character soft cap and occasionally the 2,000
+hard cap (`raport-lung.sh` catches those live). The explorer/implementer-max ceiling has not
+come down between `older` and `v1.2` (10,965 and 5,303 vs 4,487 and 4,676) — the cap targets
+*typical* reports, not the worst case, and a handful of large ones still get through.
 
 ## Honest caveats
 
-- This is not a controlled experiment. project-a is a large frontend build with screenshots
-  and 3D work; governance-repo is a documentation and tooling repo. Absolute session totals
-  are not comparable, and the *after* session was not even finished when this was written.
-- What *is* comparable is the per-report ceiling, because it is the same slot in the same
-  workflow regardless of the project: agent final report → orchestrator context. There it
-  went from 2,691–11,091 characters down to 1,586–1,640.
-- The other structural number to watch is the sidechain share. High is good — it means work
-  happened in disposable contexts. project-a already reached 70–81% in its best sessions,
-  but with expensive reports crossing back; the goal is to keep the share high *and* the
-  crossings small.
-- **22 of the 36 before-sessions show 0.0% sidechain output** — no delegation at all, every
-  token spent in the orchestrator's own context. Fifteen of those produced real work,
-  totalling **1,470,398 output tokens**, about 32% of the corpus. Those are the sessions
-  governance exists to prevent.
-- Figures marked "hand-logged" (the 21,000-character `Bash` result, the 31,000-character
-  `Read` on `tool-results/`, the 4,807–11,756 report lengths) come from a manual analysis
-  done before this analyzer existed, and were measured differently. The analyzer's own
-  worst `Read` payload in 012d7594 is 624,414 characters — mostly image data — so the two
-  sets of numbers are not on the same scale and are kept separate on purpose.
+- Not a controlled experiment. `older` mixes 4 kept projects, v1.0/v1.1 mix 3 each, v1.2
+  mixes 5 — the project count did not shrink over time; absolute dollar figures are not
+  comparable across versions regardless.
+- `$ actual/session` **increased** from `older` ($20.69) through v1.0/v1.1/v1.2 ($33.72 /
+  $28.38 / $25.37) instead of dropping, and `est. wasted/session` also rose (73.4k → 120.8k)
+  rather than fell. Neither is explained by more delegation: `main output %` (main's share
+  of total output) rose 46.1%→81.7%, i.e. the sidechain share fell 54%→18% — *less* work is
+  landing in disposable subagent contexts, the opposite of the intended direction. No cause
+  is established here beyond that reading of the numbers.
+- `hands-on ratio` fell 54%→47% (older→v1.2) — main is doing proportionally less direct
+  file editing among its own tool calls, which is a separate axis from the sidechain-share
+  drop above and does not offset it.
+- Correction to an older mistake: this document used to cite a 28,336-character `Bash`
+  `tool_result` in main for one session. That number came from a scribe subagent's own
+  sidechain transcript; the largest `tool_result` actually in that session's main context
+  was 4,768 characters.
+- "Hand-logged" figures from a manual pass done before this analyzer existed — a
+  21,000-char `Bash` result, a 31,000-char `Read` against a `tool-results/` directory, and
+  report lengths of 4,807–11,756 chars in two sessions — stay a historical note, not merged
+  into the tables above: different measurement, different era.
+- `reread` and `big_tool_result_main` are still the two largest wasted-token categories in
+  both the oldest and newest ≥5-session cohort; nothing in the rules targets them yet.
 
 ## Reproduce
 
 ```sh
-python3 tools/session_metrics.py ~/.claude/projects/<project-dir>/
-python3 tools/session_metrics.py <session>.jsonl --md --out report.md
+python3 tools/session_metrics.py <path-to-session.jsonl>... --json --md --out-dir metrics-local
+python3 tools/session_metrics.py --trends metrics-local
 ```
 
-The label → real project mapping is kept out of this repository.
+The `<path-to-session.jsonl>` list is every path recorded in the existing
+`metrics-local/*.json` files' `path` field. The project → label mapping is kept out of this
+repository.
