@@ -1,6 +1,5 @@
 #!/bin/bash
-# PreToolUse on Read, main session only (a sub-agent input carries agent_id -> exit 0).
-# Three rules, in order:
+# PreToolUse on Read: rule 0 (/tool-results/ -> deny) for everyone, the rest main-session only.
 #   a) full-size image  -> warning (additionalContext), as before;
 #   b) same file already read in this main session -> deny (v1.4: was a warning);
 #   c) no offset/limit and over 300 lines -> deny. Exempt: plan files, .md under 600 lines.
@@ -11,16 +10,11 @@ python3 - "$input" <<'PY'
 import json, sys, os
 
 d = json.loads(sys.argv[1])
-# a sub-agent (implementer/explorer/auditor) reads its own target legitimately
-if d.get("agent_id"):
-    sys.exit(0)
-tp = d.get("transcript_path") or ""
-if "subagent" in tp:
-    sys.exit(0)
 ti = d.get("tool_input") if isinstance(d.get("tool_input"), dict) else {}
 path = ti.get("file_path") or ""
 if not isinstance(path, str) or not path:
     sys.exit(0)
+tp = d.get("transcript_path") or ""
 
 
 def emit(**kw):
@@ -32,6 +26,15 @@ def emit(**kw):
 def deny(reason):
     emit(permissionDecision="deny", permissionDecisionReason=reason)
 
+
+# ---- 0) saved Bash output, everyone (main + sub-agents)
+if "/tool-results/" in path:
+    deny("output Bash salvat în fișier; nu-l citi — reia comanda pe un interval mai mic "
+         "(`sed -n a,bp | head -150`)")
+
+# a sub-agent (implementer/explorer/auditor) reads its own target legitimately
+if d.get("agent_id") or "subagent" in tp:
+    sys.exit(0)
 
 base = os.path.basename(path)
 ext = os.path.splitext(path)[1].lower()

@@ -40,6 +40,9 @@ def read_use(tid, path, offset=None, limit=None):
         inp["limit"] = limit
     return {"type": "tool_use", "id": tid, "name": "Read", "input": inp}
 
+def bash_use(tid, cmd):
+    return {"type": "tool_use", "id": tid, "name": "Bash", "input": {"command": cmd}}
+
 def usage_line(ctx):
     return {"type": "assistant", "message": {"role": "assistant", "id": "u1",
             "usage": {"input_tokens": 1000, "cache_read_input_tokens": ctx - 1500,
@@ -64,20 +67,28 @@ MAIN = jsonl("main.jsonl", [
     assistant([read_use("r2", ranged, offset=1, limit=50)]),
     assistant([read_use("r3", side)], side=True),
 ])
-SUB = {}
-for k in (100000, 160000, 230000):
-    SUB[k] = jsonl("sub%d.jsonl" % k, [
-        {"type": "user", "message": {"role": "user", "content": "brief"}},
-        usage_line(k)])
+# real layout: MAIN = <proj>/<sid>.jsonl (always 230k here), worker = <proj>/<sid>/subagents/
+SESSIONS = set()
+
+def sub_fixture(agent_id, ctx, bash_cmds=(), sid=None, pad_lines=0):
+    sid = sid or "s-%s" % agent_id
+    if sid not in SESSIONS:
+        SESSIONS.add(sid)
+        jsonl("proj/%s.jsonl" % sid,
+              [{"type": "user", "message": {"role": "user", "content": "go"}},
+               usage_line(230000)])
+    objs = [{"type": "user", "message": {"role": "user", "content": "brief"}}]
+    objs += [{"type": "user", "message": {"role": "user", "content": "x" * 900}}] * pad_lines
+    objs += [assistant([bash_use("b%d" % i, c)]) for i, c in enumerate(bash_cmds)]
+    objs.append(usage_line(ctx))
+    jsonl("proj/%s/subagents/agent-%s.jsonl" % (sid, agent_id), objs)
+    return sid
 
 # 1 MB transcripts for the timing check
 pad = "x" * 900
 big_main = jsonl("big-main.jsonl",
                  [{"type": "user", "message": {"role": "user", "content": pad}}] * 1100
                  + [assistant([read_use("r1", small)])])
-big_sub = jsonl("big-sub.jsonl",
-                [{"type": "user", "message": {"role": "user", "content": pad}}] * 1100
-                + [usage_line(230000)])
 
 # ---------------------------------------------------------------- harness
 def call(hook, payload):
@@ -91,14 +102,21 @@ def read_in(path, transcript=MAIN, tool_use_id="cur", **kw):
          "tool_input": dict({"file_path": path}, **kw)}
     return d
 
-def ctx_in(transcript, agent_id=None, agent_type="implementer", tool_name="Read"):
-    d = {"session_id": "s1", "transcript_path": transcript, "cwd": TMP,
-         "tool_name": tool_name, "tool_use_id": "cur", "tool_input": {}}
+def ctx_in(sid, agent_id=None, agent_type="implementer", tool_name="Read", command=None):
+    ti = {"command": command} if command else {}
+    d = {"session_id": sid, "transcript_path": os.path.join(TMP, "proj", "%s.jsonl" % sid),
+         "cwd": TMP, "tool_name": tool_name, "tool_use_id": "cur", "tool_input": ti}
     if agent_id:
         d["agent_id"] = agent_id
         d["agent_type"] = agent_type
         MARKERS.append(agent_id)
     return d
+
+def ctx_case(name, agent_id, ctx, expect, needle="", agent_type="implementer",
+             tool_name="Read", command=None, bash_cmds=(), reuse=False):
+    aid = "a-%s-%s" % (RUN, agent_id)
+    sid = sub_fixture(aid, ctx, bash_cmds) if not reuse else "s-%s" % aid
+    case(name, CTX_HOOK, ctx_in(sid, aid, agent_type, tool_name, command), expect, needle)
 
 results = []
 def case(name, hook, payload, expect, needle=""):
@@ -146,31 +164,65 @@ sub_payload = read_in(small)
 sub_payload["agent_id"] = "a-%s-x" % RUN
 sub_payload["agent_type"] = "implementer"
 case("sub-agent not affected by read-mare", READ_HOOK, sub_payload, "allow")
+tr = write("tool-results/x.txt", ["line %d" % i for i in range(10)])
+case("tool-results from main -> deny", READ_HOOK, read_in(tr), "deny", "interval mai mic")
+tr_sub = read_in(tr)
+tr_sub["agent_id"] = "a-%s-tr" % RUN
+tr_sub["agent_type"] = "implementer"
+case("tool-results from sub-agent -> deny", READ_HOOK, tr_sub, "deny", "nu-l citi")
 
 # ---------------------------------------------------------------- context-agent
-case("main not affected by context-agent", CTX_HOOK, ctx_in(SUB[230000]), "allow")
-case("explorer not affected", CTX_HOOK,
-     ctx_in(SUB[230000], "a-%s-expl" % RUN, "explorer"), "allow")
-case("100k -> allow", CTX_HOOK, ctx_in(SUB[100000], "a-%s-1" % RUN), "allow")
-case("160k -> warning", CTX_HOOK, ctx_in(SUB[160000], "a-%s-2" % RUN), "context",
-     "Context >=150k")
-case("160k warning only once", CTX_HOOK, ctx_in(SUB[160000], "a-%s-2" % RUN), "allow")
-case("implementer-max warned too", CTX_HOOK,
-     ctx_in(SUB[160000], "a-%s-3" % RUN, "implementer-max"), "context", "Context >=150k")
-case("implementer-sonnet 230k Edit -> deny", CTX_HOOK,
-     ctx_in(SUB[230000], "a-%s-4" % RUN, "implementer-sonnet", "Edit"), "deny",
-     "Context >=220k")
-case("scripter-complex 230k Edit -> deny", CTX_HOOK,
-     ctx_in(SUB[230000], "a-%s-4b" % RUN, "scripter-complex", "Edit"), "deny",
-     "Context >=220k")
-case("scripter 100k Edit -> allow", CTX_HOOK,
-     ctx_in(SUB[100000], "a-%s-4c" % RUN, "scripter", "Edit"), "allow")
-case("230k Read -> deny", CTX_HOOK,
-     ctx_in(SUB[230000], "a-%s-5" % RUN, "implementer", "Read"), "deny", "only Bash")
-case("230k Bash -> allowed (warning first)", CTX_HOOK,
-     ctx_in(SUB[230000], "a-%s-6" % RUN, "implementer", "Bash"), "context")
-case("230k Bash after warning -> allow", CTX_HOOK,
-     ctx_in(SUB[230000], "a-%s-6" % RUN, "implementer", "Bash"), "allow")
+sub_fixture("a-%s-main" % RUN, 100000)
+case("main not affected by context-agent", CTX_HOOK,
+     ctx_in("s-a-%s-main" % RUN), "allow")
+ctx_case("explorer not affected", "expl", 230000, "allow", agent_type="explorer")
+ctx_case("main 230k + agent 100k -> allow (regression 30.08)", "1", 100000, "allow")
+ctx_case("160k -> warning", "2", 160000, "context", "Context >=150k")
+ctx_case("160k warning only once", "2", 160000, "allow", reuse=True)
+ctx_case("implementer-max warned too", "3", 160000, "context", "Context >=150k",
+         agent_type="implementer-max")
+ctx_case("implementer-sonnet 230k Edit -> deny", "4", 230000, "deny", "Context >=220k",
+         agent_type="implementer-sonnet", tool_name="Edit")
+ctx_case("scripter-complex 230k Edit -> deny", "4b", 230000, "deny", "Context >=220k",
+         agent_type="scripter-complex", tool_name="Edit")
+ctx_case("scripter 100k Edit -> allow", "4c", 100000, "allow",
+         agent_type="scripter", tool_name="Edit")
+ctx_case("230k Read -> deny", "5", 230000, "deny", "only Bash")
+ctx_case("230k Bash -> allowed (warning first)", "6", 230000, "context",
+         tool_name="Bash")
+ctx_case("230k Bash after warning -> allow", "6", 230000, "allow",
+         tool_name="Bash", reuse=True)
+
+# missing worker transcript -> allow (never measure main)
+case("agent transcript missing -> allow", CTX_HOOK,
+     ctx_in("s-a-%s-1" % RUN, "a-%s-nofile" % RUN), "allow")
+
+# verification counter
+VER1 = ["npm run build", "node scripts/verifica-galerie.mjs"]
+ctx_case("2nd verification -> allow", "v2", 90000, "allow", tool_name="Bash",
+         command="npm run build", bash_cmds=VER1[:1])
+ctx_case("3rd verification -> context", "v3", 90000, "context", "A 3-a verificare",
+         tool_name="Bash", command="node scripts/verifica-x.mjs", bash_cmds=VER1)
+ctx_case("4th verification -> allow (once)", "v3", 90000, "allow", tool_name="Bash",
+         command="npx vitest run", reuse=True)
+ctx_case("non-verification Bash not counted", "v4", 90000, "allow", tool_name="Bash",
+         command="grep -rn foo src/", bash_cmds=VER1 + ["pytest -q"])
+ctx_case("explorer verifications not counted", "v5", 90000, "allow", agent_type="explorer",
+         tool_name="Bash", command="npm test", bash_cmds=VER1)
+
+# log: one JSON line per trigger, with the AGENT's context (not main's 230k)
+try:
+    rows = [json.loads(l) for l in open("/tmp/claude-hooks/context-agent.jsonl")
+            if RUN in l]
+except OSError:
+    rows = []
+warn_rows = [r for r in rows if r.get("decision") == "warn"]
+ok_log = (len(warn_rows) >= 2
+          and all(set(r) >= {"ts", "agent_id", "agent_type", "ctx", "decision"} for r in rows)
+          and any(r["decision"] == "verif3" for r in rows)
+          and any(r["ctx"] == 100000 for r in rows))
+results.append(("context-agent.jsonl logs agent ctx (%d rows)" % len(rows), ok_log,
+                "%d rows" % len(rows)))
 
 # ---------------------------------------------------------------- comentarii-cod
 CMT_SESSION = "cmt-%s" % RUN
@@ -238,22 +290,32 @@ def timed(hook, payload, n=3):
         best = min(best, (time.time() - t) * 1000)
     return best
 
+t_aid = "a-%s-t" % RUN
+MARKERS.append(t_aid)
+t_sid = sub_fixture(t_aid, 230000, bash_cmds=["npm run build"], pad_lines=1100)
+big_sub = os.path.join(TMP, "proj", t_sid, "subagents", "agent-%s.jsonl" % t_aid)
 mb_main = os.path.getsize(big_main) / 1024.0 / 1024.0
 mb_sub = os.path.getsize(big_sub) / 1024.0 / 1024.0
 t_read = timed(READ_HOOK, read_in(big, transcript=big_main))
-t_ctx = timed(CTX_HOOK, ctx_in(big_sub, "a-%s-t" % RUN, "implementer", "Bash"))
-results.append(("read-mare < 300 ms on %.2f MB (%.0f ms)" % (mb_main, t_read),
-                t_read < 300, "%.0f ms" % t_read))
-results.append(("context-agent < 300 ms on %.2f MB (%.0f ms)" % (mb_sub, t_ctx),
-                t_ctx < 300, "%.0f ms" % t_ctx))
+t_ctx = timed(CTX_HOOK, ctx_in(t_sid, t_aid, "implementer", "Bash", "npm run build"))
+results.append(("read-mare < 200 ms on %.2f MB (%.0f ms)" % (mb_main, t_read),
+                t_read < 200, "%.0f ms" % t_read))
+results.append(("context-agent < 200 ms on %.2f MB (%.0f ms)" % (mb_sub, t_ctx),
+                t_ctx < 200, "%.0f ms" % t_ctx))
 
 # ---------------------------------------------------------------- report
 for aid in MARKERS:
-    for f in ("/tmp/claude-hooks/%s.150k" % aid,):
+    for suf in ("150k", "seen", "verif3"):
         try:
-            os.remove(f)
+            os.remove("/tmp/claude-hooks/%s.%s" % (aid, suf))
         except OSError:
             pass
+try:
+    keep = [l for l in open("/tmp/claude-hooks/context-agent.jsonl") if RUN not in l]
+    with open("/tmp/claude-hooks/context-agent.jsonl", "w") as fh:
+        fh.writelines(keep)
+except OSError:
+    pass
 shutil.rmtree(TMP, ignore_errors=True)
 
 failed = [r for r in results if not r[1]]

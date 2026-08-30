@@ -71,6 +71,8 @@ THRESHOLDS = {
     "comment_long_line": 160,        # chars of a single added comment line
     "comment_ratio": 0.25,           # added comment lines / added lines
     "comment_min_added": 5,
+    "late_first_edit_ctx": 100000,   # worker context when it finally writes
+    "late_first_edit_reads": 15,     # reading calls before the first write
 }
 
 FLAG_TEXT = {
@@ -98,6 +100,8 @@ FLAG_TEXT = {
     "plan_echo": "plan echoed back into main as a tool_result",
     "sterile_verification": "worker re-ran the checker without it catching anything",
     "agent_ctx_high": "worker context past the degradation threshold",
+    "tool_results_read": "worker read a tool-results/ file instead of re-running a narrower command",
+    "late_first_edit": "worker read its way to a decision before writing anything",
 }
 
 # base gravity per code; wasted tokens can only push it up (see severity_of)
@@ -109,7 +113,9 @@ SEVERITY_BASE = {
     "agent_no_report": "high",
     "too_many_runs": "high",
     "agent_ctx_high": "high",
+    "late_first_edit": "high",
     "big_tool_result_main": "medium",
+    "tool_results_read": "medium",
     "reread": "medium",
     "main_read_files": "medium",
     "high_context_end": "medium",
@@ -157,6 +163,10 @@ RECOMMENDATION = {
                       "up at 150k.",
     "parallel_over_cap": "{detail} - launch at most 4 agents at once; parallel beyond that "
                          "only multiplies reports and audits landing in main together.",
+    "tool_results_read": "{detail} - Bash output too large; re-run the command on a "
+                         "narrower range instead of reading the saved file.",
+    "late_first_edit": "{detail} - decision reading belongs in a dossier written by an "
+                       "explorer; the implementer gets line ranges.",
     "comment_bloat": "{detail} - a new comment is one pointer line; the explanation "
                       "belongs in PATTERNS/DECIZII, not in the code.",
 }
@@ -677,6 +687,7 @@ def new_doc(path, label):
         "user_prompts": 0, "sendmessages": 0,
         "results": [], "agent_launches": [], "agent_results": {},
         "reads": collections.Counter(), "read_chars": collections.Counter(),
+        "read_events": [],
         "written": set(), "reread_own_write": [],
         "code_writes": [], "comment_writes": [],
         "max_turns_hit": False, "max_turns_ids": set(),
@@ -773,6 +784,7 @@ def parse_file(path, label, tool_names, tool_inputs):
                     fp = inp.get("file_path")
                     if isinstance(fp, str) and fp:
                         doc["reads"][fp] += 1
+                        doc["read_events"].append((fp, slice_of(inp)[0], slice_of(inp)[1]))
                         if fp in doc["written"]:
                             doc["reread_own_write"].append(fp)
                 elif name in ("Write", "Edit"):
@@ -909,6 +921,27 @@ def verification_calls(doc, tool_inputs, window=4):
     return len(hits), fixed
 
 
+LATE_READ_CMD_RE = re.compile(r"\b(sed|cat|grep|head|tail|awk)\b")
+WRITE_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+
+
+def first_edit_block(doc, tool_inputs, chars_by_id):
+    """Where the worker first wrote: call index, context there, reading done before."""
+    idx = reads = chars = 0
+    for c in doc["calls"]:
+        for name, tid in zip(c["tool_names"], c["tool_ids"]):
+            idx += 1
+            if name in WRITE_TOOLS:
+                return {"call": idx, "ctx": c["ctx"], "read_calls": reads,
+                        "read_chars": chars}
+            inp = tool_inputs.get(tid) or {}
+            if name == "Read" or (name == "Bash"
+                                  and LATE_READ_CMD_RE.search(inp.get("command") or "")):
+                reads += 1
+                chars += chars_by_id.get(tid, 0)
+    return None
+
+
 def resolve_results(doc, tool_names, tool_inputs):
     out = []
     for r in doc["results"]:
@@ -938,15 +971,51 @@ def tool_output_block(rows):
     }
 
 
+def slice_of(inp):
+    off, lim = inp.get("offset"), inp.get("limit")
+    off = int(off) if isinstance(off, (int, float)) else None
+    lim = int(lim) if isinstance(lim, (int, float)) else None
+    return off, lim
+
+
 def reread_block(doc):
+    # 🔴 distinct slices of one file are not a reread — DECIZII «v1.4.1 — 30.08.2026»
+    redundant = collections.Counter()
+    seen, sliced, full = set(), set(), set()
+    for key in doc["read_events"]:
+        path, off, lim = key
+        whole = off is None and lim is None
+        # 🔴 whole read after slices, or any slice after a whole read — hooks/read-mare.sh:96-100
+        if key in seen or (whole and path in sliced) or (not whole and path in full):
+            redundant[path] += 1
+        else:
+            seen.add(key)
+        if whole:
+            full.add(path)
+        else:
+            sliced.add(path)
     out = []
-    for path, n in doc["reads"].most_common():
-        if n < 2:
-            continue
-        chars = doc["read_chars"][path] // n if doc["read_chars"][path] else 0
-        out.append({"path": path, "reads": n, "chars": chars,
-                    "wasted_chars": chars * (n - 1)})
+    for path, n in redundant.most_common():
+        total = doc["read_chars"][path]
+        chars = total // (doc["reads"][path] or 1) if total else 0
+        out.append({"path": path, "reads": n + 1, "chars": chars,
+                    "wasted_chars": chars * n})
     return out
+
+
+FIX_MARK_RE = re.compile(r"(-fix|\bfix\b|repara[țt]ii|\bre-run\b|\bretrimitere\b|\bre-)", re.I)
+
+
+def brief_key(desc):
+    """Same brief re-sent: everything from the first fix marker on is not a new brief."""
+    s = (desc or "").strip()
+    m = re.match(r"(?i)^re-\s*(?:run|send|trimit\w*)?\s*", s)
+    if m:
+        s = s[m.end():]
+    m = FIX_MARK_RE.search(s)
+    if m:
+        s = s[:m.start()]
+    return " ".join(s.lower().split()).strip(" -–—:")
 
 
 def flag(code, scope, detail, evidence=None, wasted=0):
@@ -1134,6 +1203,16 @@ def scope_flags(scope, doc, rows, is_main):
         call_flags, doc["call_stats"] = main_call_flags(scope, doc, rows)
         flags.extend(call_flags)
     else:
+        trs = [{"path": (r["input"] or {}).get("file_path") or "?",
+                "lines": r["lines"], "chars": r["chars"]}
+               for r in rows
+               if r["tool"] == "Read"
+               and "/tool-results/" in ((r["input"] or {}).get("file_path") or "")]
+        trs.sort(key=lambda r: -r["chars"])
+        emit_many(flags, "tool_results_read", scope, trs,
+                  lambda r: "%s read %s (%d lines)" % (scope, os.path.basename(r["path"]),
+                                                       r["lines"]),
+                  lambda r: r["chars"] / 4.0)
         seen = []
         for path in doc["reread_own_write"]:
             if path not in seen:
@@ -1583,6 +1662,11 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             rereads_detail["agents"][scope] = rr
 
     # ------------------------------------------------ flags
+    docs_by_scope = {}
+    for scope, doc, rows in worker_scopes:
+        chars_by_id = {r["tool_use_id"]: r["chars"] for r in rows
+                       if isinstance(r.get("tool_use_id"), str)}
+        docs_by_scope[scope] = (doc, chars_by_id)
     flags = scope_flags("main", main_doc, main_rows, True)
     for scope, doc, rows in worker_scopes:
         flags.extend(scope_flags(scope, doc, rows, False))
@@ -1614,14 +1698,32 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
                               % (w["verify_calls"], w["verify_with_fix"]),
                               {"verify_calls": w["verify_calls"],
                                "verify_with_fix": w["verify_with_fix"]}, 0))
+        if w["type"].startswith("implementer") or w["type"].startswith("scripter"):
+            wd = docs_by_scope.get(w["scope"])
+            fe = first_edit_block(wd[0], tool_inputs, wd[1]) if wd else None
+            if fe and (fe["ctx"] >= THRESHOLDS["late_first_edit_ctx"]
+                       or fe["read_calls"] >= THRESHOLDS["late_first_edit_reads"]):
+                flags.append(flag("late_first_edit", w["scope"],
+                                  "first write at call %d, context %s, %d reading calls "
+                                  "(%s chars) before it"
+                                  % (fe["call"], tok(fe["ctx"]), fe["read_calls"],
+                                     fmt(fe["read_chars"])),
+                                  fe, 0))
         if w["transcript"] and w["final_report_chars"] == 0 and not w["max_turns_hit"]:
             flags.append(flag("agent_no_report", w["scope"],
                               "ended without a final report", None, 0))
-    if iterations["implementer_runs"] > THRESHOLDS["max_implementer_runs"]:
-        flags.append(flag("too_many_runs", "main",
-                          "implementer ran %d× (cap %d)"
-                          % (iterations["implementer_runs"], THRESHOLDS["max_implementer_runs"]),
-                          {"runs": iterations["implementer_runs"]}, 0))
+    # 🔴 the cap is per brief, not per session — DECIZII «v1.4.1 — 30.08.2026»
+    briefs = collections.OrderedDict()
+    for w in workers:
+        if not (w["type"].startswith("implementer") or w["type"].startswith("scripter")):
+            continue
+        briefs.setdefault(brief_key(w["description"]) or w["scope"], []).append(w)
+    for key, ws in briefs.items():
+        if len(ws) > THRESHOLDS["max_implementer_runs"]:
+            flags.append(flag("too_many_runs", "main",
+                              "brief \"%s\" ran %d× (cap %d)"
+                              % (key, len(ws), THRESHOLDS["max_implementer_runs"]),
+                              {"brief": key, "runs": len(ws)}, 0))
     if by_type.get("explorer", 0) > THRESHOLDS["max_explorer_runs"]:
         flags.append(flag("too_many_runs", "main",
                           "explorer ran %d× (cap %d)"
@@ -2000,10 +2102,12 @@ WASTE_FAMILIES = {
     "full_read_big_file": "reads",
     "big_tool_result_main": "reads",
     "read_tool_results_main": "reads",
+    "tool_results_read": "reads",
     "image_in_main": "reads",
     "long_agent_report": "agent overhead",
     "agent_reread_own_write": "agent overhead",
     "agent_ctx_high": "agent overhead",
+    "late_first_edit": "agent overhead",
     "sterile_verification": "agent overhead",
     "agent_max_turns": "agent overhead",
     "agent_no_report": "agent overhead",

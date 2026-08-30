@@ -62,7 +62,8 @@ Two roles appear below:
 - `implementer` (Opus, medium effort, maxTurns 100) is the DEFAULT for any brief, logic
   included. A brief ≈ ≤150k of the agent's context ≈ ≤~60 calls; the hook wraps it up at
   150k and blocks at 220k — split oversized briefs AT PLAN TIME; run the verifier once at
-  the end of the brief and once after a round of fixes, not after every edit, screenshots
+  the end of the brief and once after a round of fixes, not after every edit — the hook
+  flags (does not block) a 3rd verification run on the same brief, screenshots
   only if the brief asks for them (12% of verifications led to a fix; 41% of the agent's
   output is verification); up to 3 in parallel with
   disjoint file lists. The agent's turns and tokens are NOT a cost to save: its context dies
@@ -98,6 +99,15 @@ Two roles appear below:
   counts toward the 3-run cap per task. Reason (one day's transcripts): 6 repetitive runs
   cost $79 — manual find/replace ×38 on one CSS file by hand, a verifier run by hand ×21
   times, a script rebuilt from 24 incremental edits.
+- Decision dossier (v1.4.1): a brief that needs >300 lines of decision material read (docs
+  excerpts, config, comments, transcripts) before the first Edit → brief 0 = `explorer`
+  writes `docs/dosar/<slug>.md`; the implementer gets the dossier's path plus the ranges,
+  not whole files; `docs/dosar/` never enters a commit; the analyzer flags `late_first_edit`
+  when the first Edit comes too late.
+- `explorer` = the cheap read-only model, medium effort (tested against a pricier low-effort
+  model: double the cost, no correctness gain — unchanged). `auditor` = the worker model,
+  high effort (tested against medium: −3-6% cost, but medium misses silent deletions — do
+  not downgrade it).
 - Screenshots are compared by the agent, in its own context; it reports numbers and a
   conclusion. The orchestrator reads at most 1–2 final screenshots for the verdict, in the
   downscaled `*-small.png` variant, as late in the session as possible — every image read is
@@ -134,7 +144,8 @@ Two roles appear below:
 - Auditing: `git diff --stat` first, then the diff only on the relevant files. Never run
   `cat` on whole files next to a diff.
 - Never read files from `tool-results/` (you re-pay for a result you already saw); if a fact
-  is missing, ask the explorer for it.
+  is missing, ask the explorer for it. The ban applies to every agent (explorer,
+  implementer*, scripter*, auditor) — written into each one's own prompt.
 - Audit, directly, 3 fixed commands: `git diff --stat` · diff against the deliveries of
   EARLIER briefs on the same file (a brief that revisits an item can delete lines delivered
   before) · one grep/screenshot per "unclear/risky" line in the agent's report. In main,

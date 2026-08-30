@@ -14,13 +14,13 @@ project has its own HANDOFF / PATTERNS / DECISIONS.
 
   | agent | model | effort | maxTurns | role |
   |---|---|---|---|---|
-  | `explorer` | cheap | medium | 40 | read-only, brings facts with path:line |
+  | `explorer` | cheap | medium | 40 | read-only, brings facts with path:line; on request writes a decision dossier (`docs/dosar/<slug>.md`) with Bash under `permissionMode: plan` (v1.4.1, tested 30.08) |
   | `implementer` | expensive | medium | 100 | default for any brief, logic included |
   | `implementer-max` | expensive | high | 120 | escalation only: re-send after a failed audit, or debugging declared at plan time |
   | `implementer-sonnet` | cheap (sonnet) | high | 100 | briefs with a cheap checker only, no cross-file JS/TS debugging |
   | `scripter` / `scripter-complex` | cheap / expensive | high / medium | 80 / 100 | write + run a one-off or reusable script under `scripts/` before repetitive edits; log it in `scripts/SCRIPTS.md` |
   | `scribe` | cheap | low | 40 | docs, renames, one-line fixes |
-  | `auditor` | expensive | high | 60 | diffs over 150 lines / 3 files / new JS logic; reads, plus mechanical fixes via Edit |
+  | `auditor` | expensive | high | 60 | diffs over 150 lines / 3 files / new JS logic; reads, plus mechanical fixes via Edit (v1.4.1: tested against medium, medium misses silent deletions — stays high) |
   | `design-lead` | expensive | high | 60 | read-only + one plan file; gets paths and section headings, does not delegate; only via /polish |
   | `design-lead-expert` | expensive (opus) | xhigh | 50 | read-only + one plan file; two phases: concepts without data, then synthesis with measurements; gets a dossier (paths + line ranges) from an explorer and measurements from an implementer; reads fragments only; chosen by the router in /polish |
 
@@ -45,9 +45,9 @@ Registered in `settings.json` (see `hooks/settings.example.json`).
 | hook | event | threshold | effect |
 |---|---|---|---|
 | `session-start.sh` | SessionStart | — | injects `HANDOFF*.md` from the project root |
-| `read-mare.sh` | PreToolUse / Read | main only: re-read of a file already read this session, or >300 lines without `offset`/`limit` | denies (image without `-small`, plans, and short `.md` stay a reminder) |
+| `read-mare.sh` | PreToolUse / Read | main only: re-read of a file already read this session, or >300 lines without `offset`/`limit`; **everyone** (v1.4.1): `file_path` under `/tool-results/` | denies (image without `-small`, plans, and short `.md` stay a reminder) |
 | `brief-mare.sh` | PreToolUse / Agent | brief >7,000 characters | reminder: "split it into phases" |
-| `context-agent.sh` | PreToolUse / * | sub-agent only (`implementer*`/`scripter*`): its own context ≥150k / ≥220k | ≥150k: reminder to wrap up (once); ≥220k: denies every tool but `Bash` |
+| `context-agent.sh` | PreToolUse / * | sub-agent only (`implementer*`/`scripter*`): its own real transcript context (v1.4.1 fix — was reading main's), ≥150k / ≥220k; plus a verification-command counter (3rd `astro check`/`npm test`/`verifica-*.mjs`/etc. on the same agent transcript) | ≥150k: reminder to wrap up (once); ≥220k: denies every tool but `Bash`; 3rd verification: one-time `additionalContext` nudge, never blocks |
 | `comentarii-cod.sh` | PostToolUse / Edit\|Write | main **and** sub-agents: a comment block of ≥2 added lines, an added comment line >160 chars, or >25% comments in the added lines (≥5 added) | never blocks: `additionalContext` with the pointer rule + one JSONL line in `/tmp/claude-hooks/comentarii-<session>.jsonl` |
 | `raport-lung.sh` | SubagentStop | final report >2,000 characters | blocks once, asks for compression (background agents too — verified 2026-08-30 after switching the output to `hookSpecificOutput` + `last_assistant_message`) |
 | `session-metrics.sh` | SessionEnd | — | runs the offline analyzer, zero tokens |
@@ -104,6 +104,10 @@ Three design notes:
 
 ## What gets measured
 
+v1.4.1 fixed the agent-context hook (it was reading main's transcript, not the sub-agent's —
+see DECIZII «v1.4.1») and added `tool_results_read`, `late_first_edit`, an interval-aware
+`reread`, and a per-brief `too_many_runs`.
+
 - Do agent reports hold the ceiling? (final-report lengths, per agent, per session)
 - `raport-lung.sh`: false triggers or loops? `brief-mare.sh`: did it fire when it should?
 - Consumption per session against the baseline (target: −15–25% on how fast the
@@ -130,6 +134,14 @@ Three design notes:
   percentage of main's input volume.
 - A `counterfactual` object per session: what the same work would have cost in a single
   Fable-only context, versus what actually happened.
+- `reread`: keyed on `(file, offset, limit)` — distinct slices of one file are not a reread;
+  a whole-file read after slices, or the same slice twice, is.
+- `too_many_runs`: implementer/scripter runs grouped per brief (the launch description, minus
+  `-fix` / `fix` / `reparații` / `re-`), flagged above 3 runs on the same brief.
+- `tool_results_read`: a worker read a `tool-results/` file instead of re-running the command
+  on a narrower range.
+- `late_first_edit`: an implementer/scripter whose first write comes at ≥100k context or after
+  ≥15 reading calls — decision reading belongs in an explorer's dossier.
 
 ## The measurement recipe
 

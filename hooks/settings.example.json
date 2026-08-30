@@ -14,6 +14,7 @@
     ],
     "PreToolUse": [
       {
+        "_note": "any Read of a /tool-results/ file is denied for main and sub-agents alike; the rest (image, re-read, whole big file) is main-session only",
         "matcher": "Read",
         "hooks": [
           {
@@ -32,7 +33,7 @@
         ]
       },
       {
-        "_note": "implementer*/scripter* sub-agents only: warns once at 150000 tokens of context, denies every tool except Bash at 220000",
+        "_note": "implementer*/scripter* sub-agents only, measured on the worker transcript <dir(transcript_path)>/<session_id>/subagents/agent-<agent_id>.jsonl: warns once at 150000 tokens of context, denies every tool except Bash at 220000, and nudges once on the 3rd build/test/verifica-* Bash call; triggers logged in /tmp/claude-hooks/context-agent.jsonl",
         "matcher": "*",
         "hooks": [
           {

@@ -32,6 +32,8 @@ Rules:
 6. Do not re-read files you have just written. Read a target file whole at most once;
    afterwards use line ranges. Read each screenshot at most once, in its reduced `*-mic.png`
    form.
+   Bash output the tool saved under `tool-results/` is not to be read; re-run the command
+   on a smaller range instead. If the brief gives a dossier, read only the ranges it names.
 7. A new code comment = a single one-line pointer: `🔴 <constraint> — <DOC> «<section>»`
    (PATTERNS for technical traps, DECISIONS for reasons). The explanation does NOT live in the
    code, it lives in the named section; if the section does not exist, add it there (2-5

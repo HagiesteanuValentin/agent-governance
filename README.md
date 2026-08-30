@@ -59,7 +59,13 @@ sessions against v1.2's $23.13/session, not claimed in advance. v1.4b added `scr
 repetitive edits before straight-to-worker briefs — same medium-vs-high reasoning as above
 (medium ≈ high accuracy at 70–85% cost), on evidence from a $79/6-run day of manual
 find/replace and hand-run verification. It also relaxed parallelism to a hard cap of 4 live
-agents of any type (see "Parallelism" above).
+agents of any type (see "Parallelism" above). v1.4.1 (2026-08-30 evening) fixed
+`context-agent.sh` to measure the sub-agent's own transcript instead of main's (it had never
+actually enforced the 150k/220k ceiling); tested `explorer` and `auditor` against a
+lower-cost cell each — both kept their model/effort, `explorer` on tied accuracy and
+`auditor` because the cheaper cell missed silent-deletion deviations; and added a
+decision-dossier pattern (`explorer` writes `docs/dosar/<slug>.md` before a >300-line-read
+brief) plus two analyzer flags, `tool_results_read` and `late_first_edit`.
 
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000
@@ -157,6 +163,15 @@ doc section, not the code. Enforced by a non-blocking hook, `hooks/comentarii-co
 (fires in main and in every subagent — the same PostToolUse matcher, no `agent_id` filter),
 which logs every flagged Edit/Write to a JSONL file read by `/handoff`; the analyzer's
 `comment_bloat` flag caught it in 178 of 257 past sessions.
+
+**Decision dossier (v1.4.1)**: a brief that needs >300 lines of decision material read
+(docs excerpts, config, comments, transcripts) before the first `Edit` sends `explorer`
+first — it writes `docs/dosar/<slug>.md` (Bash `cat >`, works under `permissionMode: plan`)
+and the implementer gets the path plus line ranges instead of whole files.
+`late_first_edit` flags an implementer/scripter whose first write comes late anyway (≥100k
+context or ≥15 reading calls); `tool_results_read` flags any worker reading a
+`tool-results/` file instead of re-running the command narrower. Reason: on one postmortem,
+the first `Edit` landed at call 29 of 41 (197k context, 242k characters read first).
 
 ## Measured results
 

@@ -47,7 +47,9 @@ the header from the template):
 
 Prohibited: reading DECISIONS/PATTERNS/RECIPES/HANDOFF whole (only the sections named in the
 brief); exploring outside the target files; installing packages; commit/push/deploy/seed/real
-external services; re-reading files you just wrote; running the verifier more than 2x.
+external services; re-reading files you just wrote; running the verifier more than 2x; reading
+Bash output the tool saved under `tool-results/` (re-run the command on a smaller range
+instead). If the brief gives a dossier, read only the ranges it names.
 
 A new code comment = a single one-line pointer: `🔴 <constraint> — <DOC> «<section>»`
 (PATTERNS for technical traps, DECISIONS for reasons). The explanation does NOT live in the
