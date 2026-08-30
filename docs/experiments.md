@@ -48,3 +48,17 @@ Create the cell agents in `~/.claude/agents/` as copies with a different `effort
 Wait ~1–2 min for "New agent types are now available" before launching them. Launch all
 cells in one message with byte-identical prompts, so the comparison is apples-to-apples.
 Read costs from the Workers table of `tools/session_metrics.py --out-dir`.
+
+## 2026-08-30 — explorer-max: Sonnet 5 medium vs Opus 5 low (6k report)
+
+Setup: byte-identical prompt, 2 cells in parallel, question = per-agent profile of 6 JSONL
+transcripts (calls, first Edit + context, chars read before it, top 3 results, chars per tool,
+final context); ground truth = the same profile computed independently, plus a check on the
+real transcripts at every disagreement. Hook `raport-lung.sh` with a 6,000 cap for `explorer-max*`.
+
+| cell | correct | calls / $ / time | peak ctx | report chars |
+|---|---|---|---|---|
+| Sonnet 5 medium | yes (0 errors vs ground truth) | 6 / $0.20 / 1m25s | 38.8k | 2,609 |
+| Opus 5 low | 1 confirmed error (impl#1: counted a `git log … 2>/dev/null` redirect as the first write, idx 1 instead of 12) + final-context values rounded off by 1–4k | 2 / $0.32 / 39s | 27.6k | 2,346 |
+
+Both reports complete (6 agents × 6 fields); both passed the 6k hook at >2k (the old 2k cap would have blocked both). Conclusion: `explorer-max` = Sonnet 5 medium, maxTurns 60, report ≤6k; Opus low not adopted (1.6× cost, more errors on exact numbers).

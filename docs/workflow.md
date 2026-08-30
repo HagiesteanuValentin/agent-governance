@@ -15,6 +15,7 @@ project has its own HANDOFF / PATTERNS / DECISIONS.
   | agent | model | effort | maxTurns | role |
   |---|---|---|---|---|
   | `explorer` | cheap | medium | 40 | read-only, brings facts with path:line; on request writes a decision dossier (`docs/dosar/<slug>.md`) with Bash under `permissionMode: plan` (v1.4.1, tested 30.08) |
+  | `explorer-max` | cheap | medium | 60 | read-only, same model, report ≤6k, for table-shaped answers (v1.5, A/B 30.08, `docs/experiments.md`) |
   | `implementer` | expensive | medium | 100 | default for any brief, logic included |
   | `implementer-max` | expensive | high | 120 | escalation only: re-send after a failed audit, or debugging declared at plan time |
   | `implementer-sonnet` | cheap (sonnet) | high | 100 | briefs with a cheap checker only, no cross-file JS/TS debugging |

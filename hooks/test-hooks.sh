@@ -11,6 +11,7 @@ HOOKS = os.environ["HOOKS_DIR"]
 READ_HOOK = os.path.join(HOOKS, "read-mare.sh")
 CTX_HOOK = os.path.join(HOOKS, "context-agent.sh")
 CMT_HOOK = os.path.join(HOOKS, "comentarii-cod.sh")
+RAP_HOOK = os.path.join(HOOKS, "raport-lung.sh")
 TMP = tempfile.mkdtemp(prefix="test-hooks-")
 RUN = "test%d" % os.getpid()
 MARKERS = []
@@ -280,6 +281,45 @@ try:
     os.remove(CMT_LOG)
 except OSError:
     pass
+
+# ---------------------------------------------------------------- raport-lung (per-agent limit)
+def rap_in(msg, agent_id=None, agent_type=None, meta_agent_type=None):
+    sid = "s-rap-%s" % (agent_id or "main")
+    tp = write("proj-rap/%s.jsonl" % sid, ["{}"])
+    d = {"session_id": sid, "transcript_path": tp, "last_assistant_message": msg}
+    if agent_id:
+        d["agent_id"] = agent_id
+        if agent_type is not None:
+            d["agent_type"] = agent_type
+        if meta_agent_type is not None:
+            subdir = os.path.join(TMP, "proj-rap", sid, "subagents")
+            os.makedirs(subdir, exist_ok=True)
+            with open(os.path.join(subdir, "agent-%s.meta.json" % agent_id), "w") as f:
+                json.dump({"agentType": meta_agent_type}, f)
+    return d
+
+def rap_case(name, expect_block, needle="", **kw):
+    rc, out, err = call(RAP_HOOK, rap_in(**kw))
+    ok = rc == 0 and not err
+    if ok:
+        if expect_block:
+            try:
+                h = json.loads(out)
+                body = h.get("reason", "")
+                ok = h.get("decision") == "block" and (not needle or needle in body)
+            except Exception:
+                ok = False
+        else:
+            ok = out == ""
+    results.append((name, ok, "block" if out else "allow (rc=%d)%s" % (
+        rc, " stderr: " + err if err else "")))
+
+rap_case("explorer-max 5000 chars -> allow (under 6000)", False,
+         agent_id="rm1", meta_agent_type="explorer-max-sonnet", msg="x" * 5000)
+rap_case("explorer-max 6500 chars -> block (over 6000)", True, needle="6000",
+         agent_id="rm2", meta_agent_type="explorer-max-opus", msg="x" * 6500)
+rap_case("explorer 2500 chars -> block (over 2000)", True, needle="2000",
+         agent_id="rm3", agent_type="explorer", msg="x" * 2500)
 
 # ---------------------------------------------------------------- timing (1 MB transcript)
 def timed(hook, payload, n=3):

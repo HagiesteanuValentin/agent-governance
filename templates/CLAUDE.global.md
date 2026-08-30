@@ -16,9 +16,17 @@ Two roles appear below:
   the session's model and burn the expensive quota. When you need a fact that is not in the
   sources of truth, or you want to keep the context clean (including in plan mode), launch
   `explorer` (cheap model, read-only) with a precise question. Allowed agents: `explorer`,
-  `implementer`, `implementer-max`, `implementer-sonnet`, `scripter`, `scripter-complex`,
-  `scribe`, `auditor`, `design-lead`, `design-lead-expert` (only via `/polish`) — nothing
-  else without the operator's approval.
+  `explorer-max`, `implementer`, `implementer-max`, `implementer-sonnet`, `scripter`,
+  `scripter-complex`, `scribe`, `auditor`, `design-lead`, `design-lead-expert` (only via
+  `/polish`) — nothing else without the operator's approval.
+- Reading in main (v1.5): main only reads `git diff --stat`, agent reports, and at most one
+  dossier. Any command or Read whose result crosses ~3k characters of FACTS (grep/Python on
+  transcripts, agent profiling, doc excerpts, file lists) goes to `explorer`; if the answer
+  is a table or list that doesn't fit in 1.5k → `explorer-max` (report ≤6k) or an explorer
+  that writes a dossier under `docs/dosar/` plus a short report. "Doesn't fit in the report"
+  is not a reason for a direct read. Reason (30.08 s10): 9 direct reads = 64k characters,
+  context 49k→132k before the first agent; an explorer costs $0.06–0.15 per question, and
+  Anthropic recommends 1-2k token summaries (~4-8k characters) from subagents.
 - Do not re-read files you have just written.
 - A new code comment = a single one-line pointer: `🔴 <constraint> — <DOC> «<section>»`
   (PATTERNS for technical traps, DECISIONS for reasons). The explanation does NOT live in the
@@ -53,9 +61,8 @@ Two roles appear below:
   (4) the auditor fixes mechanical deviations directly (≤20 lines/file, ≤3 files, no new
   logic) and reports them as `FIXED` with the hunk; the rest all go, in a single message, to
   the same implementer via SendMessage (its context is alive; ~0 bootstrap versus ~40-50k
-  for a new run) — the first re-send after a failed audit goes to `implementer-max`; you fix
-  directly only an isolated deviation, under ~20 lines in one file, when that is faster than
-  the message; (5) only then the final report.
+  for a new run); you fix directly only an isolated deviation, under ~20 lines in one file,
+  when that is faster than the message; (5) only then the final report.
 - Light tasks (docs, HANDOFF, renames, one-line fixes, typos) → `scribe`. The scribe gets
   the target SECTIONS (heading name, maybe a line range), not whole files; it does not read
   docs end to end.
@@ -79,10 +86,15 @@ Two roles appear below:
   verification scripts. Chosen AT PLAN TIME and written into the brief. Logic deviations at
   audit → re-send to `implementer-max` (not a second Sonnet run); SendMessage to Sonnet only
   for mechanical deviations (text/CSS/config).
-- `implementer-max` (Opus, high effort, maxTurns 120) is an ESCALATION, not a default: ONLY
-  (a) a re-send after a failed audit on the same brief, or (b) debugging declared at plan
-  time with a written reason. It carries the same context thresholds as any brief —
-  maxTurns 120 is not an exemption from the 150k/220k hook.
+- After a NON-COMPLIANT audit, in this order: (1) mechanical deviations ≤20 lines/file, ≤3
+  files → the auditor fixes them (FIXED); (2) the rest, mechanical or small logic → send
+  SendMessage to the SAME implementer (medium), all in one message, cap of 3 messages;
+  (3) `implementer-max` (Opus 5 high, maxTurns 120) ONLY when the deviation is LOGIC and:
+  (a) the implementer already missed it once via SendMessage, or (b) its context is >150k /
+  the agent is closed by the hook, or (c) debugging was declared at plan time. Before any
+  max run write a line in main: `escalation: <the logic deviation> · <why not SendMessage>`
+  — the analyzer flags `max_without_sendmessage`. Reason (30.08 s1): 2 max runs = $7.8, 95
+  calls, for 10 deviations of which 9 were mechanical (text pointers), 0 SendMessage.
 - Scripter before repetitive work: at plan time, if a brief has ≥8 changes with the same
   pattern across ≥4 files, screenshots/measurements across ≥3 states or widths, or a check
   that will run in ≥2 briefs → the first brief goes to `scripter` (cheap model, high
@@ -105,9 +117,10 @@ Two roles appear below:
   not whole files; `docs/dosar/` never enters a commit; the analyzer flags `late_first_edit`
   when the first Edit comes too late.
 - `explorer` = the cheap read-only model, medium effort (tested against a pricier low-effort
-  model: double the cost, no correctness gain — unchanged). `auditor` = the worker model,
-  high effort (tested against medium: −3-6% cost, but medium misses silent deletions — do
-  not downgrade it).
+  model: double the cost, no correctness gain — unchanged). `explorer-max` = the same model,
+  report ≤6k, maxTurns 60, for table-shaped answers (A/B 30.08, `docs/experiments.md`).
+  `auditor` = the worker model, high effort (tested against medium: −3-6% cost, but medium
+  misses silent deletions — do not downgrade it).
 - Screenshots are compared by the agent, in its own context; it reports numbers and a
   conclusion. The orchestrator reads at most 1–2 final screenshots for the verdict, in the
   downscaled `*-small.png` variant, as late in the session as possible — every image read is
@@ -128,8 +141,7 @@ Two roles appear below:
   guaranteed disjoint or a risky delivery you want to be able to throw away: it costs the
   dependencies installed on the copy + a merge you audit yourself; it does not solve
   dependencies between briefs.
-- Default ceilings: at most 2 re-sends to `implementer` on the same task (3 runs total; the
-  first re-send after a failed audit goes to `implementer-max`) and
+- Default ceilings: at most 2 re-sends to `implementer` on the same task (3 runs total) and
   at most 3 `explorer` runs per task (can run in parallel); SendMessage messages to a live agent
   are not re-sends — ceiling of 3 messages per agent. An agent stopped by `maxTurns` is a
   signal that the brief is too big; split it, do not relaunch it unchanged. One
@@ -182,9 +194,11 @@ Two roles appear below:
   (commit/push/deploy/seed/real services). Write the rules out in full; do not reference a
   skill. Without a complete brief, nothing gets delegated.
 - Task with plan mode: the plan (`~/.claude/plans/<slug>.md`) contains the complete briefs
-  as `## Brief N — <title>` sections, each with every required element above. When
-  delegating, the Agent prompt is ≤10 lines: the plan's path + "execute ONLY section
-  «Brief N»" + the commit/push ban; do not rewrite the brief in the prompt. Plan = ≤10
+  as `## Brief N — <title>` sections, each with every required element above. When delegating,
+  extract the brief's section into its own file (`<scratchpad>/brief-N.md`, one `sed -n`
+  or `awk`, a single call) and the Agent prompt (≤10 lines) gives THAT path, not the whole
+  plan; the commit/push prohibition stays in the prompt. Reason (30.08 s1): all 5
+  implementers read the full 8-16k plan for a 1-2k section. Plan = ≤10
   lines of context + briefs + verification; no alternatives, no narrative (every character
   is paid twice: once to write, once as ExitPlanMode's echo).
 

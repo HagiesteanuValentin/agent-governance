@@ -1,11 +1,13 @@
 #!/bin/bash
-# SubagentStop: the subagent's last message >2000 characters -> block ONCE, asking for a
-# compressed report in the fixed format. Guarded on stop_hook_active so it cannot loop.
-# Reads last_assistant_message (official field); falls back to the transcript if absent.
+# SubagentStop: last message over the agent's limit -> block ONCE, ask for a compressed report.
+# 🔴 explorer-max* = 6000, rest = 2000 — docs/RETETE.md «Test hook SubagentStop»
+LIMIT=2000
+LIMIT_EXPLORER_MAX=6000
 input=$(cat)
-python3 - "$input" <<'PY'
-import json, sys
+python3 - "$input" "$LIMIT" "$LIMIT_EXPLORER_MAX" <<'PY'
+import json, os, sys
 d = json.loads(sys.argv[1])
+LIMIT, LIMIT_EXPLORER_MAX = int(sys.argv[2]), int(sys.argv[3])
 if d.get("stop_hook_active"):
     sys.exit(0)
 last = d.get("last_assistant_message") or ""
@@ -27,11 +29,28 @@ if not last:
                     last = t
     except OSError:
         sys.exit(0)
-if len(last) <= 2000:
+
+# 🔴 no agent_type in input — deduce via sibling .meta.json — docs/RETETE.md «Test hook SubagentStop»
+agent_type = d.get("agent_type") or ""
+if not agent_type:
+    agent_id = d.get("agent_id")
+    session_id = d.get("session_id")
+    tp = d.get("transcript_path") or ""
+    if agent_id and session_id and tp:
+        meta_path = os.path.join(os.path.dirname(tp), session_id, "subagents",
+                                  "agent-%s.meta.json" % agent_id)
+        try:
+            with open(meta_path) as f:
+                agent_type = json.load(f).get("agentType") or ""
+        except (OSError, ValueError):
+            pass
+
+limit = LIMIT_EXPLORER_MAX if agent_type.startswith("explorer-max") else LIMIT
+if len(last) <= limit:
     sys.exit(0)
-reason = (f"The final report is {len(last)} characters. The fixed format in your instructions "
-          "allows at most 1,500 (soft) / 2,000 (hard). Send back ONLY the compressed report, "
-          "in the fixed format, with no process narration.")
+reason = (f"The final report is {len(last)} characters. The limit for this agent "
+          f"({agent_type or 'unknown'}) is {limit} characters. Send back ONLY the "
+          "compressed report, in the fixed format, with no process narration.")
 print(json.dumps({"decision": "block", "reason": reason,
     "hookSpecificOutput": {"hookEventName": d.get("hook_event_name", "SubagentStop"),
                            "decision": "block", "reason": reason}}))

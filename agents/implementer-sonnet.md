@@ -34,6 +34,11 @@ Rules:
    form.
    Bash output the tool saved under `tool-results/` is not to be read; re-run the command
    on a smaller range instead. If the brief gives a dossier, read only the ranges it names.
+   Citești un fișier-țintă O dată; peste 300 de linii, cu `offset`/`limit` pe intervalul din
+   brief. Docs de decizie doar în intervalele date; re-verificarea se face cu grep sau un
+   interval, nu o a doua citire integrală. Planul de sesiune nu se citește: brief-ul tău e în
+   fișierul din prompt. Modificările de cod se fac cu Edit/Write, nu cu Bash heredoc/python —
+   heredoc-ul ocolește hook-ul de comentarii și contorul de verificări.
 7. A new code comment = a single one-line pointer: `🔴 <constraint> — <DOC> «<section>»`
    (PATTERNS for technical traps, DECISIONS for reasons). The explanation does NOT live in the
    code, it lives in the named section; if the section does not exist, add it there (2-5

@@ -49,6 +49,7 @@ THRESHOLDS = {
     "big_tool_result_main": 10000,   # chars of a single tool_result in the main context
     "full_read_lines": 300,          # lines returned by a Read without offset/limit
     "long_agent_report": 2000,       # chars of a worker's final message
+    "long_agent_report_explorer_max": 6000,  # hooks/raport-lung.sh: explorer-max* cap
     "long_brief": 7000,              # chars of Agent.input.prompt
     "max_implementer_runs": 3,       # implementer + implementer-max + implementer-sonnet + scripter + scripter-complex per session
     "max_live_agents": 4,             # hard cap on concurrently running sub-agents; over it = parallel_over_cap
@@ -73,6 +74,8 @@ THRESHOLDS = {
     "comment_min_added": 5,
     "late_first_edit_ctx": 100000,   # worker context when it finally writes
     "late_first_edit_reads": 15,     # reading calls before the first write
+    "main_read_before_agent": 20000, # chars main read itself before launching any agent
+    "edit_via_bash_calls": 2,        # heredoc writes into source files, with no Edit/Write
 }
 
 FLAG_TEXT = {
@@ -102,6 +105,10 @@ FLAG_TEXT = {
     "agent_ctx_high": "worker context past the degradation threshold",
     "tool_results_read": "worker read a tool-results/ file instead of re-running a narrower command",
     "late_first_edit": "worker read its way to a decision before writing anything",
+    "main_read_before_first_agent": "main gathered the facts itself before the first agent",
+    "max_without_sendmessage": "implementer-max launched without a SendMessage first",
+    "agent_read_plan_whole": "worker read the whole plan file instead of its brief",
+    "edit_via_bash": "worker edited source files through Bash instead of Edit/Write",
 }
 
 # base gravity per code; wasted tokens can only push it up (see severity_of)
@@ -114,6 +121,10 @@ SEVERITY_BASE = {
     "too_many_runs": "high",
     "agent_ctx_high": "high",
     "late_first_edit": "high",
+    "main_read_before_first_agent": "high",
+    "max_without_sendmessage": "high",
+    "agent_read_plan_whole": "medium",
+    "edit_via_bash": "medium",
     "big_tool_result_main": "medium",
     "tool_results_read": "medium",
     "reread": "medium",
@@ -137,7 +148,8 @@ RECOMMENDATION = {
     "full_read_big_file": "{detail} - fine for the implementer on its own target; give the "
                           "explorer/auditor line ranges instead.",
     "image_in_main": "{detail} - read the downscaled `-mic` copy, and late in the session.",
-    "long_agent_report": "{detail} - soft cap 1.5k, hard cap 2k, fixed format.",
+    "long_agent_report": "{detail} - soft cap 1.5k, hard cap 2k (explorer-max*: 4.5k/6k), "
+                         "fixed format.",
     "long_brief": "{detail} - over 7k the brief belongs in a plan file; the prompt is path "
                   "+ section.",
     "too_many_runs": "{detail} - split the work at plan time, do not re-send the same brief.",
@@ -167,9 +179,27 @@ RECOMMENDATION = {
                          "narrower range instead of reading the saved file.",
     "late_first_edit": "{detail} - decision reading belongs in a dossier written by an "
                        "explorer; the implementer gets line ranges.",
+    "main_read_before_first_agent": "{detail} - facts before the first agent belong to an "
+                                    "explorer; main reads `git diff --stat`, reports and at "
+                                    "most one dossier.",
+    "max_without_sendmessage": "{detail} - a non-conform audit goes first to the live "
+                               "implementer via SendMessage; implementer-max needs a written "
+                               "reason (logic + failed SendMessage / dead context / declared "
+                               "debugging).",
+    "agent_read_plan_whole": "{detail} - the agent gets its own brief file "
+                             "(scratchpad/brief-N.md), not the whole plan.",
+    "edit_via_bash": "{detail} - code edits go through Edit/Write; Bash heredocs bypass the "
+                     "comment hook and the verify counter.",
     "comment_bloat": "{detail} - a new comment is one pointer line; the explanation "
                       "belongs in PATTERNS/DECIZII, not in the code.",
 }
+
+
+def report_limit_for(agent_type):
+    # 🔴 explorer-max* = 6000, restul 2000 — docs/RETETE.md «Test hook SubagentStop»
+    if isinstance(agent_type, str) and agent_type.startswith("explorer-max"):
+        return THRESHOLDS["long_agent_report_explorer_max"]
+    return THRESHOLDS["long_agent_report"]
 
 
 def severity_of(code, scope, wasted):
@@ -684,7 +714,7 @@ def new_doc(path, label):
         "first_prompt_ts": None, "cwd": None,
         "groups": collections.OrderedDict(),
         "calls": [], "turn_ms": 0, "turns": 0, "slash": [],
-        "user_prompts": 0, "sendmessages": 0,
+        "user_prompts": 0, "sendmessages": 0, "sendmessage_ts": [],
         "results": [], "agent_launches": [], "agent_results": {},
         "reads": collections.Counter(), "read_chars": collections.Counter(),
         "read_events": [],
@@ -805,6 +835,8 @@ def parse_file(path, label, tool_names, tool_inputs):
                                                    "lines": body.count("\n") + 1})
                 elif name == "SendMessage":
                     doc["sendmessages"] += 1
+                    if isinstance(ts, str):
+                        doc["sendmessage_ts"].append(ts)
                     if isinstance(b.get("id"), str):
                         doc["agent_call_ids"].add(b["id"])
                 elif name == "Agent":
@@ -815,6 +847,7 @@ def parse_file(path, label, tool_names, tool_inputs):
                         "type": inp.get("subagent_type") or "agent",
                         "description": inp.get("description") or "",
                         "brief_chars": len(inp.get("prompt") or ""),
+                        "debugging": "debugging" in (inp.get("prompt") or "").lower(),
                         "at": ts,
                     })
             elif bt == "tool_result":
@@ -919,6 +952,26 @@ def verification_calls(doc, tool_inputs, window=4):
                 if any(seq[j][0] in FIX_TOOLS
                        for j in range(i + 1, min(i + 1 + window, len(seq)))))
     return len(hits), fixed
+
+
+PLANS_DIR = "/.claude/plans/"
+BASH_WRITE_RE = re.compile(r"<<|python3?\s+-(?:\s|$)")
+SRC_EXT = r"(?:js|ts|mjs|astro|css|py|sh)"
+REDIRECT_RE = re.compile(r"(?:>>?|tee\s+(?:-a\s+)?)\s*['\"]?([^\s'\";|&]+\.%s)\b" % SRC_EXT)
+PY_WRITE_RE = re.compile(r"open\([^)]*['\"][wa]|\.write\(|write_text\(")
+SRC_PATH_RE = re.compile(r"[\w./~$-]*\.%s\b" % SRC_EXT)
+# 🔴 a helper written into the scratchpad is not a source edit — DECIZII «v1.5 — 30.08.2026»
+TMP_PATH_RE = re.compile(r"^/tmp/|scratchpad|/dosar/")
+
+
+def bash_writes_source(cmd):
+    """Bash call that writes a project source file (heredoc / python3 - ), not a temp helper."""
+    if not BASH_WRITE_RE.search(cmd):
+        return False
+    targets = REDIRECT_RE.findall(cmd)
+    if PY_WRITE_RE.search(cmd):
+        targets += SRC_PATH_RE.findall(cmd)
+    return any(t and not TMP_PATH_RE.search(t) for t in targets)
 
 
 LATE_READ_CMD_RE = re.compile(r"\b(sed|cat|grep|head|tail|awk)\b")
@@ -1072,6 +1125,18 @@ def main_call_flags(scope, doc, rows):
               lambda r: "`%s` returned %s chars" % (r["cmd"], fmt(r["chars"])),
               lambda r: r["chars"] / 4.0)
 
+    launch_ts = [l["at"] for l in doc["agent_launches"] if isinstance(l.get("at"), str)]
+    first_launch = min(launch_ts) if launch_ts else "9"  # 🔴 no Agent at all = every read counts — DECIZII «v1.5 — 30.08.2026»
+    before = [r for r in rows if r["tool"] in ("Bash", "Read")
+              and isinstance(r.get("at"), str) and r["at"] < first_launch]
+    pre_chars = sum(r["chars"] for r in before)
+    if pre_chars > THRESHOLDS["main_read_before_agent"]:
+        flags.append(flag("main_read_before_first_agent", scope,
+                          "%s chars of Bash/Read results in main before the first agent "
+                          "(%d results)" % (fmt(pre_chars), len(before)),
+                          {"chars": pre_chars, "results": len(before)},
+                          pre_chars / 4.0))
+
     # an answer to the user is not narration; after a launch the turn has to end anyway
     narr = [c for c in calls if not c["has_tool_use"]
             and c["text_chars"] < THRESHOLDS["narration_text_chars"]
@@ -1221,6 +1286,25 @@ def scope_flags(scope, doc, rows, is_main):
                   [{"path": p} for p in seen],
                   lambda r: "%s re-read after writing it" % os.path.basename(r["path"]),
                   lambda r: 0)
+        plans = []
+        for r in rows:
+            inp = r["input"] or {}
+            fp = inp.get("file_path") or ""
+            if (r["tool"] == "Read" and PLANS_DIR in fp and fp.endswith(".md")
+                    and not inp.get("offset") and not inp.get("limit")):
+                plans.append({"path": fp, "chars": r["chars"]})
+        plans.sort(key=lambda r: -r["chars"])
+        emit_many(flags, "agent_read_plan_whole", scope, plans,
+                  lambda r: "%s read whole (%s chars)"
+                            % (os.path.basename(r["path"]), fmt(r["chars"])),
+                  lambda r: r["chars"] / 4.0)
+        if not doc["written"]:
+            heredocs = [r for r in rows if r["tool"] == "Bash"
+                        and bash_writes_source((r["input"] or {}).get("command") or "")]
+            if len(heredocs) >= THRESHOLDS["edit_via_bash_calls"]:
+                flags.append(flag("edit_via_bash", scope,
+                                  "%d Bash writes into source files, 0 Edit/Write"
+                                  % len(heredocs), {"calls": len(heredocs)}, 0))
     cw = doc["comment_writes"]
     if cw:
         files = sorted(set(os.path.basename(w["path"]) for w in cw))
@@ -1516,7 +1600,8 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
     workers = []
     seq = collections.Counter()
 
-    def add_worker(wtype, description, brief_chars, launch_model, entry, launch_id=None):
+    def add_worker(wtype, description, brief_chars, launch_model, entry, launch_id=None,
+                   launch_at=None, brief_debugging=False):
         seq[wtype] += 1
         scope = "%s#%d" % (wtype, seq[wtype])
         path = label = doc = None
@@ -1551,6 +1636,8 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             "output_tokens": doc["usage"]["output"] if doc else 0,
             "cost_usd": cost_of(doc["usage"], rates_for(pricing, model)) if doc else 0.0,
             "brief_chars": brief_chars,
+            "launched_at": launch_at,
+            "brief_debugging": bool(brief_debugging),
             "final_report_chars": report_chars,
             "tool_calls": len(rows),
             "reads": sum(doc["reads"].values()) if doc else 0,
@@ -1574,7 +1661,8 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             used.add(aid)
         w, doc, rows = add_worker(launch["type"], launch["description"],
                                   launch["brief_chars"], res.get("resolvedModel"), entry,
-                                  launch["tool_use_id"])
+                                  launch["tool_use_id"], launch.get("at"),
+                                  launch.get("debugging"))
         if doc is not None:
             worker_scopes.append((w["scope"], doc, rows))
     for aid, entry in sorted(by_agent_id.items()):
@@ -1671,11 +1759,13 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
     for scope, doc, rows in worker_scopes:
         flags.extend(scope_flags(scope, doc, rows, False))
     for w in workers:
-        if w["final_report_chars"] > THRESHOLDS["long_agent_report"]:
+        report_cap = report_limit_for(w["type"])
+        if w["final_report_chars"] > report_cap:
             flags.append(flag("long_agent_report", w["scope"],
-                              "final report %s chars" % fmt(w["final_report_chars"]),
-                              {"chars": w["final_report_chars"]},
-                              (w["final_report_chars"] - THRESHOLDS["long_agent_report"]) / 4.0))
+                              "final report %s chars (cap %s)"
+                              % (fmt(w["final_report_chars"]), fmt(report_cap)),
+                              {"chars": w["final_report_chars"], "cap": report_cap},
+                              (w["final_report_chars"] - report_cap) / 4.0))
         if w["brief_chars"] > THRESHOLDS["long_brief"]:
             flags.append(flag("long_brief", w["scope"],
                               "brief %s chars" % fmt(w["brief_chars"]),
@@ -1712,6 +1802,24 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         if w["transcript"] and w["final_report_chars"] == 0 and not w["max_turns_hit"]:
             flags.append(flag("agent_no_report", w["scope"],
                               "ended without a final report", None, 0))
+    sm_ts = sorted(t for t in main_doc["sendmessage_ts"] if isinstance(t, str))
+    audit_ends = sorted(w["ended"] for w in workers
+                        if w["type"] == "auditor" and w["ended"])
+    for w in workers:
+        if w["type"] != "implementer-max" or w.get("brief_debugging"):
+            continue
+        at = w.get("launched_at") or w.get("started")
+        if not at:
+            continue
+        prev = [e for e in audit_ends if e < at]
+        since = prev[-1] if prev else (main_doc["first_ts"] or "")
+        if any(since <= t < at for t in sm_ts):
+            continue
+        flags.append(flag("max_without_sendmessage", "main",
+                          "%s launched with no SendMessage since %s"
+                          % (w["scope"], "the previous audit" if prev
+                             else "the start of the session"),
+                          {"scope": w["scope"], "since": since, "at": at}, 0))
     # 🔴 the cap is per brief, not per session — DECIZII «v1.4.1 — 30.08.2026»
     briefs = collections.OrderedDict()
     for w in workers:
@@ -2104,6 +2212,10 @@ WASTE_FAMILIES = {
     "read_tool_results_main": "reads",
     "tool_results_read": "reads",
     "image_in_main": "reads",
+    "main_read_before_first_agent": "reads",
+    "agent_read_plan_whole": "reads",
+    "edit_via_bash": "agent overhead",
+    "max_without_sendmessage": "discipline",
     "long_agent_report": "agent overhead",
     "agent_reread_own_write": "agent overhead",
     "agent_ctx_high": "agent overhead",

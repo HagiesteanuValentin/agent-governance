@@ -4,7 +4,10 @@ Governance for Claude Code agent sessions: policies, enforcement hooks, and offl
 telemetry. Cheap models do the work, the expensive model only plans and audits, and hooks
 stop verbose agents from flooding the orchestrator's context.
 
-Current version: **v1.4.1** (2026-08-30). Model/effort choices are measured — see
+Current version: **v1.5** (2026-08-30) — reading goes through explorer/explorer-max (6k
+report), briefs as per-agent files, implementer-max only with a written reason; analyzer
+flags main_read_before_first_agent, max_without_sendmessage, agent_read_plan_whole,
+edit_via_bash. Model/effort choices are measured — see
 [docs/experiments.md](docs/experiments.md).
 
 ## The problem

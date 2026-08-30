@@ -3,6 +3,11 @@
 ## Test hook SubagentStop
 Agent de probă în `~/.claude/agents/` (sonnet, effort low, maxTurns 6, fără Bash/Edit/Write). Prompt: „scrie ~3.000 caractere; dacă ești blocat, comprimă și scrie pe primul rând COMPRIMAT DUPĂ BLOCARE". Verdict = raportul începe cu marcajul. Forma de block: `{"hookSpecificOutput":{"hookEventName":"SubagentStop","decision":"block","reason":"…"}}`. Șterge agentul după test.
 
+Prag per agent (v1.5): implicit 2.000 caractere, 6.000 pentru agenții al căror nume începe
+cu `explorer-max` (celule A/B cu raport lung). Payload-ul SubagentStop nu conține
+`agent_type` — se deduce din `agent-<agent_id>.meta.json`, fișierul soră al transcriptului
+agentului din același `subagents/`, cheia `agentType`.
+
 ## Regenerare metrics-local după schimbare de prețuri
 Pentru fiecare `metrics-local/*.json` iei `path` (jsonl), apoi:
 ```
