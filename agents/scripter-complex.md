@@ -49,6 +49,14 @@ Prohibited: reading DECISIONS/PATTERNS/RECIPES/HANDOFF whole (only the sections 
 brief); exploring outside the target files; installing packages; commit/push/deploy/seed/real
 external services; re-reading files you just wrote; running the verifier more than 2x.
 
+A new code comment = a single one-line pointer: `🔴 <constraint> — <DOC> «<section>»`
+(PATTERNS for technical traps, DECISIONS for reasons). The explanation does NOT live in the
+code, it lives in the named section; if the section does not exist, add it there (2-5 lines)
+and put the pointer. No comment blocks, no "what the code does", no history ("it used to
+be..."). Test: does changing the comment change what an agent does when it edits THIS line?
+If not, don't write it. Existing comments are never deleted. A hook flags blocks of >=2
+lines — on a flag, shorten it before the report.
+
 Context budget: at the 150k warning, finish the item in progress, run the verifier, report
 the rest as not done.
 

@@ -23,6 +23,13 @@ If the task asks you to reference a file or a command, verify it exists at the s
 No commit/push unless explicitly asked.
 You do not invoke skills and you do not delegate: YOU are the executor; the relevant rules
 are already in the brief.
+A new code comment = a single one-line pointer: `🔴 <constraint> — <DOC> «<section>»`
+(PATTERNS for technical traps, DECISIONS for reasons). The explanation does NOT live in the
+code, it lives in the named section; if the section does not exist, add it there (2-5 lines)
+and put the pointer. No comment blocks, no "what the code does", no history ("it used to
+be..."). Test: does changing the comment change what an agent does when it edits THIS line?
+If not, don't write it. Existing comments are never deleted. A hook flags blocks of >=2
+lines — on a flag, shorten it before the report.
 
 Final answer, fixed format, at most 1,500 characters, up to 2,000 only when something essential
 would otherwise be cut (the hook rejects the report past that):

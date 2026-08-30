@@ -68,7 +68,10 @@ denies re-reading a file already read in main, and denies a 300+ line read witho
 `offset`/`limit` (plans and images stay a warning). Another on `Agent` warns
 when a brief exceeds 7,000 characters — the signal that one brief is really three. A third,
 `context-agent.sh`, tracks a subagent's own context: a reminder at 150k to wrap up, a deny
-on every tool but `Bash` at 220k.
+on every tool but `Bash` at 220k. A `PostToolUse` hook on `Edit`/`Write`, the only one active in
+main and in every worker, flags comment blocks the call just added — a new comment is one
+pointer line, the explanation belongs in `PATTERNS`/`DECIZII` — without ever blocking, and
+logs them for `/handoff` (`comment_bloat` in the analyzer).
 
 **3. Telemetry — offline, zero tokens.**
 A `SessionEnd` hook runs a plain-Python analyzer over the session's JSONL transcript and

@@ -20,6 +20,14 @@ Two roles appear below:
   `scribe`, `auditor`, `design-lead`, `design-lead-expert` (only via `/polish`) — nothing
   else without the operator's approval.
 - Do not re-read files you have just written.
+- A new code comment = a single one-line pointer: `🔴 <constraint> — <DOC> «<section>»`
+  (PATTERNS for technical traps, DECISIONS for reasons). The explanation does NOT live in the
+  code, it lives in the named section; if the section does not exist, add it there (2-5
+  lines) and put the pointer. No comment blocks, no "what the code does", no history ("it
+  used to be..."). Test: does changing the comment change what an agent does when it edits
+  THIS line? If not, don't write it. Existing comments are never deleted. A hook flags blocks
+  of >=2 lines — on a flag, shorten it before the report. Applies to the orchestrator's own
+  sub-20-line edits too.
 
 ## Orchestration (the orchestrator plans, the worker model executes)
 

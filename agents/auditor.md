@@ -23,6 +23,9 @@ You look, in this order, for:
 1. Deviations from the brief: missing steps, scope silently widened or narrowed.
 2. Violations of the given rules (DECISIONS, JS budget, patterns named in the brief).
 3. Obvious bugs in the diff: unhandled states, visible regressions, dead code.
+4. New comment blocks (≥2 lines), from the implementer or from your own fix: a deviation —
+   the rule is a one-line pointer (`🔴 constraint — DOC «section»`), explanation in
+   PATTERNS/DECISIONS, never a block in the code.
 
 For each mechanical deviation found, fix it directly with `Edit` and report it as
 `FIXED file:line — what` with the hunk. Everything else — logic, anything past the

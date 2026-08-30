@@ -1,5 +1,5 @@
 #!/bin/bash
-# Offline test for read-mare.sh and context-agent.sh: synthetic transcripts + JSON on stdin,
+# Offline test for read-mare.sh, context-agent.sh and comentarii-cod.sh: synthetic transcripts + JSON on stdin,
 # no network, no Claude. Exit 0 only if every case passes; prints "N/N passed".
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
@@ -10,6 +10,7 @@ import json, os, shutil, subprocess, sys, tempfile, time
 HOOKS = os.environ["HOOKS_DIR"]
 READ_HOOK = os.path.join(HOOKS, "read-mare.sh")
 CTX_HOOK = os.path.join(HOOKS, "context-agent.sh")
+CMT_HOOK = os.path.join(HOOKS, "comentarii-cod.sh")
 TMP = tempfile.mkdtemp(prefix="test-hooks-")
 RUN = "test%d" % os.getpid()
 MARKERS = []
@@ -170,6 +171,63 @@ case("230k Bash -> allowed (warning first)", CTX_HOOK,
      ctx_in(SUB[230000], "a-%s-6" % RUN, "implementer", "Bash"), "context")
 case("230k Bash after warning -> allow", CTX_HOOK,
      ctx_in(SUB[230000], "a-%s-6" % RUN, "implementer", "Bash"), "allow")
+
+# ---------------------------------------------------------------- comentarii-cod
+CMT_SESSION = "cmt-%s" % RUN
+CMT_LOG = "/tmp/claude-hooks/comentarii-%s.jsonl" % CMT_SESSION
+
+def cmt_in(path, old=None, new=None, content=None, tool="Edit", **kw):
+    ti = {"file_path": path}
+    if content is not None:
+        ti["content"] = content
+    else:
+        ti["old_string"] = old or ""
+        ti["new_string"] = new or ""
+    d = {"session_id": CMT_SESSION, "cwd": TMP, "tool_name": tool,
+         "tool_use_id": "cur", "tool_input": ti}
+    d.update(kw)
+    return d
+
+CODE = os.path.join(TMP, "src.js")
+BLOCK3 = "// prima\n// a doua\n// a treia\nconst a = 1;"
+case("1 comment line -> allow", CMT_HOOK,
+     cmt_in(CODE, old="const a = 1;", new="// una\nconst a = 1;"), "allow")
+case("3-line block -> context", CMT_HOOK,
+     cmt_in(CODE, old="const a = 1;", new=BLOCK3), "context", "3 lines")
+case("moved comment -> allow", CMT_HOOK,
+     cmt_in(CODE, old=BLOCK3, new="const a = 1;\n// prima\n// a doua\n// a treia"),
+     "allow")
+case("write untracked 3/8 comments -> context", CMT_HOOK,
+     cmt_in(os.path.join(TMP, "nou.js"), tool="Write",
+            content="const a = 1;\n// nota unu\n// nota doi\n// nota trei\n"
+                    "const b = 2;\nconst c = 3;\nconst d = 4;\nconst e = 5;"),
+     "context", "nou.js")
+case("long comment line -> context", CMT_HOOK,
+     cmt_in(CODE, old="const a = 1;", new="// " + ("x" * 200) + "\nconst a = 1;"),
+     "context", "chars")
+case(".md not code -> allow", CMT_HOOK,
+     cmt_in(os.path.join(TMP, "note.md"), old="text", new=BLOCK3), "allow")
+sub_cmt = cmt_in(CODE, old="const a = 1;", new=BLOCK3)
+sub_cmt["agent_id"] = "a-%s-cmt" % RUN
+sub_cmt["agent_type"] = "implementer"
+case("sub-agent flagged too", CMT_HOOK, sub_cmt, "context", "3 lines")
+case("300 KB Write payload -> context (no E2BIG)", CMT_HOOK,
+     cmt_in(os.path.join(TMP, "huge.js"), tool="Write",
+            content="// nota unu\n// nota doi\n" + "const a = 1;\n" * 25000),
+     "context", "2 lines")
+rc_bad, out_bad, err_bad = subprocess.run(
+    ["bash", CMT_HOOK], input="not json at all", text=True,
+    capture_output=True).returncode, "", ""
+results.append(("invalid JSON -> exit 0", rc_bad == 0, "rc=%d" % rc_bad))
+try:
+    n_log = sum(1 for _ in open(CMT_LOG))
+except OSError:
+    n_log = 0
+results.append(("log file has %d rows (>=3)" % n_log, n_log >= 3, "%d rows" % n_log))
+try:
+    os.remove(CMT_LOG)
+except OSError:
+    pass
 
 # ---------------------------------------------------------------- timing (1 MB transcript)
 def timed(hook, payload, n=3):

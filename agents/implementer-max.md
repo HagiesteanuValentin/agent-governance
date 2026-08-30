@@ -32,9 +32,13 @@ Rules:
 6. Do not re-read files you have just written. Read a target file whole at most once;
    afterwards use line ranges. Read each screenshot at most once, in its reduced `*-mic.png`
    form.
-7. Code comments are documentation for the AI, not for a human: a NEW comment only for a
-   constraint that is not visible from the code, one line, telegraphic. Forbidden: "what this
-   line does" or "why this change is correct". Existing comments are never deleted.
+7. A new code comment = a single one-line pointer: `🔴 <constraint> — <DOC> «<section>»`
+   (PATTERNS for technical traps, DECISIONS for reasons). The explanation does NOT live in the
+   code, it lives in the named section; if the section does not exist, add it there (2-5
+   lines) and put the pointer. No comment blocks, no "what the code does", no history ("it
+   used to be..."). Test: does changing the comment change what an agent does when it edits
+   THIS line? If not, don't write it. Existing comments are never deleted. A hook flags blocks
+   of >=2 lines — on a flag, shorten it before the report.
 8. When the brief asks for a commit: one subject line plus at most 3 body lines.
 9. If the prompt gives a plan's path and a "Brief N" section, read the plan and execute
    ONLY that section; the other briefs are not yours.

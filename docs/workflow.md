@@ -47,7 +47,8 @@ Registered in `settings.json` (see `hooks/settings.example.json`).
 | `session-start.sh` | SessionStart | — | injects `HANDOFF*.md` from the project root |
 | `read-mare.sh` | PreToolUse / Read | main only: re-read of a file already read this session, or >300 lines without `offset`/`limit` | denies (image without `-small`, plans, and short `.md` stay a reminder) |
 | `brief-mare.sh` | PreToolUse / Agent | brief >7,000 characters | reminder: "split it into phases" |
-| `context-agent.sh` | PreToolUse / * | sub-agent only (`implementer*`): its own context ≥150k / ≥220k | ≥150k: reminder to wrap up (once); ≥220k: denies every tool but `Bash` |
+| `context-agent.sh` | PreToolUse / * | sub-agent only (`implementer*`/`scripter*`): its own context ≥150k / ≥220k | ≥150k: reminder to wrap up (once); ≥220k: denies every tool but `Bash` |
+| `comentarii-cod.sh` | PostToolUse / Edit\|Write | main **and** sub-agents: a comment block of ≥2 added lines, an added comment line >160 chars, or >25% comments in the added lines (≥5 added) | never blocks: `additionalContext` with the pointer rule + one JSONL line in `/tmp/claude-hooks/comentarii-<session>.jsonl` |
 | `raport-lung.sh` | SubagentStop | final report >2,000 characters | blocks once, asks for compression (background agents too — verified 2026-08-30 after switching the output to `hookSpecificOutput` + `last_assistant_message`) |
 | `session-metrics.sh` | SessionEnd | — | runs the offline analyzer, zero tokens |
 
@@ -55,6 +56,9 @@ Three design notes:
 
 - `read-mare.sh` and `brief-mare.sh` skip subagents (`agent_id` present in the hook input).
   Reading a lot is exactly what a subagent is *for*; the rule targets the orchestrator.
+- `comentarii-cod.sh` is the only hook that runs everywhere, main and workers alike, and
+  the only one that never denies: the writer is told while its context is still alive, and
+  the JSONL log lets `/handoff` move the explanations into `PATTERNS`/`DECIZII` later.
 - `context-agent.sh` is the mirror: it skips main (no `agent_id`) and only watches
   `implementer`/`implementer-sonnet`/`implementer-max` — the escalation carries the same
   thresholds, maxTurns is not an exemption.

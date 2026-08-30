@@ -42,6 +42,18 @@
         ]
       }
     ],
+    "PostToolUse": [
+      {
+        "_note": "main and every sub-agent: non-blocking signal when an Edit/Write adds a comment block of 2+ lines, a comment line over 160 chars, or over 25% comments in the added lines; logs to /tmp/claude-hooks/comentarii-<session>.jsonl",
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/comentarii-cod.sh"
+          }
+        ]
+      }
+    ],
     "SubagentStop": [
       {
         "hooks": [

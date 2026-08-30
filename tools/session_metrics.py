@@ -67,6 +67,10 @@ THRESHOLDS = {
     "agent_peak_ctx": 200000,        # worker context past the measured degradation band
     "sterile_verify_calls": 6,       # verification runs below which the ratio says nothing
     "sterile_verify_ratio": 0.2,     # share of verifications that led to a fix
+    "comment_block_lines": 2,        # consecutive comment lines added by one Edit/Write
+    "comment_long_line": 160,        # chars of a single added comment line
+    "comment_ratio": 0.25,           # added comment lines / added lines
+    "comment_min_added": 5,
 }
 
 FLAG_TEXT = {
@@ -78,6 +82,7 @@ FLAG_TEXT = {
     "long_brief": "brief over budget",
     "too_many_runs": "agent run cap exceeded",
     "parallel_over_cap": "too many sub-agents running at once",
+    "comment_bloat": "comment blocks written into the code instead of a pointer line",
     "fable_wrote_code": "main model wrote code instead of delegating",
     "read_tool_results_main": "tool-results/ re-read in the main context",
     "high_context_end": "main context high at the end of the session",
@@ -113,6 +118,7 @@ SEVERITY_BASE = {
     "plan_echo": "medium",
     "sterile_verification": "medium",
     "parallel_over_cap": "medium",
+    "comment_bloat": "medium",
 }
 
 SEVERITY_ORDER = {"high": 0, "medium": 1, "low": 2}
@@ -151,6 +157,8 @@ RECOMMENDATION = {
                       "up at 150k.",
     "parallel_over_cap": "{detail} - launch at most 4 agents at once; parallel beyond that "
                          "only multiplies reports and audits landing in main together.",
+    "comment_bloat": "{detail} - a new comment is one pointer line; the explanation "
+                      "belongs in PATTERNS/DECIZII, not in the code.",
 }
 
 
@@ -571,6 +579,94 @@ def collect_targets(paths):
     return targets
 
 
+COMMENT_CODE_EXT = {".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".astro", ".css", ".scss",
+                    ".html", ".py", ".sh", ".fish", ".yml", ".yaml", ".toml"}
+COMMENT_HASH_EXT = {".py", ".sh", ".fish", ".yml", ".yaml", ".toml"}
+COMMENT_SLASH_EXT = {".js", ".mjs", ".cjs", ".ts", ".tsx", ".jsx", ".astro", ".css", ".scss"}
+COMMENT_HTML_EXT = {".html", ".astro"}
+LICENSE_RE = re.compile(r"SPDX-License-Identifier|Copyright")
+
+
+def comment_flags(text, ext):
+    """mirror of hooks/comentarii-cod.sh - one bool per line: is it a comment line?"""
+    lines = text.split("\n")
+    slash, html = ext in COMMENT_SLASH_EXT, ext in COMMENT_HTML_EXT
+    hashy = ext in COMMENT_HASH_EXT
+    out, in_block, in_html = [], False, False
+    for i, raw in enumerate(lines):
+        st = raw.strip()
+        if in_block:
+            out.append(True)
+            in_block = "*/" not in st
+            continue
+        if in_html:
+            out.append(True)
+            in_html = "-->" not in st
+            continue
+        if i < 5 and LICENSE_RE.search(st):
+            out.append(False)
+            continue
+        is_c = False
+        if slash and st.startswith("//"):
+            is_c = True
+        elif slash and (st.startswith("/*") or st.startswith("{/*")):
+            is_c = True
+            in_block = "*/" not in (st[3:] if st.startswith("{/*") else st[2:])
+        elif html and st.startswith("<!--"):
+            is_c = True
+            in_html = "-->" not in st[4:]
+        elif hashy and st.startswith("#") and not st.startswith("#!"):
+            is_c = True
+        out.append(is_c)
+    return lines, out
+
+
+def comment_bloat(path, new, old):
+    """mirror of hooks/comentarii-cod.sh - None, or the stats of the comments this call added."""
+    p = path or ""
+    ext = os.path.splitext(p)[1].lower()
+    if (ext not in COMMENT_CODE_EXT or "/.claude/plans/" in p
+            or "/docs/" in p or p.startswith("docs/")):
+        return None
+    new_lines, new_c = comment_flags(new or "", ext)
+    old_lines, old_c = comment_flags(old or "", ext)
+    pool = collections.Counter(old_lines[i].strip() for i, c in enumerate(old_c)
+                               if c and old_lines[i].strip())
+    added = []
+    for i, c in enumerate(new_c):
+        st = new_lines[i].strip()
+        if not c or not st:
+            continue
+        if pool[st] > 0:
+            pool[st] -= 1
+            continue
+        added.append(i)
+    if not added:
+        return None
+    pool_all = collections.Counter(x.strip() for x in old_lines if x.strip())
+    lines_added = 0
+    for st in (x.strip() for x in new_lines):
+        if not st:
+            continue
+        if pool_all[st] > 0:
+            pool_all[st] -= 1
+            continue
+        lines_added += 1
+    aset, max_block, run = set(added), 0, 0
+    for i in range(len(new_lines)):
+        run = run + 1 if i in aset else 0
+        max_block = max(max_block, run)
+    long_line = max([len(new_lines[i].rstrip()) for i in added] + [0])
+    ratio_hit = (lines_added >= THRESHOLDS["comment_min_added"]
+                 and len(added) / float(lines_added) > THRESHOLDS["comment_ratio"])
+    if not (max_block >= THRESHOLDS["comment_block_lines"]
+            or long_line > THRESHOLDS["comment_long_line"] or ratio_hit):
+        return None
+    return {"path": path or "?", "max_block": max_block,
+            "comment_added": len(added), "lines_added": lines_added,
+            "chars": sum(len(new_lines[i].strip()) for i in added)}
+
+
 def new_doc(path, label):
     return {
         "path": path, "label": label,
@@ -582,7 +678,8 @@ def new_doc(path, label):
         "results": [], "agent_launches": [], "agent_results": {},
         "reads": collections.Counter(), "read_chars": collections.Counter(),
         "written": set(), "reread_own_write": [],
-        "code_writes": [], "max_turns_hit": False, "max_turns_ids": set(),
+        "code_writes": [], "comment_writes": [],
+        "max_turns_hit": False, "max_turns_ids": set(),
         "agent_call_ids": set(), "call_stats": {},
         "usage": zeros(), "model_counts": collections.Counter(),
         "final_text": "",
@@ -681,8 +778,14 @@ def parse_file(path, label, tool_names, tool_inputs):
                 elif name in ("Write", "Edit"):
                     fp = inp.get("file_path")
                     body = inp.get("content") or inp.get("new_string") or ""
+                    # 🔴 hook uses git show HEAD:, analyzer has no HEAD - Write counted only for unseen paths
+                    seen_before = name == "Write" and (fp in doc["reads"] or fp in doc["written"])
                     if isinstance(fp, str) and fp:
                         doc["written"].add(fp)
+                    if isinstance(fp, str) and isinstance(body, str) and not seen_before:
+                        cb = comment_bloat(fp, body, inp.get("old_string") or "")
+                        if cb:
+                            doc["comment_writes"].append(cb)
                     is_plan = isinstance(fp, str) and "/.claude/plans/" in fp
                     if (isinstance(body, str) and not is_plan
                             and body.count("\n") + 1 > THRESHOLDS["fable_code_lines"]):
@@ -1039,6 +1142,18 @@ def scope_flags(scope, doc, rows, is_main):
                   [{"path": p} for p in seen],
                   lambda r: "%s re-read after writing it" % os.path.basename(r["path"]),
                   lambda r: 0)
+    cw = doc["comment_writes"]
+    if cw:
+        files = sorted(set(os.path.basename(w["path"]) for w in cw))
+        shown = ", ".join(files[:THRESHOLDS["flag_examples"]])
+        if len(files) > THRESHOLDS["flag_examples"]:
+            shown += ", +%d more" % (len(files) - THRESHOLDS["flag_examples"])
+        flags.append(flag("comment_bloat", scope,
+                          "%d edits added comment blocks (max %d lines) in %s"
+                          % (len(cw), max(w["max_block"] for w in cw), shown),
+                          {"edits": len(cw), "files": files,
+                           "comment_lines": sum(w["comment_added"] for w in cw)},
+                          sum(w["chars"] for w in cw) / 4.0))
     return flags
 
 
@@ -1901,6 +2016,7 @@ WASTE_FAMILIES = {
     "too_many_runs": "discipline",
     "high_context_end": "discipline",
     "parallel_over_cap": "discipline",
+    "comment_bloat": "discipline",
 }
 FAMILY_ORDER = ("reads", "agent overhead", "orchestration turns", "discipline", "other")
 
