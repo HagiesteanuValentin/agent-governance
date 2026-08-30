@@ -142,11 +142,21 @@ many files, or a check that will run more than once, the first brief goes to `sc
 `scripts/SCRIPTS.md` so the next brief can reuse or adapt it instead of writing a new one.
 Motive: one day's transcripts showed 6 repetitive runs costing $79 — manual find/replace
 by hand across a CSS file, and a verification script run by hand 21 times in one brief.
+v1.4 also (2026-08-30 afternoon) made the comment policy explicit — a new comment is a
+one-line pointer to a PATTERNS/DECISIONS section, never a block — after measuring 49%
+comment lines and 234 multi-line blocks in one project's `src/`.
 
 **Parallelism (v1.4)**: explorers can run in parallel without asking; the auditor runs on
 brief N while the worker runs brief N+1, when the two briefs' file lists are disjoint. Hard
 cap of 4 live agents of any type; the analyzer flags a session that goes over it as
 `parallel_over_cap`. Reason: parallelism does not change tokens, only wall-clock time.
+
+**Comments (v1.4)**: a new code comment is a one-line pointer, `🔴 <constraint> —
+PATTERNS/DECISIONS «section»`, never an explanatory block — the explanation lives in the
+doc section, not the code. Enforced by a non-blocking hook, `hooks/comentarii-cod.sh`
+(fires in main and in every subagent — the same PostToolUse matcher, no `agent_id` filter),
+which logs every flagged Edit/Write to a JSONL file read by `/handoff`; the analyzer's
+`comment_bloat` flag caught it in 178 of 257 past sessions.
 
 ## Measured results
 
