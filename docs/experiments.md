@@ -42,13 +42,6 @@ Conclusion: medium saves 3–6% (cost is dominated by reading the diff, not thin
 medium missed the "deleted without replacement" class 3 times. `auditor` stays Opus 5 high;
 no `auditor-max`.
 
-## How to rerun
-
-Create the cell agents in `~/.claude/agents/` as copies with a different `effort`/`model`.
-Wait ~1–2 min for "New agent types are now available" before launching them. Launch all
-cells in one message with byte-identical prompts, so the comparison is apples-to-apples.
-Read costs from the Workers table of `tools/session_metrics.py --out-dir`.
-
 ## 2026-08-30 — explorer-max: Sonnet 5 medium vs Opus 5 low (6k report)
 
 Setup: byte-identical prompt, 2 cells in parallel, question = per-agent profile of 6 JSONL
@@ -62,3 +55,10 @@ real transcripts at every disagreement. Hook `raport-lung.sh` with a 6,000 cap f
 | Opus 5 low | 1 confirmed error (impl#1: counted a `git log … 2>/dev/null` redirect as the first write, idx 1 instead of 12) + final-context values rounded off by 1–4k | 2 / $0.32 / 39s | 27.6k | 2,346 |
 
 Both reports complete (6 agents × 6 fields); both passed the 6k hook at >2k (the old 2k cap would have blocked both). Conclusion: `explorer-max` = Sonnet 5 medium, maxTurns 60, report ≤6k; Opus low not adopted (1.6× cost, more errors on exact numbers).
+
+## How to rerun
+
+Create the cell agents in `~/.claude/agents/` as copies with a different `effort`/`model`.
+Wait ~1–2 min for "New agent types are now available" before launching them. Launch all
+cells in one message with byte-identical prompts, so the comparison is apples-to-apples.
+Read costs from the Workers table of `tools/session_metrics.py --out-dir`.

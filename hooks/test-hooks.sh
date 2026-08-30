@@ -1,6 +1,5 @@
 #!/bin/bash
-# Offline test for read-mare.sh, context-agent.sh and comentarii-cod.sh: synthetic transcripts + JSON on stdin,
-# no network, no Claude. Exit 0 only if every case passes; prints "N/N passed".
+# 🔴 offline, synthetic transcripts, no network/Claude — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR

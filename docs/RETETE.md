@@ -31,6 +31,13 @@ rescrie fișierul cu `pathlib` (rescriere completă, nu `sed -i`) → dacă tot 
 editează manual. Verificare de împăturire după orice editare a `~/.claude/CLAUDE.md`:
 `awk 'length > 100' ~/.claude/CLAUDE.md | wc -l`.
 
+## Stare din transcript, nu din fișier (read-mare, test-hooks)
+`hooks/read-mare.sh` nu ține stare într-un fișier separat: citește transcriptul JSONL al
+sesiunii curente la fiecare apel — apelul curent de `tool_use` e deja scris în jsonl, deci
+e sărit după `tool_use_id` ca să nu se autoblocheze. Regula 0 (deny pe `/tool-results/`) se
+aplică tuturor; regulile a-c sunt doar pentru sesiunea main. `hooks/test-hooks.sh` rulează
+aceeași logică offline, cu transcripte JSONL sintetice pe stdin, fără rețea și fără Claude.
+
 ## Curățare comentarii-bloc într-un proiect (scripter-complex)
 Se rulează din repo-ul proiectului. Pas 0 (Fable): `grep -rnE "^\s*(//|/\*|\*|#|<!--)" src/ | wc -l`
 pentru cifra „înainte"; citește `scripts/SCRIPTS.md`. Brief scripter-complex (script

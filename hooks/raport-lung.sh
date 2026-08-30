@@ -1,5 +1,4 @@
 #!/bin/bash
-# SubagentStop: last message over the agent's limit -> block ONCE, ask for a compressed report.
 # 🔴 explorer-max* = 6000, rest = 2000 — docs/RETETE.md «Test hook SubagentStop»
 LIMIT=2000
 LIMIT_EXPLORER_MAX=6000

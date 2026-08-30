@@ -1,7 +1,5 @@
 #!/bin/bash
-# 🔴 rule 0 (/tool-results/ -> deny) applies to everyone; a-c are main-session only — docs/workflow.md «Active hooks»
-# State comes from the transcript, not from a state file; the current call's own tool_use
-# block is already in the jsonl, so it is skipped by tool_use_id.
+# 🔴 state from transcript, not a state file; rule 0 applies to everyone — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
 input=$(cat)
 python3 - "$input" <<'PY'
 import json, sys, os

@@ -71,7 +71,11 @@ actually enforced the 150k/220k ceiling); tested `explorer` and `auditor` agains
 lower-cost cell each — both kept their model/effort, `explorer` on tied accuracy and
 `auditor` because the cheaper cell missed silent-deletion deviations; and added a
 decision-dossier pattern (`explorer` writes `docs/dosar/<slug>.md` before a >300-line-read
-brief) plus two analyzer flags, `tool_results_read` and `late_first_edit`.
+brief) plus two analyzer flags, `tool_results_read` and `late_first_edit`. v1.5 (2026-08-30
+evening) routed main's own reading through `explorer`/`explorer-max` instead of direct
+`Read`/grep, added `explorer-max` (Sonnet 5 medium, 6k report cap) and four analyzer flags
+for the new rules (`main_read_before_first_agent`, `max_without_sendmessage`,
+`agent_read_plan_whole`, `edit_via_bash`).
 
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000
@@ -178,6 +182,17 @@ and the implementer gets the path plus line ranges instead of whole files.
 context or ≥15 reading calls); `tool_results_read` flags any worker reading a
 `tool-results/` file instead of re-running the command narrower. Reason: on one postmortem,
 the first `Edit` landed at call 29 of 41 (197k context, 242k characters read first).
+
+**Reading through explorers (v1.5)**: main reads only `git diff --stat`, agent reports and
+one dossier — facts over 3k characters go to `explorer`, table-shaped answers to
+`explorer-max` (Sonnet 5 medium, 6k report cap, per-agent cap in `raport-lung.sh`). Each
+agent gets its brief as its own file, never the whole plan. After a non-compliant audit the
+order is auditor-fix → `SendMessage` to the live implementer → `implementer-max` only for
+logic deviations with a written reason. The analyzer flags `main_read_before_first_agent`,
+`max_without_sendmessage`, `agent_read_plan_whole`, `edit_via_bash`. Reason: on one
+postmortem (s10) main read 64k characters before the first agent because "the table didn't
+fit in 2k"; on another (s1) two `implementer-max` runs cost $7.8 for 9 of 10 deviations that
+were mechanical.
 
 ## Measured results
 
