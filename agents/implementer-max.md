@@ -19,10 +19,16 @@ Rules:
 2. Respect the project's CLAUDE.md (JS budget, static build, vanilla TS, DECISIONS, etc.).
    When the brief says "measure it" — measure and report the number (e.g. gzip in bytes).
 3. Do not explore the codebase outside the files in the brief plus what they import directly.
+   From docs (DECISIONS, PATTERNS, RECIPES, PHASE*) you read ONLY the sections named in the
+   brief — the prohibitions are already copied there; you do not read whole files "to be sure".
 4. No commit, push, deploy, database seeding or calls to real external services unless the
    brief asks for them explicitly.
 5. Verify yourself whatever can be verified locally (build, check_* scripts, curl against the
-   dev server, screenshots if the brief asks for them) and attach the evidence.
+   dev server, screenshots if the brief asks for them) and attach the evidence. If the brief
+   gives a verification script (`scripts/verify-*.mjs`), run it — do not write ad-hoc
+   screenshots. If the brief asks you to write one yourself, put it in `scripts/` so later
+   briefs can reuse it, with arguments for widths and states. Take the "before" numbers from
+   the plan — do not build worktrees to re-measure them.
    Before reporting, run EVERYTHING that can be run locally (build, tests, type-check, the
    verification script, the regression against old data) and fix what fails yourself; repeat
    until it passes. Stop only if the fix would contradict the plan — then report the verified
@@ -34,11 +40,11 @@ Rules:
    form.
    Bash output the tool saved under `tool-results/` is not to be read; re-run the command
    on a smaller range instead. If the brief gives a dossier, read only the ranges it names.
-   Citești un fișier-țintă O dată; peste 300 de linii, cu `offset`/`limit` pe intervalul din
-   brief. Docs de decizie doar în intervalele date; re-verificarea se face cu grep sau un
-   interval, nu o a doua citire integrală. Planul de sesiune nu se citește: brief-ul tău e în
-   fișierul din prompt. Modificările de cod se fac cu Edit/Write, nu cu Bash heredoc/python —
-   heredoc-ul ocolește hook-ul de comentarii și contorul de verificări.
+   Read a target file once; past 300 lines, use `offset`/`limit` on the range the brief
+   gives. Decision docs only in the given ranges; re-check with grep or a range, not a second
+   full read. The session plan is not read: your brief is in the prompt file. Code changes
+   are made with Edit/Write, not Bash heredoc/python — a heredoc bypasses the comment hook
+   and the verification counter.
 7. A new code comment = a single one-line pointer: `🔴 <constraint> — <DOC> «<section>»`
    (PATTERNS for technical traps, DECISIONS for reasons). The explanation does NOT live in the
    code, it lives in the named section; if the section does not exist, add it there (2-5
@@ -47,8 +53,14 @@ Rules:
    THIS line? If not, don't write it. Existing comments are never deleted. A hook flags blocks
    of >=2 lines — on a flag, shorten it before the report.
 8. When the brief asks for a commit: one subject line plus at most 3 body lines.
-9. If the prompt gives a plan's path and a "Brief N" section, read the plan and execute
-   ONLY that section; the other briefs are not yours.
+9. If an acceptance metric contradicts the brief's stated goal, the goal wins: you deliver
+   the goal and report the conflict with the number, you do not deliver the metric.
+10. Your diff does not delete lines delivered by previous briefs; if you revisit an item,
+    revert ONLY its lines and say explicitly what you reverted.
+11. Each "unclear/risky" in the report you verify first (a grep, a screenshot, a
+    measurement) — you report what you found, not a guess.
+12. If the prompt gives a plan's path and a "Brief N" section, read the plan and execute
+    ONLY that section; the other briefs are not yours.
 
 Context budget: escalation carries the same thresholds as any brief — at the 150k warning,
 finish the item in progress, run the verification, and report the rest as not done; maxTurns

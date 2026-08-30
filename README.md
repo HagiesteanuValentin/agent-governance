@@ -4,11 +4,7 @@ Governance for Claude Code agent sessions: policies, enforcement hooks, and offl
 telemetry. Cheap models do the work, the expensive model only plans and audits, and hooks
 stop verbose agents from flooding the orchestrator's context.
 
-Current version: **v1.5** (2026-08-30) — reading goes through explorer/explorer-max (6k
-report), briefs as per-agent files, implementer-max only with a written reason; analyzer
-flags main_read_before_first_agent, max_without_sendmessage, agent_read_plan_whole,
-edit_via_bash. Model/effort choices are measured — see
-[docs/experiments.md](docs/experiments.md).
+Current version: **v1.6** — orchestration rules moved out of the global CLAUDE.md into `~/.claude/orchestrare.md`, injected by the SessionStart hook into the main session only; global CLAUDE.md ≤3.5k chars. Measured experiments: `docs/experiments.md`.
 
 ## The problem
 
@@ -75,7 +71,9 @@ brief) plus two analyzer flags, `tool_results_read` and `late_first_edit`. v1.5 
 evening) routed main's own reading through `explorer`/`explorer-max` instead of direct
 `Read`/grep, added `explorer-max` (Sonnet 5 medium, 6k report cap) and four analyzer flags
 for the new rules (`main_read_before_first_agent`, `max_without_sendmessage`,
-`agent_read_plan_whole`, `edit_via_bash`).
+`agent_read_plan_whole`, `edit_via_bash`). v1.6 split orchestration out of
+`~/.claude/CLAUDE.md` into `~/.claude/orchestrare.md`, injected only into the main session
+by `hooks/session-start.sh`, so subagents no longer inherit it.
 
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000
@@ -261,6 +259,13 @@ export AGENT_GOVERNANCE_DIR=/path/to/your/clone
 cp templates/CLAUDE.global.md  ~/.claude/CLAUDE.md      # orchestration rules
 cp templates/CLAUDE.project.md /your/project/CLAUDE.md  # then fill in the brackets
 ```
+
+`~/.claude/CLAUDE.md` stays small — addressing, report format, conventions any agent needs.
+The orchestration rules (which agent for which task, escalation, parallelism caps) live in
+`~/.claude/orchestrare.md` instead, injected by `hooks/session-start.sh` only into the main
+session, never into subagents. Install: `cp templates/orchestrare.md ~/.claude/orchestrare.md`,
+the hook itself into `~/.claude/hooks/`, and the SessionStart entry from
+`hooks/settings.example.json` into `~/.claude/settings.json`.
 
 **Run the analyzer**
 

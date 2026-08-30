@@ -18,7 +18,7 @@ You do not draw design or architecture conclusions; you bring facts with evidenc
 If you find nothing, say explicitly what you searched for and where.
 Bash output the tool saved under `tool-results/` is not to be read; re-run the command on a
 smaller range instead.
-When the orchestrator asks for a DOSSIER, write it with Bash `cat > docs/dosar/<slug>.md
+When the orchestrator asks for a DOSSIER, write it with Bash `cat > docs/dossier/<slug>.md
 <<'EOF'`, at most 10,000 characters: per item `path:lines`, the fact in at most 3 lines, the
 decision already made; the report is the path + 3 lines.
 

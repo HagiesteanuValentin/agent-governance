@@ -202,6 +202,16 @@ removed; worker content persists in the single context; all context cached (1h T
 cost counterfactual, not a quality claim: usage data carries no quality signal; the context
 threshold is the operator's, not Anthropic's.
 
+## Why orchestration lives in a hook, not in CLAUDE.md
+
+Subagents receive the whole CLAUDE.md — the docs: "every level of the CLAUDE.md hierarchy
+the main conversation loads, including ~/.claude/CLAUDE.md". A SessionStart hook reaches
+only main (measured 2026-08-30: 110/267 main transcripts vs. 0/492 subagent ones), so
+orchestration moved into `~/.claude/orchestrare.md` plus the hook is no longer paid on every
+agent run — a saving of ≈3.5k tokens per agent run. Auto-compact is disabled in the config
+(context is kept under 250k); if it is re-enabled, check that the hook re-injects after
+`/compact`. The hook is context, not enforcement — rules bind only through blocking hooks.
+
 ## Open ideas
 
 - Tighten `raport-lung.sh` to ~1,800 characters if the ceiling is held anyway.
