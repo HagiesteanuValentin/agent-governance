@@ -4,7 +4,7 @@ Governance for Claude Code agent sessions: policies, enforcement hooks, and offl
 telemetry. Cheap models do the work, the expensive model only plans and audits, and hooks
 stop verbose agents from flooding the orchestrator's context.
 
-Current version: **v1.5.1** — orchestration rules moved out of the global CLAUDE.md into `~/.claude/orchestrare.md`, injected by the SessionStart hook into the main session only; global CLAUDE.md ≤3.5k chars. Measured experiments: `docs/experiments.md`.
+Current version: **v1.5.2** — orchestration rules moved out of the global CLAUDE.md into `~/.claude/orchestrare.md`, injected by the SessionStart hook into the main session only; global CLAUDE.md ≤3.5k chars. SessionStart injection split into two hook calls (a single >10KB hook output gets persisted with a 2KB preview and never reaches the model). Measured experiments: `docs/experiments.md`.
 
 ## The problem
 
@@ -73,7 +73,12 @@ evening) routed main's own reading through `explorer`/`explorer-max` instead of 
 for the new rules (`main_read_before_first_agent`, `max_without_sendmessage`,
 `agent_read_plan_whole`, `edit_via_bash`). v1.5.1 split orchestration out of
 `~/.claude/CLAUDE.md` into `~/.claude/orchestrare.md`, injected only into the main session
-by `hooks/session-start.sh`, so subagents no longer inherit it.
+by `hooks/session-start.sh`, so subagents no longer inherit it. v1.5.2 (2026-08-30 night)
+split the SessionStart injection into two hook calls (`rules`, `handoff`) after finding the
+combined 12KB output was persisted to a file with only a 2KB preview in context — sessions
+had been starting with truncated rules and no handoff; verified on a test session, both
+blocks now arrive whole. Same night: killed sessions get no SessionEnd, so their metrics are
+recovered by running the analyzer manually.
 
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000

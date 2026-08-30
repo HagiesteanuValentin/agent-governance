@@ -1,5 +1,5 @@
 #!/bin/sh
-# 🔴 SessionStart, $1=rules|handoff (one output >10KB → persisted, 2KB preview) — DECIZII «v1.5.1 — split SessionStart»
+# 🔴 SessionStart, $1=rules|handoff (one output >10KB → persisted, 2KB preview) — DECIZII «v1.5.2 — split SessionStart»
 d="${CLAUDE_PROJECT_DIR:-$PWD}"
 o="$HOME/.claude/orchestrare.md"
 if [ "${1:-rules}" != "handoff" ] && [ -f "$o" ]; then
