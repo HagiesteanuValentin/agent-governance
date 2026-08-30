@@ -54,7 +54,12 @@ run, cost per call doubled) and Anthropic's published effort curve (medium ≈ �
 half the cost on long-horizon coding); the auditor now fixes mechanical deviations itself
 (35/37 audits reported deviations, median fix 526 characters); verification runs once at the
 end (12% of 507 verification calls led to a fix). Expected effect: measured on ≥5 v1.4
-sessions against v1.2's $23.13/session, not claimed in advance.
+sessions against v1.2's $23.13/session, not claimed in advance. v1.4b added `scripter`
+(cheap model, high effort) and `scripter-complex` (worker model, medium effort) for
+repetitive edits before straight-to-worker briefs — same medium-vs-high reasoning as above
+(medium ≈ high accuracy at 70–85% cost), on evidence from a $79/6-run day of manual
+find/replace and hand-run verification. It also relaxed parallelism to a hard cap of 4 live
+agents of any type (see "Parallelism" above).
 
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000
@@ -134,6 +139,11 @@ many files, or a check that will run more than once, the first brief goes to `sc
 `scripts/SCRIPTS.md` so the next brief can reuse or adapt it instead of writing a new one.
 Motive: one day's transcripts showed 6 repetitive runs costing $79 — manual find/replace
 by hand across a CSS file, and a verification script run by hand 21 times in one brief.
+
+**Parallelism (v1.4)**: explorers can run in parallel without asking; the auditor runs on
+brief N while the worker runs brief N+1, when the two briefs' file lists are disjoint. Hard
+cap of 4 live agents of any type; the analyzer flags a session that goes over it as
+`parallel_over_cap`. Reason: parallelism does not change tokens, only wall-clock time.
 
 ## Measured results
 
