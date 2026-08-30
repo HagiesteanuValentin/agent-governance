@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# 🔴 ce verifică și cu ce praguri — scripts/SCRIPTS.md
 set -u
 
 cd "$(dirname "$0")/.." || exit 1
@@ -53,7 +54,7 @@ m=$(wc -c < "$ORCH")
 # 5. hook fără orchestrare.md
 TMP2=$(mktemp -d)
 mkdir -p "$TMP2/.claude"
-out2=$(echo '{"source":"startup","cwd":"'"$PWD"'"}' | HOME="$TMP2" bash "$HOOK"); rc=$?
+out2=$(echo '{"source":"startup","cwd":"'"$TMP2"'"}' | HOME="$TMP2" CLAUDE_PROJECT_DIR="$TMP2" bash "$HOOK"); rc=$?
 [ "$rc" -eq 0 ] && pass "hook fără orchestrare: exit 0" || fail "hook fără orchestrare: exit $rc"
 case "$out2" in
   *"=== ORCHESTRATION"*) fail "hook fără orchestrare: marker prezent" ;;

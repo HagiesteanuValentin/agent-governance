@@ -4,7 +4,7 @@ Governance for Claude Code agent sessions: policies, enforcement hooks, and offl
 telemetry. Cheap models do the work, the expensive model only plans and audits, and hooks
 stop verbose agents from flooding the orchestrator's context.
 
-Current version: **v1.6** — orchestration rules moved out of the global CLAUDE.md into `~/.claude/orchestrare.md`, injected by the SessionStart hook into the main session only; global CLAUDE.md ≤3.5k chars. Measured experiments: `docs/experiments.md`.
+Current version: **v1.5.1** — orchestration rules moved out of the global CLAUDE.md into `~/.claude/orchestrare.md`, injected by the SessionStart hook into the main session only; global CLAUDE.md ≤3.5k chars. Measured experiments: `docs/experiments.md`.
 
 ## The problem
 
@@ -71,7 +71,7 @@ brief) plus two analyzer flags, `tool_results_read` and `late_first_edit`. v1.5 
 evening) routed main's own reading through `explorer`/`explorer-max` instead of direct
 `Read`/grep, added `explorer-max` (Sonnet 5 medium, 6k report cap) and four analyzer flags
 for the new rules (`main_read_before_first_agent`, `max_without_sendmessage`,
-`agent_read_plan_whole`, `edit_via_bash`). v1.6 split orchestration out of
+`agent_read_plan_whole`, `edit_via_bash`). v1.5.1 split orchestration out of
 `~/.claude/CLAUDE.md` into `~/.claude/orchestrare.md`, injected only into the main session
 by `hooks/session-start.sh`, so subagents no longer inherit it.
 
