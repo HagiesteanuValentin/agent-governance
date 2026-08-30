@@ -166,7 +166,11 @@ automatically and drops the JSON and the Markdown report into `metrics-local/` (
 `--rot-at` (default 0.35) sets the context-exposure threshold as a fraction of the window.
 `--window` (default 1,000,000) sets the context window size used for that threshold.
 `--trends DIR` reads every session JSON in `DIR` and writes `DIR/TRENDS.md`; the
-`SessionEnd` hook runs it after every session. Sessions where at least 50% of the main
+`SessionEnd` hook runs it after every session. TRENDS opens with an executive summary per
+corpus and per version: spend, savings against the Fable-only realistic estimate ($ and %,
+cumulative across versions), estimated waste in tokens and as % of main input volume, waste
+grouped into families (reads, agent overhead, orchestration turns, discipline), and deltas
+against the previous version and against `older`. Sessions where at least 50% of the main
 session's tool calls are `mcp__claude-in-chrome__*` are listed separately under "Excluded"
 and do not count toward the numbers (threshold: `--browser-threshold`, default 0.5;
 version list: `--versions PATH`). `/rate N [note]` before closing a session attaches a 1-5

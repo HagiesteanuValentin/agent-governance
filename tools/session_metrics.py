@@ -1867,13 +1867,72 @@ def code_rows(sessions):
     return sorted(rows.values(), key=lambda e: (-len(e["sessions"]), -e["wasted"]))
 
 
+# waste codes grouped into families; a code missing here lands in "other"
+WASTE_FAMILIES = {
+    "main_read_files": "reads",
+    "reread": "reads",
+    "full_read_big_file": "reads",
+    "big_tool_result_main": "reads",
+    "read_tool_results_main": "reads",
+    "image_in_main": "reads",
+    "long_agent_report": "agent overhead",
+    "agent_reread_own_write": "agent overhead",
+    "agent_ctx_high": "agent overhead",
+    "sterile_verification": "agent overhead",
+    "agent_max_turns": "agent overhead",
+    "agent_no_report": "agent overhead",
+    "narration_turns": "orchestration turns",
+    "plan_echo": "orchestration turns",
+    "long_brief": "orchestration turns",
+    "batchable_bash": "orchestration turns",
+    "cache_churn_main": "orchestration turns",
+    "fable_wrote_code": "discipline",
+    "too_many_runs": "discipline",
+    "high_context_end": "discipline",
+}
+FAMILY_ORDER = ("reads", "agent overhead", "orchestration turns", "discipline", "other")
+
+
+def usd(x):
+    return "$%s" % format(float(x or 0.0), ",.2f")
+
+
+def family_of(code):
+    return WASTE_FAMILIES.get(code, "other")
+
+
+def main_input_of(s):
+    """Same weighting as postmortem_block: cache reads cost a tenth of fresh input."""
+    m = s.get("main") or {}
+    return (m.get("input", 0) + m.get("cache_creation", 0) + m.get("cache_read", 0) / 10.0)
+
+
+def family_rows(sessions):
+    """One row per waste family present, biggest first."""
+    fam = {}
+    for s in sessions:
+        for f in s.get("flags", []):
+            name = family_of(f["code"])
+            e = fam.setdefault(name, {"family": name, "wasted": 0, "sessions": set(),
+                                      "codes": {}})
+            e["wasted"] += f.get("est_wasted_tokens", 0)
+            e["sessions"].add(s.get("name") or s.get("session"))
+            e["codes"][f["code"]] = e["codes"].get(f["code"], 0) + f.get("est_wasted_tokens", 0)
+    out = list(fam.values())
+    for e in out:
+        e["top_code"] = max(e["codes"].items(), key=lambda kv: kv[1])[0] if e["codes"] else "-"
+    out.sort(key=lambda e: (-e["wasted"], FAMILY_ORDER.index(e["family"])
+                            if e["family"] in FAMILY_ORDER else 99))
+    return out
+
+
 def group_range(sessions):
     days = sorted(local_day(s.get("started")) for s in sessions if s.get("started"))
     return (days[0] if days else "?", days[-1] if days else "?")
 
 
 def version_stats(sessions):
-    """Per-session figures for one version group; the Versions table and the \u0394 line share them."""
+    """Per-session figures for one version group; the Versions table and the Δ line share them."""
     n = len(sessions)
     d = float(n or 1)
     cfs = [s.get("counterfactual") or {} for s in sessions]
@@ -1884,6 +1943,10 @@ def version_stats(sessions):
     hands = sum(p.get("hands_on_calls", 0) for p in pms)
     calls = sum(p.get("main_tool_calls", 0) for p in pms)
     actual = sum((s.get("totals") or {}).get("cost_usd", 0.0) for s in sessions)
+    real = sum(c.get("realistic_usd", 0.0) for c in cfs)
+    floor = sum(c.get("floor_usd", 0.0) for c in cfs)
+    wasted = sum(p.get("wasted_total", 0) for p in pms)
+    main_in = sum(main_input_of(s) for s in sessions)
     scores = [q for q in (quality_score(s) for s in sessions) if q]
     return {
         "n": n,
@@ -1891,7 +1954,13 @@ def version_stats(sessions):
         "q_mean": (sum(scores) / float(len(scores))) if scores else None,
         "actual": actual,
         "actual_per": actual / d,
-        "real_per": sum(c.get("realistic_usd", 0.0) for c in cfs) / d,
+        "real": real,
+        "real_per": real / d,
+        "floor": floor,
+        "saved": real - actual,
+        "saved_pct": 100.0 * (real - actual) / (real or 1),
+        "saved_floor": floor - actual,
+        "n_cf": sum(1 for c in cfs if c.get("realistic_usd")),
         "ratio": sum(rr) / (len(rr) or 1),
         "out_pct": sum(c.get("main_output_pct", 0.0) for c in ctxs) / d,
         "hands": hands,
@@ -1901,90 +1970,179 @@ def version_stats(sessions):
         "high_per": sum(x.get("high", 0) for x in sevs) / d,
         "med_per": sum(x.get("medium", 0) for x in sevs) / d,
         "low_per": sum(x.get("low", 0) for x in sevs) / d,
-        "wasted_per": sum(p.get("wasted_total", 0) for p in pms) / d,
+        "wasted": wasted,
+        "wasted_per": wasted / d,
+        "main_input": main_in,
+        "wasted_pct": 100.0 * wasted / (main_in or 1),
+        "n_pm": sum(1 for p in pms if p.get("wasted_total") is not None),
         "peak_ctx": sum(c.get("main_peak_tokens", 0) for c in ctxs) / d,
     }
 
 
-DELTA_FIELDS = (("$ actual/session", "actual_per"), ("ratio", "ratio"),
-                ("main output %", "out_pct"), ("hands-on %", "hands_pct"),
-                ("issues/session", "issues_per"), ("wasted/session", "wasted_per"))
+# (label, key, unit): "pts" for fields that are already percentages
+DELTA_FIELDS = (("$/session", "actual_per", "rel"), ("saved %", "saved_pct", "pts"),
+                ("wasted/session", "wasted_per", "rel"), ("wasted %", "wasted_pct", "pts"),
+                ("issues/session", "issues_per", "rel"), ("main output %", "out_pct", "pts"),
+                ("hands-on %", "hands_pct", "pts"))
 
 
-def delta_line(name, base, cur):
-    parts = []
-    for label, key in DELTA_FIELDS:
-        a, b = base[key], cur[key]
-        parts.append("%s %s" % (label, "n/a" if not a else "%+.0f%%" % (100.0 * (b - a) / a)))
-    # quality in points, not %, and only when both sides have a rated session
+def delta_cell(base, cur, key, unit):
+    a, b = base.get(key), cur.get(key)
+    if a is None or b is None:
+        return "—"
+    if unit == "pts":
+        return "%+.1f pts" % (b - a)
+    return "n/a" if not a else "%+.0f%%" % (100.0 * (b - a) / a)
+
+
+def delta_line(base_name, base, cur):
+    parts = ["%s %s" % (label, delta_cell(base, cur, key, unit))
+             for label, key, unit in DELTA_FIELDS]
     if base.get("q_mean") is not None and cur.get("q_mean") is not None:
         parts.append("quality %+.1f" % (cur["q_mean"] - base["q_mean"]))
-    return "\u0394 %s vs %s: %s" % (name, VERSION_OLDER, " \u00b7 ".join(parts))
+    return "- **vs %s:** %s" % (base_name, " · ".join(parts))
 
 
-def versions_table(order, groups):
+def versions_table(order, groups, cum):
     out = ["## Versions", ""]
-    out.append("| version | sessions | $ actual | $ actual/session | $ fable-only realistic/session "
-               "| mean ratio realistic | main output % | hands-on ratio | issues/session (H/M/L) "
-               "| est. wasted/session | peak ctx | quality (mean \u00b7 rated/n) |")
-    out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    out.append("| version | sessions | $ actual | $/session | $ Fable realistic | saved $ "
+               "| saved % | saved cumulative | wasted tok/session | wasted % "
+               "| issues/session (H/M/L) | main output % | hands-on | peak ctx | quality |")
+    out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     for name in order:
         v = version_stats(groups.get(name) or [])
-        out.append("| %s | %d | %.2f | %.2f | %.2f | \u00d7%.1f | %.1f%% | %d/%d (%.0f%%) "
-                   "| %.1f (%.1f/%.1f/%.1f) | %s | %s | %s \u00b7 %d/%d |"
-                   % (name, v["n"], v["actual"], v["actual_per"], v["real_per"], v["ratio"],
-                      v["out_pct"], v["hands"], v["calls"], v["hands_pct"], v["issues_per"],
-                      v["high_per"], v["med_per"], v["low_per"], tok(v["wasted_per"]),
+        if not v["n"]:
+            out.append("| %s | 0 |%s" % (name, " — |" * 13))
+            continue
+        out.append("| %s | %d | %s | %s | %s | %s | %.1f%% | %s | %s | %.1f%% "
+                   "| %.1f (%.1f/%.1f/%.1f) | %.1f%% | %d/%d (%.0f%%) | %s | %s · %d/%d |"
+                   % (name, v["n"], usd(v["actual"]), usd(v["actual_per"]), usd(v["real"]),
+                      usd(v["saved"]), v["saved_pct"], usd(cum.get(name, 0.0)),
+                      tok(v["wasted_per"]), v["wasted_pct"],
+                      v["issues_per"], v["high_per"], v["med_per"], v["low_per"],
+                      v["out_pct"], v["hands"], v["calls"], v["hands_pct"],
                       tok(v["peak_ctx"]),
-                      "\u2014" if v["q_mean"] is None else "%.1f" % v["q_mean"],
+                      "—" if v["q_mean"] is None else "%.1f" % v["q_mean"],
                       v["rated"], v["n"]))
     out.append("")
-    base = version_stats(groups.get(VERSION_OLDER) or [])
-    if base["n"]:
-        for name in order[1:]:
-            cur = version_stats(groups.get(name) or [])
-            if cur["n"]:
-                out.append(delta_line(name, base, cur))
-        out.append("")
     return out
 
 
-def version_block(name, sessions):
-    """The whole per-version section: summary line, the two flag tables, the Sessions table."""
+def deltas_table(order, groups):
+    """Every non-older version with sessions, compared to the previous one and to older."""
+    live = [name for name in order if groups.get(name)]
+    older = version_stats(groups.get(VERSION_OLDER) or [])
+    out = ["### Deltas", ""]
+    out.append("| version | vs | " + " | ".join(l for l, _, _ in DELTA_FIELDS) + " |")
+    out.append("|---|---|" + "---:|" * len(DELTA_FIELDS))
+    rows = 0
+    for i, name in enumerate(live):
+        if name == VERSION_OLDER:
+            continue
+        cur = version_stats(groups[name])
+        pairs = []
+        if i > 0:
+            pairs.append((live[i - 1], version_stats(groups[live[i - 1]])))
+        if older["n"] and (i == 0 or live[i - 1] != VERSION_OLDER):
+            pairs.append((VERSION_OLDER, older))
+        for base_name, base in pairs:
+            out.append("| %s | %s | %s |"
+                       % (name, base_name,
+                          " | ".join(delta_cell(base, cur, k, u) for _, k, u in DELTA_FIELDS)))
+            rows += 1
+    if not rows:
+        out.append("| — | — |" + " — |" * len(DELTA_FIELDS))
+    out.append("")
+    return out
+
+
+def corpus_block(kept, skipped_note):
+    v = version_stats(kept)
+    lo, hi = group_range(kept)
+    out = ["## Corpus", ""]
+    out.append("- **Spend:** %s actual across %d sessions (%s/session)"
+               % (usd(v["actual"]), v["n"], usd(v["actual_per"])))
+    out.append("- **Fable-only realistic:** %s (floor %s) → **saved %s (%.1f%%)**"
+               % (usd(v["real"]), usd(v["floor"]), usd(v["saved"]), v["saved_pct"]))
+    out.append("- **Est. wasted:** ~%s tokens = %.1f%% of main input volume"
+               % (tok(v["wasted"]), v["wasted_pct"]))
+    out.append("- **Quality:** %s mean · %d/%d rated"
+               % ("—" if v["q_mean"] is None else "%.1f" % v["q_mean"],
+                  v["rated"], v["n"]))
+    out.append("- **Span:** %s → %s · %d/%d sessions with a counterfactual%s"
+               % (lo, hi, v["n_cf"], v["n"], skipped_note))
+    out.append("")
+    return out
+
+
+def version_block(name, sessions, groups, prev_name, cum):
+    """The whole per-version section: at a glance, waste families, flag tables, sessions."""
     n = len(sessions)
     lo, hi = group_range(sessions)
-    cfs = [s.get("counterfactual") or {} for s in sessions]
-    actual = sum((s.get("totals") or {}).get("cost_usd", 0.0) for s in sessions)
-    floor = sum(c.get("floor_usd", 0.0) for c in cfs)
-    real = sum(c.get("realistic_usd", 0.0) for c in cfs)
-    rf = [c["ratio_floor"] for c in cfs if c.get("ratio_floor")]
-    rr = [c["ratio_realistic"] for c in cfs if c.get("ratio_realistic")]
-    wasted = sum((s.get("postmortem") or {}).get("wasted_total", 0) for s in sessions)
-    out = ["## %s \u2014 %d sessions (%s \u2192 %s)" % (name, n, lo, hi)]
-    out.append("actual $%.2f \u00b7 Fable-only floor $%.2f \u00b7 realistic $%.2f \u00b7 "
-               "mean ratio \u00d7%.1f floor / \u00d7%.1f realistic \u00b7 ~%s tokens est. wasted"
-               % (actual, floor, real,
-                  sum(rf) / (len(rf) or 1), sum(rr) / (len(rr) or 1), tok(wasted)))
+    v = version_stats(sessions)
+    out = ["## %s — %d sessions (%s → %s)" % (name, n, lo, hi), ""]
+    out.append("**At a glance**")
     out.append("")
+    out.append("- **Spend:** %s · %s/session" % (usd(v["actual"]), usd(v["actual_per"])))
+    out.append("- **Fable-only realistic:** %s (floor %s) → **saved %s (%.1f%%)**; "
+               "cumulative through %s: %s"
+               % (usd(v["real"]), usd(v["floor"]), usd(v["saved"]), v["saved_pct"],
+                  name, usd(cum.get(name, 0.0))))
+    out.append("- **Waste:** ~%s tokens = %.1f%% of main input volume · %.1f issues/session "
+               "(%.1f H / %.1f M / %.1f L)"
+               % (tok(v["wasted"]), v["wasted_pct"], v["issues_per"],
+                  v["high_per"], v["med_per"], v["low_per"]))
+    if prev_name:
+        out.append(delta_line(prev_name, version_stats(groups[prev_name]), v))
+    if name != VERSION_OLDER and prev_name != VERSION_OLDER and groups.get(VERSION_OLDER):
+        out.append(delta_line(VERSION_OLDER, version_stats(groups[VERSION_OLDER]), v))
+    out.append("- **Shape:** main output %.1f%% · hands-on %.0f%% · peak ctx %s "
+               "· quality %s (%d/%d rated)"
+               % (v["out_pct"], v["hands_pct"], tok(v["peak_ctx"]),
+                  "—" if v["q_mean"] is None else "%.1f" % v["q_mean"],
+                  v["rated"], v["n"]))
+    out.append("")
+
+    out.append("**Waste by category**")
+    out.append("")
+    out.append("| family | est. wasted | % of waste | % of main input | sessions | top code |")
+    out.append("|---|---:|---:|---:|---:|---|")
+    fams = family_rows(sessions)
+    for f in fams:
+        out.append("| %s | %s | %.1f%% | %.1f%% | %d/%d | %s |"
+                   % (f["family"], tok(f["wasted"]),
+                      100.0 * f["wasted"] / (v["wasted"] or 1),
+                      100.0 * f["wasted"] / (v["main_input"] or 1),
+                      len(f["sessions"]), n, f["top_code"]))
+    if not fams:
+        out.append("| none | 0 | 0.0%% | 0.0%% | 0/%d | - |" % n)
+    out.append("")
+
     rows = code_rows(sessions)
-    for title, sel in (("Recurring inefficiencies", [r for r in rows if len(r["sessions"]) >= 2]),
-                       ("One-off", [r for r in rows if len(r["sessions"]) < 2])):
-        out.append("### %s" % title)
+    for title, sel in (("Recurring inefficiencies** (≥2 sessions)",
+                        [r for r in rows if len(r["sessions"]) >= 2]),
+                       ("One-off**", [r for r in rows if len(r["sessions"]) < 2])):
+        out.append("**%s" % title)
         out.append("")
-        out.append("| code | severity | sessions | occurrences | est. wasted | recommendation |")
-        out.append("|---|---|---:|---:|---:|---|")
-        for r in sel:
-            out.append("| %s | %s | %d/%d | %d | %s | %s |"
-                       % (r["code"], r["severity"], len(r["sessions"]), n, r["n"],
-                          tok(r["wasted"]), advice_of(r["code"])))
         if not sel:
-            out.append("| - | - | 0/%d | 0 | 0 | - |" % n)
+            out.append("none")
+            out.append("")
+            continue
+        out.append("| code | family | severity | sessions | occurrences | est. wasted "
+                   "| % of waste | recommendation |")
+        out.append("|---|---|---|---:|---:|---:|---:|---|")
+        for r in sel:
+            out.append("| %s | %s | %s | %d/%d | %d | %s | %.1f%% | %s |"
+                       % (r["code"], family_of(r["code"]), r["severity"],
+                          len(r["sessions"]), n, r["n"], tok(r["wasted"]),
+                          100.0 * r["wasted"] / (v["wasted"] or 1), advice_of(r["code"])))
         out.append("")
-    out.append("### Sessions")
+
+    out.append("**Sessions**")
     out.append("")
-    out.append("| session | $ actual | $ fable-only realistic | main output % | "
-               "hands-on ratio | issues (H/M/L) | peak ctx | q |")
-    out.append("|---|---:|---:|---:|---:|---:|---:|---:|")
+    out.append("| session | $ actual | $ fable-only realistic | saved $ | main output % | "
+               "hands-on ratio | issues (H/M/L) | wasted tok | wasted % | peak ctx | q |")
+    out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     recent = sorted(sessions, key=lambda s: s.get("started") or "", reverse=True)[:15]
     for s in recent:
         pm = s.get("postmortem") or {}
@@ -1992,12 +2150,16 @@ def version_block(name, sessions):
         sev = pm.get("severity_counts") or {}
         ctx = s.get("context") or {}
         q = quality_score(s)
-        out.append("| %s | %.2f | %.2f | %.1f%% | %d/%d | %d/%d/%d | %s | %s |"
+        act = (s.get("totals") or {}).get("cost_usd", 0.0)
+        out.append("| %s | %.2f | %.2f | %.2f | %.1f%% | %d/%d | %d/%d/%d | %s | %.1f%% | %s | %s |"
                    % (s.get("name") or s.get("session") or "?",
-                      (s.get("totals") or {}).get("cost_usd", 0.0),
-                      cf.get("realistic_usd", 0.0), ctx.get("main_output_pct", 0.0),
+                      act, cf.get("realistic_usd", 0.0),
+                      cf.get("realistic_usd", 0.0) - act,
+                      ctx.get("main_output_pct", 0.0),
                       pm.get("hands_on_calls", 0), pm.get("main_tool_calls", 0),
                       sev.get("high", 0), sev.get("medium", 0), sev.get("low", 0),
+                      tok(pm.get("wasted_total", 0)),
+                      pm.get("wasted_pct_of_main_input", 0.0),
                       tok(ctx.get("main_peak_tokens", 0)), q if q else "—"))
     out.append("")
     return out
@@ -2013,7 +2175,7 @@ def is_empty_session(s):
 
 
 def excluded_table(excluded, threshold):
-    out = ["## Excluded (browser \u2265%d%% of main tool calls \u00b7 empty sessions)"
+    out = ["## Excluded (browser ≥%d%% of main tool calls · empty sessions)"
            % round(threshold * 100), ""]
     if not excluded:
         out.append("none")
@@ -2059,19 +2221,31 @@ def trends_md(sessions, skipped, versions=None, threshold=BROWSER_THRESHOLD_DEFA
         if name not in order:
             order.append(name)
 
-    lo, hi = group_range(kept)
-    counts = " / ".join("%s %d" % (name, len(groups.get(name) or [])) for name in order)
-    n_browser = sum(1 for s in excluded if s["browser_session"])
-    out = ["# TRENDS \u2014 %d sessions kept (%s \u2192 %s) \u00b7 %s \u00b7 "
-           "excluded: %d (browser %d \u00b7 empty %d)%s"
-           % (len(kept), lo, hi, counts, len(excluded), n_browser,
-              len(excluded) - n_browser,
-              " \u00b7 %d skipped (old format)" % skipped if skipped else "")]
-    out.append("")
-    out.extend(versions_table(order, groups))
+    # cumulative savings run in version order, so the last live version holds the corpus total
+    cum, running = {}, 0.0
     for name in order:
         if groups.get(name):
-            out.extend(version_block(name, groups[name]))
+            running += version_stats(groups[name])["saved"]
+        cum[name] = running
+
+    lo, hi = group_range(kept)
+    n_browser = sum(1 for s in excluded if s["browser_session"])
+    skipped_note = " · %d skipped (old format)" % skipped if skipped else ""
+    out = ["# TRENDS — %d sessions kept (%s → %s) · excluded %d "
+           "(browser %d · empty %d)"
+           % (len(kept), lo, hi, len(excluded), n_browser, len(excluded) - n_browser)]
+    out.append("")
+    out.extend(corpus_block(kept, skipped_note))
+    out.extend(versions_table(order, groups, cum))
+    out.extend(deltas_table(order, groups))
+    live = [name for name in order if groups.get(name)]
+    for i, name in enumerate(live):
+        out.append("---")
+        out.append("")
+        out.extend(version_block(name, groups[name], groups,
+                                 live[i - 1] if i else None, cum))
+    out.append("---")
+    out.append("")
     out.extend(excluded_table(excluded, threshold))
     return "\n".join(out)
 

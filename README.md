@@ -213,7 +213,11 @@ threshold for the `high_context_end` flag (default 150000). Files are named
 by start time, `<project>` = basename of the working directory); the `.md` report includes
 the summary plus the "Inefficiencies" list, an automatic "Postmortem" section with severity
 and recommendations, and a Fable-only cost estimate. `--trends DIR` regenerates
-`DIR/TRENDS.md`, a cross-session view of recurring inefficiencies. Sessions where at least
+`DIR/TRENDS.md`, a cross-session view of recurring inefficiencies. It opens with an
+executive summary per corpus and per version: spend, savings against the Fable-only
+realistic estimate ($ and %, cumulative across versions), estimated waste in tokens and as
+% of main input volume, waste grouped into families (reads, agent overhead, orchestration
+turns, discipline), and deltas against the previous version and against `older`. Sessions where at least
 50% of the main session's tool calls are `mcp__claude-in-chrome__*` are listed separately
 under "Excluded" and do not count toward the numbers (threshold: `--browser-threshold`,
 default 0.5; version list: `--versions PATH`). `/rate N [note]` before closing a session
