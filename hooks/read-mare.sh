@@ -1,8 +1,5 @@
 #!/bin/bash
-# PreToolUse on Read: rule 0 (/tool-results/ -> deny) for everyone, the rest main-session only.
-#   a) full-size image  -> warning (additionalContext), as before;
-#   b) same file already read in this main session -> deny (v1.4: was a warning);
-#   c) no offset/limit and over 300 lines -> deny. Exempt: plan files, .md under 600 lines.
+# 🔴 rule 0 (/tool-results/ -> deny) applies to everyone; a-c are main-session only — docs/workflow.md «Active hooks»
 # State comes from the transcript, not from a state file; the current call's own tool_use
 # block is already in the jsonl, so it is skipped by tool_use_id.
 input=$(cat)

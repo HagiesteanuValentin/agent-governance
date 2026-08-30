@@ -1,5 +1,5 @@
 #!/bin/bash
-# PreToolUse, implementer*/scripter* sub-agents: context budget + verification counter.
+# 🔴 must read the sub-agent's own transcript, not main's — docs/workflow.md «Active hooks»
 WARN_AT=150000
 BLOCK_AT=220000
 MARKER_DIR=/tmp/claude-hooks

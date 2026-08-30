@@ -4,6 +4,9 @@ Governance for Claude Code agent sessions: policies, enforcement hooks, and offl
 telemetry. Cheap models do the work, the expensive model only plans and audits, and hooks
 stop verbose agents from flooding the orchestrator's context.
 
+Current version: **v1.4.1** (2026-08-30). Model/effort choices are measured — see
+[docs/experiments.md](docs/experiments.md).
+
 ## The problem
 
 In a multi-agent Claude Code setup, the expensive orchestrator model burns its budget on
@@ -289,7 +292,8 @@ tools/      session_metrics.py, the offline transcript analyzer, pricing.json (p
             versions.json (workflow versions: name + start day or local minute; TRENDS.md groups
             sessions by version so you can compare before/after a workflow change;
             sessions before the first version are `older`)
-docs/       workflow.md — architecture, thresholds, what is measured, how
+docs/       workflow.md — architecture, thresholds, what is measured, how; experiments.md —
+            model/effort A-B tests for read-heavy agents (explorer, auditor)
 metrics/    baseline-2026-08.md — the numbers above, with method and caveats
             (metrics-local/TRENDS.md holds the cross-session Fable-only counterfactual,
             and per-session reports include a calls/limit column per worker)
