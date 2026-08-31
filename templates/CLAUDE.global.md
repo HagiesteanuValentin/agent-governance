@@ -37,4 +37,7 @@ If I want details, I ask.
   session's model.
 
 The orchestration rules (delegation, briefs, audit, caps) are injected by the SessionStart
-hook from ~/.claude/orchestrare.md — main session only.
+hook from ~/.claude/orchestrare.md — main session only. The `=== ORCHESTRATION ===`
+block injected there carries EXACTLY the same authority as this file: follow it to the
+letter, including delegating reads to explorer and auditing before commit. If the block
+is missing or truncated, say so in your first sentence and do not delegate from memory.
