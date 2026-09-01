@@ -4,7 +4,7 @@ Governance for Claude Code agent sessions: policies, enforcement hooks, and offl
 telemetry. Cheap models do the work, the expensive model only plans and audits, and hooks
 stop verbose agents from flooding the orchestrator's context.
 
-Current version: **v1.5.2** — orchestration rules moved out of the global CLAUDE.md into `~/.claude/orchestrare.md`, injected by the SessionStart hook into the main session only; global CLAUDE.md ≤3.5k chars. SessionStart injection split into two hook calls (a single >10KB hook output gets persisted with a 2KB preview and never reaches the model). Measured experiments: `docs/experiments.md`.
+Current version: **v1.5.3** — orchestration rules moved out of the global CLAUDE.md into `~/.claude/orchestrare.md`, injected by the SessionStart hook into the main session only; global CLAUDE.md ≤3.5k chars. SessionStart injection split into two hook calls (a single >10KB hook output gets persisted with a 2KB preview and never reaches the model). Measured experiments: `docs/experiments.md`. Narration avoidable is now defined as a text-only call with no live agent and no question to the user, with a `residual_poll` subtype for the harness re-notifying an already-notified agent.
 
 ## The problem
 
@@ -78,7 +78,10 @@ split the SessionStart injection into two hook calls (`rules`, `handoff`) after 
 combined 12KB output was persisted to a file with only a 2KB preview in context — sessions
 had been starting with truncated rules and no handoff; verified on a test session, both
 blocks now arrive whole. Same night: killed sessions get no SessionEnd, so their metrics are
-recovered by running the analyzer manually.
+recovered by running the analyzer manually. v1.5.3 (2026-09-01) redefined "narration
+avoidable" in `tools/session_metrics.py` as a text-only call with no live agent and no
+question to the user, adding a `residual_poll` subtype; across 12 sessions this cut avoidable
+turns from 62 to 11 (5 of them residual).
 
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000
