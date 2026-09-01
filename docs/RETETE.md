@@ -56,3 +56,18 @@ fiecare), rescrie pointerele cu numele secțiunii reale, șterge staging-ul. Aud
 doar `--dry-run`-ul de după și `git diff --stat`. De ce din proiect, nu din
 agent-governance: CLAUDE.md-ul proiectului se încarcă, PATTERNS/DECIZII sunt ținta,
 `scripts/SCRIPTS.md` e al proiectului, hook-ul și analizorul loghează pe cwd.
+
+## Experiment celule — evaluarea unui lot
+S = `~/.claude/projects/-home-vali-workflow-proiecte-agent-governance/<sesiune>/subagents`
+(lot 1 = `eb3b7cff-2e84-44ec-b9de-fe02fa88366c`; fiecare lot nou adaugă `--subagents-dir` al
+sesiunii lui). R = `metrics-local/experiments/simplu/r<k>`. Pași:
+1. `python3 tools/cell_metrics.py --subagents-dir S… --min-calls 2 --exclude-agent <id din
+   r2/EXCLUDE.txt>… --dump-reports R/rapoarte`
+2. `node scripts/evalueaza-simplu.mjs /home/vali/workflow/experimente/simplu/<cell>-r<k>
+   --report R/rapoarte/<cell>-r<k>.md --json R/<cell>-r<k>.json` × 4 (câte o dată per celulă)
+3. `python3 tools/cell_metrics.py --subagents-dir S… --min-calls 2 --exclude-agent … \
+   --results-dir R --md --json --out-dir R`
+4. Auditor (Brief 4 din plan) → `R/audit.md`.
+
+Verificatorul văzut de celule = `scripts/verifica-simplu.mjs` (doar I1–I8); capcanele T1–T5
+sunt doar în `scripts/evalueaza-simplu.mjs`, nu se expun celulelor.
