@@ -119,11 +119,14 @@ see DECIZII «v1.4.1») and added `tool_results_read`, `late_first_edit`, an int
   `less`, long heredocs, `grep`/`wc`) instead of delegating the read — counted only when the
   result comes back over 2,000 characters, so a targeted lookup is not a flag.
 - `narration_turns`: API calls in main with no tool use and short text. A short answer to
-  the user is not counted at all. The rest are split by what came before them: `structural`
-  (right after an agent launch or a `SendMessage` — the launch returns at once, so the turn
-  has to end) is counted but not taxed; `avoidable` (after a task notification or any other
-  tool result — main wrote a line and stopped instead of continuing) is taxed at
-  `cache_read / 10`. The flag fires above 2 avoidable calls.
+  the user is not counted at all. The rest are split by what the turn could have done
+  instead: `structural` (an async agent was still live, the note came right after a launch,
+  the text ends in a question, or it is the session's last turn — the turn had to end
+  anyway) is counted but not taxed; `avoidable` (nothing running, nothing asked — main wrote
+  a line and stopped instead of continuing) is taxed at `cache_read / 10`. The flag fires
+  above 2 avoidable calls. Sub-type `residual_poll`: a note after the harness re-notified an
+  already-notified agent — always avoidable, reported separately since the cause is the
+  harness, not the model.
 - `batchable_bash`: runs of ≥3 consecutive small Bash calls in main that could have been one
   call.
 - `plan_echo`: an `ExitPlanMode` result in main large enough that the plan is being paid for

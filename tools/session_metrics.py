@@ -60,7 +60,7 @@ THRESHOLDS = {
     "context_drop_pct": 30.0,        # drop between two consecutive main calls
     "flag_examples": 5,              # per code, per scope: how many are listed one by one
     "main_read_chars": 2000,         # any Bash read in main under this is a targeted lookup
-    "narration_avoidable_calls": 2,  # narration calls after a notification or a plain result
+    "narration_avoidable_calls": 2,  # narration calls with no live agent and no question to the user (residual_poll = harness re-notify)
     "narration_text_chars": 300,     # under this, an answer is narration, not work
     "batchable_calls": 3,            # consecutive one-Bash API calls that could be one
     "batchable_chars": 2000,         # ...and together return less than this
@@ -96,9 +96,11 @@ FLAG_TEXT = {
     "agent_no_report": "worker ended without a final report",
     "agent_reread_own_write": "worker re-read a file it had just written",
     "main_read_files": "main read files through Bash instead of delegating",
-    "narration_turns": "main ended a turn on a note after a result instead of continuing; "
+    "narration_turns": "main ended a turn on a note with nothing running and nothing asked; "
                        "wasted = cache_read / 10 (input-equivalent, the cached context "
-                       "re-sent for nothing); launch-structural calls are counted, not taxed",
+                       "re-sent for nothing); a note while an async agent is live, right "
+                       "after a launch, a question or the last turn is structural, counted "
+                       "but not taxed; residual_poll = harness re-notifying a done agent",
     "batchable_bash": "consecutive Bash calls that fit in one call",
     "plan_echo": "plan echoed back into main as a tool_result",
     "sterile_verification": "worker re-ran the checker without it catching anything",
@@ -164,8 +166,8 @@ RECOMMENDATION = {
     "agent_reread_own_write": "{detail} - the write already succeeded; do not read it back.",
     "main_read_files": "{detail} - delegate the reading; an audit is `git diff --stat` "
                        "plus a targeted grep.",
-    "narration_turns": "{detail} - after a notification, the one-line note and the next "
-                       "tool call go in the same message.",
+    "narration_turns": "{detail} - text-only calls with no live agent; residual_poll = the harness "
+                       "re-sent a notification for an already-notified agent, not a rule miss.",
     "batchable_bash": "{detail} - one Bash call chained with `;` / `&&`.",
     "plan_echo": "{detail} - keep the plan under 8k; briefs go in the plan file, the prompt "
                  "is path + section.",
@@ -737,6 +739,8 @@ def slash_name(content):
 
 
 ASYNC_LAUNCH_RE = re.compile(r"Async agent launched|Resuming agent|running in the background|will be notified")
+AGENT_ID_RE = re.compile(r"agentId:\s*([A-Za-z0-9_-]+)")
+TASK_ID_RE = re.compile(r"<task-id>\s*([A-Za-z0-9_-]+)\s*</task-id>")
 
 
 def human_side_kind(obj, msg, agent_call_ids):
@@ -762,6 +766,9 @@ def parse_file(path, label, tool_names, tool_inputs):
     doc = new_doc(path, label)
     groups = doc["groups"]
     last_human = "user"
+    # 🔴 a turn with a live async agent is structural, not waste — DECIZII «Narration turns: avoidable»
+    live_agents, notified, revived = set(), collections.Counter(), set()
+    pending_residual = False
     for obj in read_lines(path):
         ts = obj.get("timestamp")
         if isinstance(ts, str):
@@ -788,6 +795,15 @@ def parse_file(path, label, tool_names, tool_inputs):
         if kind == "user":
             if not obj.get("isSidechain"):
                 last_human = human_side_kind(obj, msg, doc["agent_call_ids"])
+                raw = msg.get("content")
+                raw = raw if isinstance(raw, str) else text_of(raw)
+                pending_residual = False
+                for tid in TASK_ID_RE.findall(raw or ""):
+                    if notified[tid] and tid not in revived:
+                        pending_residual = True
+                    notified[tid] += 1
+                    revived.discard(tid)
+                    live_agents.discard(tid)
             content = msg.get("content")
             if isinstance(content, str) and not obj.get("isMeta"):
                 stripped = content.strip()
@@ -833,7 +849,13 @@ def parse_file(path, label, tool_names, tool_inputs):
                             and body.count("\n") + 1 > THRESHOLDS["fable_code_lines"]):
                         doc["code_writes"].append({"path": fp or "?",
                                                    "lines": body.count("\n") + 1})
+                elif name == "TaskStop":
+                    live_agents.discard(inp.get("task_id"))
                 elif name == "SendMessage":
+                    to = inp.get("to")
+                    if isinstance(to, str) and to:
+                        live_agents.add(to)
+                        revived.add(to)
                     doc["sendmessages"] += 1
                     if isinstance(ts, str):
                         doc["sendmessage_ts"].append(ts)
@@ -853,6 +875,12 @@ def parse_file(path, label, tool_names, tool_inputs):
             elif bt == "tool_result":
                 body = text_of(b.get("content"))
                 tuid = b.get("tool_use_id")
+                if (isinstance(tuid, str) and tuid in doc["agent_call_ids"]
+                        and not obj.get("isSidechain")
+                        and ASYNC_LAUNCH_RE.search(body)):
+                    aid = AGENT_ID_RE.search(body)
+                    if aid:
+                        live_agents.add(aid.group(1))
                 if (label is None and isinstance(tuid, str)
                         and tuid in doc["agent_call_ids"]
                         and MAX_TURNS_RE.search(body[:4000])):
@@ -884,7 +912,10 @@ def parse_file(path, label, tool_names, tool_inputs):
                 "texts": [], "tools": [], "tool_ids": [],
                 "at": ts,
                 "prev_human": last_human,
+                "agents_live": bool(live_agents),
+                "residual_poll": pending_residual,
             }
+            pending_residual = False
         else:
             grp["usage"]["output_tokens"] = max(grp["usage"].get("output_tokens") or 0,
                                                 usage.get("output_tokens") or 0)
@@ -917,6 +948,9 @@ def parse_file(path, label, tool_names, tool_inputs):
             "output": usage.get("output_tokens") or 0,
             "has_tool_use": bool(grp["tools"]),
             "prev_human": grp.get("prev_human") or "user",
+            "agents_live": bool(grp.get("agents_live")),
+            "residual_poll": bool(grp.get("residual_poll")),
+            "asks_user": "".join(grp["texts"]).strip().endswith("?"),
             "text_chars": sum(len(t) for t in grp["texts"]),
             "tool_names": list(grp["tools"]),
             "tool_ids": list(grp["tool_ids"]),
@@ -1141,16 +1175,28 @@ def main_call_flags(scope, doc, rows):
     narr = [c for c in calls if not c["has_tool_use"]
             and c["text_chars"] < THRESHOLDS["narration_text_chars"]
             and c["prev_human"] != "user"]
-    structural = [c for c in narr if c["prev_human"] == "agent_result"]
-    avoidable = [c for c in narr if c["prev_human"] != "agent_result"]
+    last_call = calls[-1] if calls else None
+
+    def inherent(c):
+        # 🔴 only a note with nothing running is waste — DECIZII «Narration turns: avoidable»
+        return (not c.get("residual_poll")
+                and (c["prev_human"] == "agent_result" or c.get("agents_live")
+                     or c.get("asks_user") or c is last_call))
+
+    structural = [c for c in narr if inherent(c)]
+    avoidable = [c for c in narr if not inherent(c)]
+    residual = [c for c in avoidable if c.get("residual_poll")]
     narr_cache = sum(c["cache_read"] for c in narr)
     avoid_cache = sum(c["cache_read"] for c in avoidable)
     if len(avoidable) > THRESHOLDS["narration_avoidable_calls"]:
         flags.append(flag("narration_turns", scope,
-                          "%d avoidable narration calls (%s cache_read re-sent) · "
-                          "%d structural after agent launches"
-                          % (len(avoidable), tok(avoid_cache), len(structural)),
+                          "%d avoidable narration calls (%s cache_read re-sent, "
+                          "%d of them residual_poll) · %d structural (agent live, "
+                          "launch, question or last turn)"
+                          % (len(avoidable), tok(avoid_cache), len(residual),
+                             len(structural)),
                           {"calls": len(narr), "avoidable": len(avoidable),
+                           "residual_poll": len(residual),
                            "structural": len(structural), "cache_read": avoid_cache},
                           int(avoid_cache / 10.0)))
 
@@ -1202,6 +1248,7 @@ def main_call_flags(scope, doc, rows):
         "hands_on_ratio": round(hands_on / float(tool_calls or 1), 3),
         "narration_calls": len(narr),
         "narration_avoidable": len(avoidable),
+        "narration_residual_poll": len(residual),
         "narration_structural": len(structural),
         "narration_cache_read": narr_cache,
         "narration_avoidable_cache_read": avoid_cache,
@@ -1932,9 +1979,10 @@ def postmortem_lines(s):
     out.append("Delegable work in main: " + " · ".join(parts))
     ctx = s["context"]
     if "narration_avoidable" in pm:
-        narr = ("narration-only calls %d (%d avoidable · %d structural, ~%s cache_read "
-                "≈ %s input-equiv.)"
+        narr = ("narration-only calls %d (%d avoidable, of which %d residual_poll · "
+                "%d structural, ~%s cache_read ≈ %s input-equiv.)"
                 % (pm.get("narration_calls", 0), pm["narration_avoidable"],
+                   pm.get("narration_residual_poll", 0),
                    pm.get("narration_structural", 0),
                    tok(pm.get("narration_avoidable_cache_read", 0)),
                    tok(pm.get("narration_avoidable_cache_read", 0) // 10)))
