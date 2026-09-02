@@ -175,11 +175,20 @@ knew which window was which); medium session's explorer tried to write `docs/dos
 blocked, leaving a plan-file artifact (`~/.claude/plans/salut-am-de-modificat-snoopy-bubble-agent-*.md`) and
 5.1% wasted; both sessions saw the same HANDOFF; judge = Fable high on the rubric, not a blind human.
 
-Phase 2 (pending): execute plan-M in a fresh session started with `claude --effort medium`; measure
-on that session: analyzer flags (`fable_wrote_code`, `parallel_over_cap`, commit without audit),
-repair rounds, `$ main out` (new column from the task itself), `/rate`. At the final audit add the
-two cheap checks the auditor flagged: grep for old session names in docs/HANDOFF and one real
-SessionEnd run. Kill switch back to high: any flag above.
+Phase 2 (2026-09-02, executed): session `claude --effort medium`, prompt only "planul e aprobat…,
+execută-l"; session was restarted mid-run (transcripts: d959214c killed, f5db2a97 continued), so
+main $ is split. Brief 1 → implementer-complex (58k tokens, 46 tool uses) → auditor: ABATERI (3),
+0 fixed (collision branch AttributeError/`?-?` name, dead `first_timestamp`, PATTERNS 7 lines) →
+1 SendMessage to same implementer → re-audit OK. Brief 2 → implementer-complex (96k tokens, 90
+tool uses) → auditor: ABATERI (3), 1 fixed (dead code); 2 logic ones (main $ % denominator over
+all sessions → 22% instead of 66%; ghost scripter runs from inherited workers in resumed
+sessions) → SendMessage impossible (agent lost at restart) → escalation implementer-max (45k
+tokens, 35 tool uses) → re-audit OK. Real migration: 89 records renamed, 0 SKIP, idempotent; live
+SessionEnd hook run on the killed transcript: record `2026-09-02-135613-agent-governance`, effort
+medium, main $1.93 of $11.13, scripter runs 0. Delivered in commit 4864fe4 (push refused, rights).
+Flags, total main $ out and /rate: to be filled from `metrics-local/` after this session ends
+(record of f5db2a97). Kill-switch check: no fable_wrote_code (main edited only .gitignore +1
+line), no parallel_over_cap (max 1 agent live), no commit without audit.
 
 ## How to rerun
 
