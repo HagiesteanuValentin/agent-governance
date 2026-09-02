@@ -39,6 +39,24 @@ WINDOW_DEFAULT = 1_000_000
 NO_QUALITY = ("no quality claim — the threshold is the operator's, not Anthropic's")
 MAX_TURNS_FM_RE = re.compile(r"^maxTurns:\s*(\d+)\s*$", re.M)
 
+# 🔴 cifrele nu se compară între clase de task — DECIZII «Clasa de task»
+GOVERNANCE_PROJECTS = {"agent-governance"}
+
+
+def task_class(record_or_project):
+    """`governance-rd` for the meta-projects, `product` for the rest; record or project slug."""
+    if isinstance(record_or_project, dict):
+        if record_or_project.get("task_class"):
+            return record_or_project["task_class"]
+        project = record_or_project.get("project") or ""
+    else:
+        project = record_or_project or ""
+    project = str(project)
+    for name in GOVERNANCE_PROJECTS:
+        if project == name or project.endswith("-" + name) or project.endswith("/" + name):
+            return "governance-rd"
+    return "product"
+
 IMG_EXT = (".png", ".jpg", ".jpeg", ".webp")
 SMALL_IMG = ("-mic", "-small")
 COST_KEYS = (("input", "input"), ("output", "output"),
@@ -1691,8 +1709,6 @@ ADVISOR_HEADER_RE = re.compile(r"^\s*(?:VERDICT|CHANGES|SCHIMB\w*|RISK|RISC|EDGE
                                r"IMPROVEMENTS|[IÎ]MBUN\w*|NEED|NEVOI\w*)\s*:", re.I)
 CHANGES_RE = re.compile(r"^\s*(?:CHANGES|SCHIMB\w*)\s*:", re.I)
 IMPROVE_RE = re.compile(r"^\s*(?:IMPROVEMENTS|[IÎ]MBUN\w*)\s*:", re.I)
-CF_HIGH_NOTE = ("estimare: output-ul turelor non-high înlocuit cu mediana turelor high din "
-                "corpus; nu prinde turele în plus cauzate de greșeli")
 V17_VERSION_PREFIX = "v1.7"
 
 
@@ -1784,17 +1800,19 @@ def turn_cost(call, pricing):
 
 
 EMPTY_ITEM_RE = re.compile(r"^(?:niciuna|niciun\w*|nimic|none|n/?a|-{1,3}|—|\.)$", re.I)
+# an item starts with a bullet or a number; a section with no marker at all falls back to lines
+ITEM_START_RE = re.compile(r"^(?:[-*•]\s+|\d+[.)]\s*)")
 
 
 def advisor_section_count(text, header_re):
-    """Lines under one header of the advisor's fixed format, up to the next header."""
-    n, started = 0, False
+    """Items under one header of the advisor's fixed format, up to the next header."""
+    tail_item, lines, started = 0, [], False
     for raw in (text or "").splitlines():
         if header_re.match(raw):
             started = True
             tail = raw.split(":", 1)[1].strip() if ":" in raw else ""
             if tail and not EMPTY_ITEM_RE.match(tail):
-                n += 1
+                tail_item = 1
             continue
         if not started:
             continue
@@ -1802,12 +1820,13 @@ def advisor_section_count(text, header_re):
             break
         line = raw.strip()
         if line and not EMPTY_ITEM_RE.match(line):
-            n += 1
-    return n
+            lines.append(line)
+    marked = [l for l in lines if ITEM_START_RE.match(l)]
+    return tail_item + (len(marked) if marked else len(lines))
 
 
 def v17_block(main_doc, workers, docs_by_scope, tool_inputs, pricing, version,
-              flags, baseline, total_cost_usd):
+              flags, total_cost_usd):
     """The v1.7 numbers: effort phases, plan lag, advisor, low phase. (block, new flags)."""
     new_flags = []
     all_main = [c for c in main_doc["calls"] if not c["side"]]
@@ -1987,28 +2006,18 @@ def v17_block(main_doc, workers, docs_by_scope, tool_inputs, pricing, version,
                               "v1.7 session with ExitPlanMode and no low turn at all",
                               None, 0))
 
-    # ---- counterfactual: everything at high
-    cf_high = None
-    if baseline and baseline.get("median_output_tokens") is not None:
-        med = float(baseline["median_output_tokens"])
-        actual = est = 0.0
-        for c in turns:
-            rates = rates_for(pricing, c["model"])
-            a = turn_cost(c, pricing)
-            actual += a
-            if effort_of(c) != "high" and str(c["model"]).startswith("claude-fable"):
-                orate = float(rates.get("output", 0.0)) / 1_000_000.0
-                est += a - c["output"] * orate + med * orate
-            else:
-                est += a
-        cf_high = {
-            "basis_n": baseline.get("n"),
-            "median_output_high": baseline.get("median_output_tokens"),
-            "median_thinking_high": baseline.get("median_thinking_tokens"),
-            "cost_if_high_est_usd": round(est, 4),
-            "cost_saved_est_usd": round(est - actual, 4),
-            "note": CF_HIGH_NOTE,
-        }
+    # ---- the plan echoed back as a tool_result, re-sent on every later turn
+    echo = None
+    if exit_pos:
+        pos, tid = exit_pos[0]
+        res_chars = {r["tool_use_id"]: r["chars"] for r in main_doc["results"]}
+        chars = res_chars.get(tid, 0)
+        model = collections.Counter(c["model"] for c in turns).most_common(1)[0][0]
+        rate = float(rates_for(pricing, model).get("cache_read", 0.0)) / 1_000_000.0
+        tokens_est = chars // 4
+        turns_after = len(turns) - 1 - pos
+        echo = {"chars": chars, "tokens_est": tokens_est, "turns_after": turns_after,
+                "cost_est_usd": round(tokens_est * turns_after * rate, 6)}
 
     block = {
         "is_v17": is_v17,
@@ -2020,10 +2029,11 @@ def v17_block(main_doc, workers, docs_by_scope, tool_inputs, pricing, version,
         "effort_tool_calls": {k: tcalls.get(k, 0) for k in EFFORT_KEYS},
         "effort_runs": runs,
         "plan": {"exit_plan_count": len(exit_pos), "enter_plan_count": len(enter_pos),
-                 "lag_turns_to_low": lags, "mismatch_turns": mismatch},
+                 "lag_turns_to_low": lags, "mismatch_turns": mismatch, "echo": echo},
         "advisor": advisor,
         "low_phase": low_phase,
-        "counterfactual_high": cf_high,
+        # 🔴 medianele de corpus se umplu în --trends, nu la analiza unei sesiuni — DECIZII «Counterfactual înlocuit»
+        "cost_per_turn": None,
     }
     return block, new_flags
 
@@ -2046,6 +2056,7 @@ def apply_quality_to_v17(session):
 def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             as_model=None, rot_at=ROT_AT_DEFAULT, window=WINDOW_DEFAULT,
             versions=None, browser_threshold=BROWSER_THRESHOLD_DEFAULT,
+            # 🔴 effort_baseline e acceptat, dar ignorat — DECIZII «Counterfactual înlocuit»
             effort_baseline=None):
     if versions is None:
         versions = []
@@ -2436,7 +2447,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
     v17, v17_flags = v17_block(main_doc, workers,
                                {sc: d for sc, d, _r in worker_scopes},
                                tool_inputs, pricing, version, flags,
-                               effort_baseline, totals["cost_usd"])
+                               totals["cost_usd"])
     flags.extend(v17_flags)
 
     postmortem = postmortem_block(main_doc, workers, flags, main, by_type)
@@ -2461,6 +2472,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         "session": os.path.basename(jsonl_path)[:-len(".jsonl")],
         "name": session_name(jsonl_path, ts0, cwd0),
         "project": os.path.basename(os.path.dirname(jsonl_path)),
+        "task_class": task_class(os.path.basename(os.path.dirname(jsonl_path))),
         "path": jsonl_path,
         "started": first_ts,
         "ended": last_ts,
@@ -2501,6 +2513,10 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
 
 def fmt(n):
     return "{:,}".format(n).replace(",", ".")
+
+
+def num_or_dash(x):
+    return "—" if x is None else x
 
 
 def flags_by_scope(session, scope):
@@ -2593,6 +2609,69 @@ def counterfactual_lines(s):
     return out
 
 
+def summary_ok_list(s):
+    """The checks that did NOT fire: the counterpart of the flags, named one by one."""
+    codes = set(f["code"] for f in s.get("flags") or [])
+    runs = (s.get("iterations") or {}).get("agent_runs_by_type") or {}
+    lp = ((s.get("v17") if isinstance(s.get("v17"), dict) else {}) or {}).get("low_phase") or {}
+    live = (s.get("parallel") or {}).get("max_concurrent", 0)
+    ok = []
+    if "too_many_runs" not in codes:
+        ok.append("runs ≤ cap")
+    if runs.get("explorer", 0) <= THRESHOLDS["max_explorer_runs"]:
+        ok.append("explorer %d ≤ %d" % (runs.get("explorer", 0), THRESHOLDS["max_explorer_runs"]))
+    if live <= THRESHOLDS["max_live_agents"]:
+        ok.append("agenți vii %d ≤ %d" % (live, THRESHOLDS["max_live_agents"]))
+    if lp.get("audit_ok") and not lp.get("audit_abateri_total"):
+        ok.append("audit OK")
+    if not any(w.get("type", "").endswith("-max") for w in s.get("workers") or []):
+        ok.append("fără escaladare max")
+    return ok
+
+
+def summary_lines(s):
+    """`## Summary`: the whole post-mortem in a few lines, no JSON needed."""
+    v = s.get("v17") if isinstance(s.get("v17"), dict) else {}
+    v = v or {}
+    t, m = s.get("totals") or {}, s.get("main") or {}
+    et, ec = v.get("effort_turns") or {}, v.get("effort_cost_usd") or {}
+    p, a = v.get("plan") or {}, v.get("advisor") or {}
+    lp, cpt = v.get("low_phase") or {}, v.get("cost_per_turn") or {}
+    out = ["## Summary", ""]
+    out.append("%s · %s · effort %s · $%.2f total (main $%s · agenți $%s) · quality %s"
+               % (task_class(s), s.get("version") or VERSION_OLDER, m.get("effort") or "—",
+                  t.get("cost_usd", 0.0),
+                  "—" if m.get("cost_usd") is None else "%.2f" % m["cost_usd"],
+                  "—" if t.get("agents_cost_usd") is None else "%.2f" % t["agents_cost_usd"],
+                  quality_score(s) or "—"))
+    lag = ", ".join("—" if l is None else str(l) for l in (p.get("lag_turns_to_low") or [])) or "—"
+    out.append("Ture: plan %d medium ($%.2f) / impl %d low ($%.2f) · high %d · lag %s ture "
+               "· $/tură %s"
+               % (et.get("medium", 0), ec.get("medium", 0.0), et.get("low", 0),
+                  ec.get("low", 0.0), et.get("high", 0), lag,
+                  num_or_dash(cpt.get("main_usd_per_turn") or main_usd_per_turn(s))))
+    out.append("Advisor: %s · schimbări %d itemi · audit ABATERI %d (OK %d)"
+               % (a.get("verdict") or "necerut", a.get("n_schimbari", 0),
+                  lp.get("audit_abateri_total", 0), lp.get("audit_ok", 0)))
+    echo = p.get("echo")
+    out.append("Plan echo: %s"
+               % ("—" if not echo else "$%.4f (%s chars re-trimiși pe %d ture)"
+                  % (echo.get("cost_est_usd", 0.0), fmt(echo.get("chars", 0)),
+                     echo.get("turns_after", 0))))
+    flags = s.get("flags") or []
+    if flags:
+        sev = collections.Counter(f.get("severity") or "low" for f in flags)
+        top = collections.Counter(f["code"] for f in flags).most_common(3)
+        out.append("Flags: %d (%dH/%dM/%dL) — %s"
+                   % (len(flags), sev["high"], sev["medium"], sev["low"],
+                      ", ".join("%s×%d" % (c, n) for c, n in top)))
+    else:
+        out.append("Flags: no flags")
+    out.append("ok: " + (" · ".join(summary_ok_list(s)) or "—"))
+    out.append("")
+    return out
+
+
 def session_report(s):
     out = []
     t = s["totals"]
@@ -2659,6 +2738,8 @@ def session_report(s):
         "%s %s out / $%.2f" % (short_model(m), tok(r["output"]), r["cost_usd"])
         for m, r in sorted(s["models"].items(), key=lambda kv: -kv[1]["cost_usd"])))
     out.append("")
+
+    out = [out[0], ""] + summary_lines(s) + ["## Session", ""] + out[1:]
 
     wasted = sum(f.get("est_wasted_tokens", 0) for f in s["flags"])
     out.append("## Inefficiencies (%d%s)"
@@ -2799,15 +2880,21 @@ def v17_lines(s):
                % (fl, lp.get("sendmessage_resends", 0), lp.get("reruns", 0),
                   lp.get("audit_abateri_total", 0), lp.get("audit_ok", 0),
                   "—" if lp.get("mistakes") is None else lp["mistakes"]))
-    cf = v.get("counterfactual_high")
-    if cf:
-        out.append("If everything had run at high: $%.2f (estimate, n=%s · median output %s tok) "
-                   "→ saved $%.2f · %s"
-                   % (cf.get("cost_if_high_est_usd", 0.0), cf.get("basis_n"),
-                      cf.get("median_output_high"), cf.get("cost_saved_est_usd", 0.0),
-                      cf.get("note", "")))
+    echo = p.get("echo")
+    if echo:
+        out.append("Plan echo: %s chars (~%s tok) re-sent over %d turns → $%.4f cache-read"
+                   % (fmt(echo.get("chars", 0)), fmt(echo.get("tokens_est", 0)),
+                      echo.get("turns_after", 0), echo.get("cost_est_usd", 0.0)))
+    cpt = v.get("cost_per_turn")
+    if cpt:
+        out.append("Cost/main turn: $%s (%s) · corpus high median %s (n=%d) · medium median %s "
+                   "(n=%d)"
+                   % (cpt.get("main_usd_per_turn"), cpt.get("task_class"),
+                      num_or_dash(cpt.get("corpus_high_median")), cpt.get("corpus_n_high", 0),
+                      num_or_dash(cpt.get("corpus_medium_median")),
+                      cpt.get("corpus_n_medium", 0)))
     else:
-        out.append("If everything had run at high: no baseline (run --build-effort-baseline)")
+        out.append("Cost/main turn: corpus medians only in --trends")
     out.append("")
     return out
 
@@ -2832,6 +2919,58 @@ def v17_group_of(s):
     if et.get("medium", 0) / float(total) >= 0.9:
         return "medium permanent"
     return None
+
+
+EFFORT_PURE_SHARE = 0.9
+
+
+def effort_profile(s):
+    """`high`/`medium` when nearly every main turn ran at that effort; else None."""
+    v = s.get("v17")
+    if not isinstance(v, dict):
+        return None
+    et = v.get("effort_turns") or {}
+    total = sum(et.values())
+    if not total:
+        return None
+    for k in ("high", "medium"):
+        if et.get(k, 0) / float(total) >= EFFORT_PURE_SHARE:
+            return k
+    return None
+
+
+def main_usd_per_turn(s):
+    v = s.get("v17")
+    if not isinstance(v, dict):
+        return None
+    turns = sum((v.get("effort_turns") or {}).values())
+    main_cost = (s.get("main") or {}).get("cost_usd") or 0.0
+    return round(main_cost / turns, 4) if turns else None
+
+
+def apply_cost_per_turn(sessions):
+    """v17.cost_per_turn: this session's $/main turn next to the medians of its task class."""
+    corpus = collections.defaultdict(lambda: collections.defaultdict(list))
+    for s in sessions:
+        prof, val = effort_profile(s), main_usd_per_turn(s)
+        if prof and val is not None:
+            corpus[task_class(s)][prof].append(val)
+    for s in sessions:
+        v = s.get("v17")
+        if not isinstance(v, dict):
+            continue
+        tc = task_class(s)
+        highs, meds = corpus[tc]["high"], corpus[tc]["medium"]
+        v["cost_per_turn"] = {
+            "main_usd_per_turn": main_usd_per_turn(s),
+            # 🔴 sub 2 sesiuni mediana nu spune nimic — DECIZII «Counterfactual înlocuit»
+            "corpus_high_median": round(median(highs), 4) if len(highs) >= 2 else None,
+            "corpus_medium_median": round(median(meds), 4) if len(meds) >= 2 else None,
+            "corpus_n_high": len(highs),
+            "corpus_n_medium": len(meds),
+            "task_class": tc,
+        }
+    return sessions
 
 
 def v17_session_metrics(s):
@@ -2863,27 +3002,32 @@ def v17_md(sessions):
     rows = [s for s in sessions if v17_group_of(s) == "v1.7"]
     out = ["# V17 — effort phases & advisor (%d v1.7 sessions)" % len(rows), "",
            V17_BENCH_NOTE, ""]
-    out.append("| session | rate | mistakes | advisor calls/score/verdict | turns med/low | "
-               "$ med | $ low | $ if high | saved | ABATERI | low flags | lag |")
-    out.append("|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---|---:|")
+    out.append("| session | class | rate | mistakes | advisor calls/score/verdict | "
+               "turns med/low | $ med | $ low | $/turn | corpus med $/turn | "
+               "corpus high $/turn | ABATERI | low flags | lag |")
+    out.append("|---|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---:|---|---:|")
     if not rows:
-        out.append("| _no v1.7 session yet_ | | | | | | | | | | | |")
+        out.append("| _no v1.7 session yet_ | | | | | | | | | | | | | |")
     for s in sorted(rows, key=lambda s: s.get("started") or ""):
         v = s["v17"]
         et, ec = v.get("effort_turns") or {}, v.get("effort_cost_usd") or {}
         a, lp, p = v.get("advisor") or {}, v.get("low_phase") or {}, v.get("plan") or {}
-        cf = v.get("counterfactual_high") or {}
+        cpt = v.get("cost_per_turn") or {}
         fl = ", ".join("%s×%d" % (c, n) for c, n in (lp.get("flags") or [])) or "—"
         lag = ", ".join("—" if l is None else str(l)
                         for l in (p.get("lag_turns_to_low") or [])) or "—"
-        out.append("| %s | %s | %s | %d/%s/%s | %d/%d | %.2f | %.2f | %s | %s | %d | %s | %s |"
-                   % (s.get("name") or s.get("session"), quality_score(s) or "—",
+        # 🔴 medianele se citesc pe clasa lor, fără fallback high↔medium — DECIZII «Clasa de task»
+        out.append("| %s | %s | %s | %s | %d/%s/%s | %d/%d | %.2f | %.2f | %s | %s | %s "
+                   "| %d | %s | %s |"
+                   % (s.get("name") or s.get("session"), cpt.get("task_class") or task_class(s),
+                      quality_score(s) or "—",
                       "—" if lp.get("mistakes") is None else lp["mistakes"],
                       a.get("calls", 0), a.get("score") or "—", a.get("verdict") or "—",
                       et.get("medium", 0), et.get("low", 0),
                       ec.get("medium", 0.0), ec.get("low", 0.0),
-                      "%.2f" % cf["cost_if_high_est_usd"] if cf else "—",
-                      "%.2f" % cf["cost_saved_est_usd"] if cf else "—",
+                      num_or_dash(cpt.get("main_usd_per_turn")),
+                      num_or_dash(cpt.get("corpus_medium_median")),
+                      num_or_dash(cpt.get("corpus_high_median")),
                       lp.get("audit_abateri_total", 0), fl, lag))
     out.append("")
     groups = collections.OrderedDict((g, []) for g in V17_GROUPS)
@@ -2978,6 +3122,8 @@ def load_session_dir(directory):
             if isinstance(rec, dict) and all(k in rec for k in SESSION_KEYS):
                 rec.setdefault("postmortem", {})
                 rec.setdefault("counterfactual", {})
+                # 🔴 record-urile vechi n-au cheia; se derivă la citire, nu se rescriu — DECIZII «Clasa de task»
+                rec["task_class"] = task_class(rec)
                 sessions.append(rec)
             else:
                 skipped += 1
@@ -3187,8 +3333,47 @@ def delta_line(base_name, base, cur):
     return "- **vs %s:** %s" % (base_name, " · ".join(parts))
 
 
-def versions_table(order, groups, cum, edit_cost=None):
-    out = ["## Versions", ""]
+def class_groups(order, groups, cls):
+    """The per-version groups kept only for one task class; cls None = everything."""
+    return collections.OrderedDict(
+        (name, [s for s in (groups.get(name) or []) if cls is None or task_class(s) == cls])
+        for name in order)
+
+
+def cumulative_saved(order, groups):
+    """Savings summed in version order; each table cumulates only its own sessions."""
+    cum, running = {}, 0.0
+    for name in order:
+        if groups.get(name):
+            running += version_stats(groups[name])["saved"]
+        cum[name] = running
+    return cum
+
+
+def rd_cost_block(order, groups):
+    """`## R&D governance cost`: what the research on the workflow itself costs, per version."""
+    out = ["## R&D governance cost", "",
+           "| version | records | $ total | $ main | session hours |",
+           "|---|---:|---:|---:|---:|"]
+    tot_n, tot_cost, tot_main, tot_h = 0, 0.0, 0.0, 0.0
+    for name in order:
+        rd = [s for s in (groups.get(name) or []) if task_class(s) == "governance-rd"]
+        if not rd:
+            continue
+        cost = sum((s.get("totals") or {}).get("cost_usd", 0.0) for s in rd)
+        main = sum(((s.get("main") or {}).get("cost_usd") or 0.0) for s in rd)
+        hours = sum((span_s(s.get("started"), s.get("ended")) or 0) for s in rd) / 3600.0
+        tot_n, tot_cost, tot_main, tot_h = tot_n + len(rd), tot_cost + cost, \
+            tot_main + main, tot_h + hours
+        out.append("| %s | %d | %s | %s | %.1f |" % (name, len(rd), usd(cost), usd(main), hours))
+    out.append("| **total** | %d | %s | %s | %.1f |" % (tot_n, usd(tot_cost), usd(tot_main),
+                                                        tot_h))
+    out.append("")
+    return out
+
+
+def versions_table(order, groups, cum, edit_cost=None, title="Versions", note=True):
+    out = ["## %s" % title, ""]
     out.append("| version | sessions | $ actual | $/session | $ Fable realistic | saved $ "
                "| saved % | saved cumulative | wasted tok/session | wasted % "
                "| issues/session (H/M/L) | main output % | hands-on | peak ctx | quality "
@@ -3219,7 +3404,7 @@ def versions_table(order, groups, cum, edit_cost=None):
                       "—" if v["edit_cost"] is None else "$%.2f" % v["edit_cost"],
                       scr))
     out.append("")
-    if edit_cost:
+    if edit_cost and note:
         out.append("Scripter saved = files changed by scripts × $%.2f/edit (corpus implementer "
                    "mean) − scripter cost; lower bound, sessions without a `files changed` "
                    "line count 0." % edit_cost)
@@ -3444,11 +3629,7 @@ def trends_md(sessions, skipped, versions=None, threshold=BROWSER_THRESHOLD_DEFA
             order.append(name)
 
     # cumulative savings run in version order, so the last live version holds the corpus total
-    cum, running = {}, 0.0
-    for name in order:
-        if groups.get(name):
-            running += version_stats(groups[name])["saved"]
-        cum[name] = running
+    cum = cumulative_saved(order, groups)
 
     lo, hi = group_range(kept)
     n_browser = sum(1 for s in excluded if s["browser_session"])
@@ -3459,7 +3640,14 @@ def trends_md(sessions, skipped, versions=None, threshold=BROWSER_THRESHOLD_DEFA
     out.append("")
     edit_cost = edit_cost_of(kept)
     out.extend(corpus_block(kept, skipped_note, edit_cost))
-    out.extend(versions_table(order, groups, cum, edit_cost))
+    # 🔴 tabelele pe clasă nu se compară între ele — DECIZII «Clasa de task»
+    for cls, title in (("product", "Versions — product"),
+                       ("governance-rd", "Versions — governance-rd"),
+                       (None, "Versions — total")):
+        sub = class_groups(order, groups, cls)
+        out.extend(versions_table(order, sub, cumulative_saved(order, sub), edit_cost,
+                                  title, note=cls is None))
+    out.extend(rd_cost_block(order, groups))
     out.extend(deltas_table(order, groups))
     live = [name for name in order if groups.get(name)]
     for i, name in enumerate(live):
@@ -3572,6 +3760,7 @@ def write_trends(directory, versions, threshold):
     if not sessions:
         print("niciun raport de sesiune in %s" % directory, file=sys.stderr)
         return 1
+    apply_cost_per_turn(sessions)
     text = trends_md(sessions, skipped, versions, threshold) + "\n"
     tmp = os.path.join(directory, "TRENDS.md.tmp")
     with open(tmp, "w", encoding="utf-8") as fh:
@@ -3761,8 +3950,9 @@ def main(argv=None):
                          "write the medians to --effort-baseline, then exit" % BASELINE_MODEL)
     ap.add_argument("--effort-baseline", dest="effort_baseline",
                     default=EFFORT_BASELINE_DEFAULT,
-                    help="corpus medians used by the v1.7 'all at high' estimate; missing "
-                         "file means no estimate (default %s)" % EFFORT_BASELINE_DEFAULT)
+                    help="ignorat din v1.7.2, vezi DECIZII «Counterfactual înlocuit»; "
+                         "ramane doar tinta lui --build-effort-baseline (default %s)"
+                         % EFFORT_BASELINE_DEFAULT)
     ap.add_argument("--pricing", default=os.path.join(here, "pricing.json"))
     ap.add_argument("--versions", default=os.path.join(here, "versions.json"),
                     help="workflow versions (name + start day) used to group sessions "
@@ -3824,10 +4014,9 @@ def main(argv=None):
             origins.append(origin)
     targets = origins
 
-    baseline = load_effort_baseline(args.effort_baseline)
     sessions = [analyze(p, pricing, args.ctx_warn, args.agents_dir,
                         args.as_model, args.rot_at, args.window,
-                        versions, args.browser_threshold, baseline) for p in targets]
+                        versions, args.browser_threshold) for p in targets]
     sessions.sort(key=lambda s: s.get("started") or "")
 
     rating = load_rating(args.rating_file) if args.rating_file else None

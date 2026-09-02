@@ -51,13 +51,70 @@ def test_audit_abateri():
     assert v["low_phase"]["audit_ok"] == 0
 
 
-def test_counterfactual_needs_a_baseline():
-    assert analyzed()["v17"]["counterfactual_high"] is None
-    cf = analyzed(BASELINE)["v17"]["counterfactual_high"]
-    assert cf is not None and cf["basis_n"] == 10
-    assert cf["cost_if_high_est_usd"] > 0
-    # the medium/low turns wrote less than the high median -> the estimate is more expensive
-    assert cf["cost_saved_est_usd"] > 0
+def test_cost_per_turn_is_filled_only_in_trends():
+    assert analyzed()["v17"]["cost_per_turn"] is None
+
+
+def test_task_class_from_slug_and_from_an_old_record():
+    assert sm.task_class("-home-vali-workflow-proiecte-agent-governance") == "governance-rd"
+    assert sm.task_class("-home-vali-proiecte-site_ac") == "product"
+    assert sm.task_class({"project": "-home-x-agent-governance"}) == "governance-rd"
+    assert sm.task_class({"project": "-home-x-shop", "task_class": "governance-rd"}) \
+        == "governance-rd"
+    assert analyzed()["task_class"] == "product"
+
+
+def _rec(name, project, high, medium, main_cost):
+    return {"name": name, "project": project, "main": {"cost_usd": main_cost},
+            "v17": {"effort_turns": {"high": high, "medium": medium,
+                                     "low": 0, "unknown": 0}}}
+
+
+def test_cost_per_turn_medians_per_task_class():
+    gov = "-home-x-agent-governance"
+    sessions = [_rec("g1", gov, 10, 0, 10.0), _rec("g2", gov, 10, 0, 30.0),
+                _rec("g3", gov, 0, 10, 5.0),
+                _rec("p1", "-home-x-shop", 10, 0, 100.0),
+                _rec("mix", gov, 5, 5, 20.0)]
+    sm.apply_cost_per_turn(sessions)
+    c = sessions[0]["v17"]["cost_per_turn"]
+    assert c["task_class"] == "governance-rd" and c["main_usd_per_turn"] == 1.0
+    assert c["corpus_n_high"] == 2 and c["corpus_high_median"] == 2.0
+    # one medium session only -> no median
+    assert c["corpus_n_medium"] == 1 and c["corpus_medium_median"] is None
+    # the product session has its own corpus and does not feed the governance median
+    p = sessions[3]["v17"]["cost_per_turn"]
+    assert p["task_class"] == "product" and p["corpus_n_high"] == 1
+    # a mixed-effort session gets the block but is not part of any corpus
+    assert sessions[4]["v17"]["cost_per_turn"]["corpus_n_high"] == 2
+
+
+def test_advisor_counts_items_not_lines():
+    txt = ("SCHIMBARI: \n"
+           "- Brief 1 - muta pasul 3\n"
+           "  pentru ca ordinea rupe testul\n"
+           "- Brief 2 - fixeaza calea\n"
+           "  altfel scrie in repo\n"
+           "3. Brief 3 - adauga fixture\n"
+           "  cu doua rulari\n"
+           "NEED: niciuna")
+    assert sm.advisor_section_count(txt, sm.CHANGES_RE) == 3
+
+
+def test_plan_echo():
+    e = analyzed()["v17"]["plan"]["echo"]
+    assert e["chars"] == len("plan aprobat")
+    assert e["tokens_est"] == e["chars"] // 4
+    # ExitPlanMode is turn 2 of 8; the plan is re-sent on the 5 turns after it
+    assert e["turns_after"] == 5
+    assert e["cost_est_usd"] > 0
+
+
+def test_fork_chain_does_not_double_agent_runs():
+    s = analyzed(fixture=os.path.join(HERE, "fixtures", "v17-fork-a.jsonl"))
+    assert s["forked_to"] == ["v17-fork-b"]
+    assert s["iterations"]["agent_runs_by_type"]["explorer"] == 2
+    assert sorted(w["agent_id"] for w in s["workers"]) == ["e1", "e2"]
 
 
 def test_baseline_roundtrip():
@@ -108,6 +165,71 @@ def test_empty_advisor_sections_count_zero():
     txt = "VERDICT: GO\nSCHIMBĂRI: niciuna\nIMPROVEMENTS: none\nNEED: -"
     assert sm.advisor_section_count(txt, sm.CHANGES_RE) == 0
     assert sm.advisor_section_count(txt, sm.IMPROVE_RE) == 0
+
+
+def test_summary_is_the_first_section():
+    md = sm.markdown([analyzed()], aggregate=False)
+    heads = [l for l in md.splitlines() if l.startswith("## ")]
+    assert heads[0] == "## Summary" and heads[1] == "## Session"
+    body = md.split("## Session")[0].split("## Summary")[1].splitlines()
+    lines = [l for l in body if l.strip()]
+    assert len(lines) <= 8
+    assert any(l.startswith("ok: ") for l in lines)
+    assert any(l.startswith("Plan echo: $") for l in lines)
+    assert any(l.startswith("Advisor: GO") for l in lines)
+
+
+def _trend_rec(name, project, cost, main_cost):
+    return {"session": name, "name": name, "project": project, "version": "v1.7",
+            "started": "2026-09-02T10:00:00Z", "ended": "2026-09-02T12:00:00Z",
+            "totals": {"cost_usd": cost, "agents_cost_usd": 0.0, "output": 10},
+            "main": {"cost_usd": main_cost, "effort": "high"}, "context": {},
+            "flags": [], "workers": [], "postmortem": {}, "counterfactual": {},
+            "main_tool_calls": 0,
+            "v17": {"effort_turns": {"high": 10, "medium": 0, "low": 0, "unknown": 0}}}
+
+
+def test_trends_has_three_tables_and_the_rd_block():
+    recs = [_trend_rec("g", "-home-x-agent-governance", 10.0, 8.0),
+            _trend_rec("p", "-home-x-shop", 4.0, 4.0)]
+    md = sm.trends_md(recs, 0, [{"name": "v1.7", "from": "2026-09-01T00:00"}])
+    heads = [l for l in md.splitlines() if l.startswith("## ")]
+    assert heads[1:4] == ["## Versions — product", "## Versions — governance-rd",
+                          "## Versions — total"]
+    assert "## R&D governance cost" in heads
+    # only the governance session counts, with its own $ main and 2 session hours
+    assert "| **total** | 1 | $10.00 | $8.00 | 2.0 |" in md
+
+
+def test_cumulative_saved_is_per_table():
+    g = _trend_rec("g", "-home-x-agent-governance", 10.0, 8.0)
+    p = _trend_rec("p", "-home-x-shop", 4.0, 4.0)
+    g["counterfactual"] = {"realistic_usd": 40.0, "floor_usd": 20.0}
+    p["counterfactual"] = {"realistic_usd": 14.0, "floor_usd": 6.0}
+    md = sm.trends_md([g, p], 0, [{"name": "v1.7", "from": "2026-09-01T00:00"}])
+    cum = {}
+    title = None
+    for line in md.splitlines():
+        if line.startswith("## Versions"):
+            title = line.split("— ")[1]
+        elif title and line.startswith("| v1.7 |"):
+            cum[title] = [c.strip() for c in line.split("|")][8]
+            title = None
+    # product saved 14-4=10, governance-rd 40-10=30, total is the sum
+    assert cum["product"] == "$10.00" and cum["governance-rd"] == "$30.00"
+    assert cum["total"] == "$40.00"
+
+
+def test_v17_md_shows_the_median_of_its_own_class():
+    recs = [_trend_rec("g1", "-home-x-agent-governance", 10.0, 10.0),
+            _trend_rec("g2", "-home-x-agent-governance", 30.0, 30.0)]
+    sm.apply_cost_per_turn(recs)
+    row = [l for l in sm.v17_md(recs).splitlines() if l.startswith("| g1 ")][0]
+    cells = [c.strip() for c in row.split("|")]
+    assert cells[2] == "governance-rd"
+    # pure-high session: the medium column stays empty, the high one holds the median
+    assert cells[10] == "—" and cells[11] == "2.0"
+    assert "$ if high" not in sm.v17_md(recs)
 
 
 def test_v17_report_and_md():

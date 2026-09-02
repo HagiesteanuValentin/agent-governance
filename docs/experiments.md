@@ -204,8 +204,9 @@ until the advisor and the effort-phase switch have both been observed working en
 Metrics (record key `v17`, benchmark not fail criterion): `effort_turns/effort_cost_usd/effort_runs`,
 `plan.lag_turns_to_low/mismatch_turns`, `advisor.{calls,sendmessages,cost_usd,verdict,n_schimbari,
 plan_edits_after,score}`, `low_phase.{flags,sendmessage_resends,audit_abateri_total,mistakes}`.
-`counterfactual_high`: output-ul fiecărei ture non-high a lui main înlocuit cu mediana turelor
-high din corpus (estimare — nu prinde turele în plus cauzate de greșeli). Flag-uri noi, doar la
+`counterfactual_high` e înlocuit cu `v17.cost_per_turn`: vechiul calcul schimba doar tokenii de
+output per tură cu mediana high din baseline, ignora thinking-ul și numărul de ture, iar
+baseline-ul venea din alte task-uri — dădea „saved −0,70 $", fals. Flag-uri noi, doar la
 v1.7: `advisor_mandatory_missed`, `advisor_trigger_b_missed`, `effort_lag_high`, `no_low_phase`
 (heuristice, nu verdicte). `python3 tools/session_metrics.py --trends metrics-local` scrie
 `metrics-local/V17.md` (tabel per sesiune v1.7 + mediane v1.7 vs high permanent vs medium
@@ -213,10 +214,14 @@ permanent) — folosit ca benchmark alături de `/rate`, nu ca prag de trecere/p
 „Greșeli evitabile" = valoarea dată la `/rate N --advisor M --mistakes K`, salvată în
 `pending-rating.json` ca `mistakes` (împreună cu `advisor_score`).
 
+Confound: sesiunile 1-3 T-v17 sunt R&D pe workflow-ul agent-governance însuși, nu task
+normal (`task_class = governance-rd`). Comparațiile de cost se fac în clasa `governance-rd`,
+nu contra sesiuni `product`. Verdictul pe workflow normal vine abia după sesiuni `product` —
+Vali trece pe workflow normal după sesiunea asta.
+
 Status 02.09: switch-ul oprit temporar 02.09 după-amiază, repornit seara după fix-ul
 hook-ului și al metricilor. Costul switch-ului = o rescriere ~52k la ExitPlanMode (~0,8 $,
-sub 4% din sesiune). Record 1609 complet. Verdict după încă 2 sesiuni. `counterfactual_high`
-suspect (vezi HANDOFF).
+sub 4% din sesiune). Record 1609 complet. Verdict după încă 2 sesiuni.
 
 ## How to rerun
 

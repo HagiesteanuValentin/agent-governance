@@ -109,7 +109,9 @@ injected by a third, separate `SessionStart` hook call because the existing
 now switches by phase — medium while planning, low while implementing — flipped by hooks
 around `EnterPlanMode`/`ExitPlanMode`, with a `WARN` line when the setting and the actual
 effort disagree. Live-agent cap raised 4 → 6. Metrici: secțiunea «T-v17» din
-`docs/experiments.md` + `metrics-local/V17.md`.
+`docs/experiments.md` + `metrics-local/V17.md`. Sesiunile se etichetează `task_class`
+(`governance-rd`/`product`), costul se citește ca `v17.cost_per_turn` (nu counterfactual),
+iar `plan.echo` și `Summary` apar în raportul per sesiune din `metrics-local/`.
 
 **What we're testing**: Vali's theory is that heavy reasoning earns its cost at plan time;
 at implementation time governance (briefs, audit, hooks) already does the reasoning's job,

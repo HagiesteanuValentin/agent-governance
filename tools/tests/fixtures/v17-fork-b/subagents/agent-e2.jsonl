@@ -1,0 +1,1 @@
+{"type":"assistant","timestamp":"2026-09-02T20:00:40Z","isSidechain":true,"session_id":"e2","message":{"id":"xe2","model":"claude-fable-5-1","usage":{"input_tokens":50,"output_tokens":400,"cache_read_input_tokens":200,"cache_creation_input_tokens":0},"content":[{"type":"text","text":"DOSAR: e2"}]}}
