@@ -23,7 +23,7 @@ proiect → nota merge la prima închisă; în worktree notează cu
 `python3 tools/session_metrics.py --rate <nume> N`.
 
 ## Regenerare TRENDS și invariante
-`python3 tools/session_metrics.py --trends metrics-local/` (rulează întâi refresh_versions, deci schimbarea lui `from` în `tools/versions.json` re-etichetează sesiunile). Invariante de verificat după o schimbare în zona TRENDS: Σ actual pe versiuni = Corpus; ultimul `saved cumulative` = Corpus saved; Σ familii = Σ coduri = waste versiune; `wasted %` sesiune = `postmortem.wasted_pct_of_main_input` din JSON. A doua rulare trebuie să dea `TRENDS.md` identic (idempotent).
+`python3 tools/session_metrics.py --trends metrics-local/` (rulează întâi refresh_versions, deci schimbarea lui `from` în `tools/versions.json` re-etichetează sesiunile). Invariante de verificat după o schimbare în zona TRENDS: Σ actual pe versiuni = Corpus; ultimul `saved cumulative` = Corpus saved; Σ familii = Σ coduri = waste versiune; `wasted %` sesiune = `postmortem.wasted_pct_of_main_input` din JSON, dar celula e `n/a` și sesiunea iese din media versiunii când `main` e 0 (PATTERNS «Procente cu numitor lipsă»). A doua rulare trebuie să dea `TRENDS.md` identic (idempotent).
 
 ## Editare config live când clasificatorul blochează
 Ordinea: agent (SendMessage/brief) → dacă rămâne blocat, `python3 - <<'EOF'` din main care

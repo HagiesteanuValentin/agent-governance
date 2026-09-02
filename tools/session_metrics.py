@@ -1564,7 +1564,9 @@ def postmortem_block(main_doc, workers, flags, main_counts, by_type):
     pm["delegation_mix_text"] = ", ".join("%s %d" % kv for kv in mix.items())
     pm["agent_report_chars_in_main"] = sum(w["final_report_chars"] for w in workers)
     pm["wasted_total"] = wasted
-    pm["wasted_pct_of_main_input"] = round(100.0 * wasted / (main_input or 1), 1)
+    # 🔴 fără volum de input în main procentul nu există (nu e 0) — PATTERNS «Procente cu numitor lipsă»
+    pm["wasted_pct_of_main_input"] = (round(100.0 * wasted / main_input, 1)
+                                      if main_input > 0 else None)
     pm["severity_counts"] = {k: sev.get(k, 0) for k in ("high", "medium", "low")}
     pm["recommendations"] = recommendations(flags)
     return pm
@@ -2531,9 +2533,9 @@ def postmortem_lines(s):
     if not s["flags"]:
         return ["## Postmortem — clean session: 0 issues", ""]
     out = ["## Postmortem — %d issues (%d high · %d medium · %d low) · ~%s tokens est. "
-           "wasted (%.1f%% of main input volume)"
+           "wasted (%s of main input volume)"
            % (len(s["flags"]), sev["high"], sev["medium"], sev["low"],
-              tok(pm["wasted_total"]), pm["wasted_pct_of_main_input"])]
+              tok(pm["wasted_total"]), pct(pm.get("wasted_pct_of_main_input"), "n/a"))]
     parts = []
     if pm.get("code_write_lines"):
         parts.append("Edit/Write %d files, %d lines (over the %d-line rule)"
@@ -3187,6 +3189,16 @@ def usd(x):
     return "$%s" % format(float(x or 0.0), ",.2f")
 
 
+def pct(x, dash="—"):
+    return dash if x is None else "%.1f%%" % x
+
+
+def wasted_pct_cell(v):
+    """Percent plus how many sessions were left out for want of a denominator."""
+    return pct(v["wasted_pct"], "n/a") + (" (%d excl.)" % v["wasted_na"]
+                                          if v["wasted_na"] else "")
+
+
 def family_of(code):
     return WASTE_FAMILIES.get(code, "other")
 
@@ -3263,6 +3275,10 @@ def version_stats(sessions):
     floor = sum(c.get("floor_usd", 0.0) for c in cfs)
     wasted = sum(p.get("wasted_total", 0) for p in pms)
     main_in = sum(main_input_of(s) for s in sessions)
+    # 🔴 procentul se face doar pe sesiunile cu input în main — PATTERNS «Procente cu numitor lipsă»
+    with_in = [(p, main_input_of(s)) for s, p in zip(sessions, pms) if main_input_of(s) > 0]
+    wasted_in = sum(p.get("wasted_total", 0) for p, _ in with_in)
+    main_in_pct = sum(mi for _, mi in with_in)
     scores = [q for q in (quality_score(s) for s in sessions) if q]
     # 🔴 numitorul lui main_pct = doar sesiunile care au main.cost_usd — PATTERNS «Câmpuri noi în recorduri vechi»
     with_main = [s for s in sessions if (s.get("main") or {}).get("cost_usd") is not None]
@@ -3303,7 +3319,8 @@ def version_stats(sessions):
         "wasted": wasted,
         "wasted_per": wasted / d,
         "main_input": main_in,
-        "wasted_pct": 100.0 * wasted / (main_in or 1),
+        "wasted_pct": (100.0 * wasted_in / main_in_pct) if main_in_pct > 0 else None,
+        "wasted_na": n - len(with_in),
         "n_pm": sum(1 for p in pms if p.get("wasted_total") is not None),
         "peak_ctx": sum(c.get("main_peak_tokens", 0) for c in ctxs) / d,
     }
@@ -3388,12 +3405,12 @@ def versions_table(order, groups, cum, edit_cost=None, title="Versions", note=Tr
             continue
         saved = scripter_saved(sessions, edit_cost)
         scr = "%d / %s" % (v["scr_runs"], "—" if saved is None else usd(saved))
-        out.append("| %s | %d | %s | %s | %s | %s | %.1f%% | %s | %s | %.1f%% "
+        out.append("| %s | %d | %s | %s | %s | %s | %.1f%% | %s | %s | %s "
                    "| %.1f (%.1f/%.1f/%.1f) | %.1f%% | %d/%d (%.0f%%) | %s | %s · %d/%d "
                    "| %s | %s | %s | %s |"
                    % (name, v["n"], usd(v["actual"]), usd(v["actual_per"]), usd(v["real"]),
                       usd(v["saved"]), v["saved_pct"], usd(cum.get(name, 0.0)),
-                      tok(v["wasted_per"]), v["wasted_pct"],
+                      tok(v["wasted_per"]), wasted_pct_cell(v),
                       v["issues_per"], v["high_per"], v["med_per"], v["low_per"],
                       v["out_pct"], v["hands"], v["calls"], v["hands_pct"],
                       tok(v["peak_ctx"]),
@@ -3448,8 +3465,8 @@ def corpus_block(kept, skipped_note, edit_cost=None):
                % (usd(v["actual"]), v["n"], usd(v["actual_per"])))
     out.append("- **Fable-only realistic:** %s (floor %s) → **saved %s (%.1f%%)**"
                % (usd(v["real"]), usd(v["floor"]), usd(v["saved"]), v["saved_pct"]))
-    out.append("- **Est. wasted:** ~%s tokens = %.1f%% of main input volume"
-               % (tok(v["wasted"]), v["wasted_pct"]))
+    out.append("- **Est. wasted:** ~%s tokens = %s of main input volume"
+               % (tok(v["wasted"]), pct(v["wasted_pct"], "n/a")))
     out.append("- **Quality:** %s mean · %d/%d rated"
                % ("—" if v["q_mean"] is None else "%.1f" % v["q_mean"],
                   v["rated"], v["n"]))
@@ -3476,9 +3493,9 @@ def version_block(name, sessions, groups, prev_name, cum, edit_cost=None):
                "cumulative through %s: %s"
                % (usd(v["real"]), usd(v["floor"]), usd(v["saved"]), v["saved_pct"],
                   name, usd(cum.get(name, 0.0))))
-    out.append("- **Waste:** ~%s tokens = %.1f%% of main input volume · %.1f issues/session "
+    out.append("- **Waste:** ~%s tokens = %s of main input volume · %.1f issues/session "
                "(%.1f H / %.1f M / %.1f L)"
-               % (tok(v["wasted"]), v["wasted_pct"], v["issues_per"],
+               % (tok(v["wasted"]), pct(v["wasted_pct"], "n/a"), v["issues_per"],
                   v["high_per"], v["med_per"], v["low_per"]))
     if prev_name:
         out.append(delta_line(prev_name, version_stats(groups[prev_name]), v))
@@ -3553,7 +3570,7 @@ def version_block(name, sessions, groups, prev_name, cum, edit_cost=None):
             sc["runs"], sc["files_changed"] if sc.get("files_changed") else "—",
             "—" if saved_s is None else usd(saved_s))
         out.append("| %s | %.2f | %s | %s | %s | %s | %.2f | %.2f | %.1f%% | %d/%d "
-                   "| %d/%d/%d | %s | %.1f%% | %s | %s |"
+                   "| %d/%d/%d | %s | %s | %s | %s |"
                    % (s.get("name") or s.get("session") or "?",
                       act,
                       "—" if m.get("cost_usd") is None else "%.2f" % m["cost_usd"],
@@ -3566,7 +3583,8 @@ def version_block(name, sessions, groups, prev_name, cum, edit_cost=None):
                       pm.get("hands_on_calls", 0), pm.get("main_tool_calls", 0),
                       sev.get("high", 0), sev.get("medium", 0), sev.get("low", 0),
                       tok(pm.get("wasted_total", 0)),
-                      pm.get("wasted_pct_of_main_input", 0.0),
+                      pct(pm.get("wasted_pct_of_main_input")
+                          if main_input_of(s) > 0 else None, "n/a"),
                       tok(ctx.get("main_peak_tokens", 0)), q if q else "—"))
     out.append("")
     return out

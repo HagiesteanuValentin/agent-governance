@@ -242,6 +242,43 @@ def test_v17_report_and_md():
     assert "Medians per setup" in md and s["name"] in md
 
 
+def _session(name, main_in, wasted):
+    m = {"input": main_in, "cache_creation": 0, "cache_read": 0, "cost_usd": 1.0}
+    return {"name": name, "started": "2026-08-30T18:00", "main": m,
+            "totals": {"cost_usd": 2.0}, "flags": [],
+            "postmortem": {"wasted_total": wasted,
+                           "wasted_pct_of_main_input": round(100.0 * wasted / (main_in or 1), 1),
+                           "severity_counts": {"high": 0, "medium": 0, "low": 0}}}
+
+
+def test_wasted_pct_skips_sessions_without_main_input():
+    broken = _session("no-main", 0, 48074)          # main attribution failed: all zeros
+    good = _session("ok", 400000, 40000)
+    v = sm.version_stats([broken, good])
+    assert v["wasted_na"] == 1
+    assert 0 < v["wasted_pct"] <= 100, v["wasted_pct"]
+    assert abs(v["wasted_pct"] - 10.0) < 0.01, v["wasted_pct"]
+    assert v["wasted"] == 88074  # the tokens still count in the total
+    only_broken = sm.version_stats([broken])
+    assert only_broken["wasted_pct"] is None and only_broken["wasted_na"] == 1
+
+
+def test_wasted_pct_cell_is_na_not_a_huge_number():
+    broken = _session("no-main", 0, 48074)
+    rows = sm.versions_table(["v1.5"], {"v1.5": [broken]}, {})
+    row = [r for r in rows if r.startswith("| v1.5 |")][0]
+    assert "n/a (1 excl.)" in row and "4807400" not in row, row
+    mixed = sm.versions_table(["v1.5"], {"v1.5": [broken, _session("ok", 400000, 40000)]}, {})
+    mrow = [r for r in mixed if r.startswith("| v1.5 |")][0]
+    assert "10.0% (1 excl.)" in mrow, mrow
+    clean = sm.versions_table(["v1.5"], {"v1.5": [_session("ok", 400000, 40000)]}, {})
+    crow = [r for r in clean if r.startswith("| v1.5 |")][0]
+    assert "10.0% |" in crow and "excl." not in crow, crow
+    sess = sm.version_block("v1.5", [broken], {"v1.5": [broken]}, None, {})
+    assert not any("4807400" in l for l in sess), [l for l in sess if "4807400" in l]
+    assert any("n/a of main input volume" in l for l in sess)
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):

@@ -67,3 +67,10 @@ Câmpul `effort` e scris pe linia din `.jsonl` (nu în obiectul `message`); `thi
 stă sub `message.usage.output_tokens_details`, nu direct sub `usage`. Cine parsează
 transcriptul pentru efort/tokeni citește ambele la nivelul lor corect, altfel iese `None`
 tăcut în loc de eroare.
+
+## Procente cu numitor lipsă
+Când atribuirea pe main eșuează, `main.*` iese tot 0, dar `wasted_total` rămâne mare.
+Fallback-ul `x / (total or 1)` transformă asta în procente absurde (v1.5: 4.807.400%).
+Numitorul 0 înseamnă „nu se poate calcula": sesiunea iese din numărător ȘI din numitor,
+iar celula se afișează `n/a`. Regula ține și pentru procentul salvat în record, nu doar
+pentru cel calculat la agregare.
