@@ -88,3 +88,4 @@ resume; `session_id` (snake_case) e id de proces, supraviețuiește `/clear` și
 pe linii proprii. Niciunul singur nu distinge originalul de copie: o linie e moștenită doar
 dacă `session_id` e străin ȘI `uuid`-ul ei apare în `<dir>/<session_id>.jsonl` (deja facturată
 acolo). Părinte lipsă → linie proprie; uuid-urile lui se citesc o dată, în `_PARENT_UUIDS`.
+Părinte dintr-un alt proiect (alt director) nu e detectat → linia iese proprie.

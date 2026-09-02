@@ -97,6 +97,27 @@ implementer to Opus 5 low effort after the "simplu" experiment — see `docs/exp
 lot, vs opus-medium 4/4/3, eval 9–10/11, $2.52 (confounds listed in the same section); added
 `implementer-complex` (Opus medium) as the plan-time choice for multi-file logic.
 
+## v1.7.3 EXPERIMENTAL (2026-09-02)
+
+`/rate N [note]` now takes only the score (1-5) and one line of context; `advisor_score`
+and `mistakes` are derived by the analyzer instead of typed by hand (`derive_quality` in
+`tools/session_metrics.py`). Rough formula: start at 3, +1 if changes were actually
+applied after the plan, +1 if the audit found zero deviations, -1 for ≥3 deviations, -1 if
+a NO-GO verdict was implemented anyway, clamped 1-5; `mistakes` sums audit deviations,
+low-effort-phase flags, and reruns. Both fields carry a `*_src` tag, `auto` or `manual`.
+
+Bug fixes this round: `main=0` on 33 of 94 metrics records, because `inherited` compared
+`session_id` — a process id that survives `/clear` — against the transcript file name; the
+fix checks the foreign `session_id` AND that the line's `uuid` is present in the parent's
+own transcript (a first attempt keyed on `sessionId` instead double-counted three
+sessions, caught by the advisor before it shipped). `write_record` now writes `.json`/`.md`
+through a temp file + atomic rename. `hooks/session-start.sh`: the v17 branch read
+`settings.json` before the rules branch had written it, so a `/clear` could show a stale
+effort — fixed with one shared reset function called from both branches.
+
+The metrics corpus was regenerated: 21 records moved from `main=0` to their real cost,
+so `TRENDS.md` and `V17.md` now attribute spend correctly.
+
 ## v1.7.1 EXPERIMENTAL (2026-09-02)
 
 Two additions, both gated by a trigger, not always-on. An **advisor** agent (Fable 5.1
