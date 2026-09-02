@@ -22,6 +22,7 @@ except Exception:
 
 case "$mode" in
   low|medium)
+    rm -f "${CLAUDE_JOB_DIR:-/tmp}"/effort-phase-* 2>/dev/null  # 🔴 phase switch re-arms the once-per-session WARN — PATTERNS «Claude Code — limite verificate în docs (02.09.2026)»
     python3 - "$settings" "$mode" <<'PY' "$in" 2>/dev/null
 import json, os, sys, tempfile
 try:

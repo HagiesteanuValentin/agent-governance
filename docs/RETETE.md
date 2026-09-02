@@ -121,3 +121,12 @@ nimic. Nume noi: `<zi>-HHMM-<proiect>` (HHMMSS doar la coliziune). Recordurile v
 primesc câmpurile noi (effort, main $ %, scripter) automat — re-analizezi cu
 `scripts/reanalyze-metrics.sh metrics-local` (backup manual înainte).
 Pentru TRENDS cronologic după migrare: `--trends`.
+
+## Efort pe faze (v1.7)
+Flux exact: 1) aprobi planul → hook `ExitPlanMode` scrie `low` în settings și injectează
+`effort: settings->low`; 2) la primul tool call reușit, hook `check` injectează o dată
+`WARN effort effective=medium settings=low -> You: /effort low`; 3) main se oprește cu
+«Tu: /effort low, apoi go»; 4) `/effort low`, apoi «go»; 5) sesiune nouă (startup) revine
+pe medium în settings; resume păstrează; `EnterPlanMode` scrie medium →
+`/effort medium` manual când apare WARN. Oprirea experimentului: `rm ~/.claude/v17-effort-auto`.
+Capcană: `PostToolUse` nu trage la tool cu exit≠0.

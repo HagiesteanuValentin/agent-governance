@@ -97,6 +97,30 @@ implementer to Opus 5 low effort after the "simplu" experiment — see `docs/exp
 lot, vs opus-medium 4/4/3, eval 9–10/11, $2.52 (confounds listed in the same section); added
 `implementer-complex` (Opus medium) as the plan-time choice for multi-file logic.
 
+## v1.7 EXPERIMENTAL (2026-09-02)
+
+Two additions, both gated by a trigger, not always-on. An **advisor** agent (Fable 5.1
+high, read-only) is called only for risky plans — see `orchestrare-v17.md` for the exact
+a/b/c trigger conditions — and returns a fixed report (verdict, changes, risks, edge
+cases, improvements); if it needs more information it asks for it via a `NEED` line
+through the orchestrator, never by reading extra files itself. `orchestrare-v17.md` is
+injected by a third, separate `SessionStart` hook call because the existing
+`orchestrare.md` is already near the 10k-character cap per hook command. Second: effort
+now switches by phase — medium while planning, low while implementing — flipped by hooks
+around `EnterPlanMode`/`ExitPlanMode`, with a `WARN` line when the setting and the actual
+effort disagree. Live-agent cap raised 4 → 6.
+
+**What we're testing**: Vali's theory is that heavy reasoning earns its cost at plan time;
+at implementation time governance (briefs, audit, hooks) already does the reasoning's job,
+so the expensive second opinion (the advisor) is only worth it when the plan is risky.
+Judged over ≥3 real sessions with `/rate`, $ spent by main per phase, and the flags from
+`metrics-local`, compared against medium-throughout sessions; conclusion goes in
+`docs/experiments.md` «T-v17».
+
+**Known limitations**: switching effort currently needs a manual `/effort low` — the
+running session's settings.json is not reloaded live, this was measured, not assumed; no
+evidence yet either way for running main itself on low effort.
+
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000
 characters, demanding the compressed fixed format — it fires for background agents too (verified 2026-08-30; the earlier version was silently ignored because it emitted a top-level `decision` instead of `hookSpecificOutput`); the cap is enforced by the brief's report format, and the metric (`long_agent_report`) shows how often it holds. A `PreToolUse` hook on `Read`
