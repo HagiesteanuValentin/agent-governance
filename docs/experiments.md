@@ -191,6 +191,8 @@ Flags, total main $ out and /rate: to be filled from `metrics-local/` after this
 line), no parallel_over_cap (max 1 agent live), no commit without audit.
 
 ## T-v17 — design (not yet run)
+2026-09-03: effort split stopped (see DECIZII); T-v17 continues as advisor + v1.7 rules vs
+pre-v1.7, main effort medium constant.
 Benchmark, not a fail criterion (see "Plans: benchmark, not fail criteria"): compare main $
 with plan-phase effort medium / implementation-phase effort low (v1.7's automated split,
 `hooks/effort-phase.sh`) against the existing medium-integral sessions (whole session at

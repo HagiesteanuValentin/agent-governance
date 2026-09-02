@@ -129,6 +129,7 @@ Flux exact: 1) aprobi planul → hook `ExitPlanMode` scrie `low` în settings ș
 «Tu: /effort low, apoi go»; 4) `/effort low`, apoi «go»; 5) sesiune nouă (startup) revine
 pe medium în settings; resume păstrează; `EnterPlanMode` scrie medium →
 `/effort medium` manual când apare WARN. Oprirea experimentului: `rm ~/.claude/v17-effort-auto`.
+Repornirea: `touch ~/.claude/v17-effort-auto`
 Capcană: `PostToolUse` nu trage la tool cu exit≠0.
 
 ## Scripturi

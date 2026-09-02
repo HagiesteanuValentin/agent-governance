@@ -21,7 +21,7 @@ lines marked "scope+" are not applied — list them in one line for Vali at Exit
 1 advisor per plan; at most 3 SendMessage to it during implementation. It counts against the
 live-agent cap and against the 3-explorer budget. Over either -> AskUserQuestion.
 
-## Main on low (implementation phase)
+## Main in the implementation phase
 Main never reads `git diff` directly — the auditor reads every diff. Advisor is MANDATORY
 (not optional) when: a brief gets its 2nd DEVIATIONS report in a row · a worker's report has
 "unclear/risky" touching logic · the verifier fails again after a SendMessage round · any
@@ -34,12 +34,7 @@ context is small, parallelizing helps. The plan-time conditions (disjoint file l
 build, no cross-brief dependency) still apply; do not parallelize for the count's sake.
 
 ## Effort per phase
-Plan = medium, implementation = low. Mechanism: `hooks/effort-phase.sh`, gated by the
-`~/.claude/v17-effort-auto` flag file (delete it to stop the experiment). `PostToolUse` on
-`ExitPlanMode` sets `low` (context: `effort: settings->low (was <x>)`); `PostToolUse` on
-`EnterPlanMode` and `SessionStart rules` set `medium` (silent when called from `session-start.sh
-rules` — it already prints the effort row). A `PostToolUse .*` check compares the live
-`effort.level` against settings; on a mismatch it prints, once per session, `WARN effort
-effective=<x> settings=<y> -> You: /effort <y>`; on a match, it stays silent.
-If that warning line appears after the plan is approved, stop and say: "You: /effort low,
-then go." If it does not appear, continue — the switch already happened live.
+Main effort = `medium` constant. The phase experiment (plan medium, implementation low) is
+STOPPED as of 2026-09-03 — the `~/.claude/v17-effort-auto` guard file was deleted; the hooks
+(`hooks/effort-phase.sh`) stay in the code but are inert without the guard. Reason: `DECIZII
+«Efort pe faze — oprit»`.

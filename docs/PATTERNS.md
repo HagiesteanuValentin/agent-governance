@@ -51,6 +51,8 @@ ar veni din toate sesiunile, numitorul doar din cele noi. În tabele afișează 
 11. An automatic fork (`SessionStart source=fork`, seen when main goes `sessionKind: bg`
     with live subagents) invalidates the cache the same way (69 326 → 14 904), also with
     no effort change (session 1457: 104 536 → 14 904). Undocumented; cannot be disabled.
+12. Documented officially: top-level (session) effort invalidates the cache; per-message effort
+    keeps it — see issue anthropics/claude-code #61984 (per-message effort).
 Sursa: code.claude.com/docs (hooks, sub-agents, model-config, settings-reference).
 - Measured 02.09: editing `settings.json` from a hook does NOT change the live effort (main stayed medium after the hook wrote low); only `/effort` does. PostToolUse does not fire when the tool exits non-zero (PostToolUseFailure does) — a check hook stays silent on failed calls.
 
