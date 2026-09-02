@@ -130,3 +130,8 @@ Flux exact: 1) aprobi planul → hook `ExitPlanMode` scrie `low` în settings ș
 pe medium în settings; resume păstrează; `EnterPlanMode` scrie medium →
 `/effort medium` manual când apare WARN. Oprirea experimentului: `rm ~/.claude/v17-effort-auto`.
 Capcană: `PostToolUse` nu trage la tool cu exit≠0.
+
+## Scripturi
+`hooks/bash-mare.sh` (PreToolUse/Bash, doar sesiunea main): blochează citiri întregi mari
+și heredoc-uri mari scrise direct în proiect — pragurile sunt `BIG_LINES=300` (linii citite)
+și `BODY_LINES=20` (linii de heredoc).

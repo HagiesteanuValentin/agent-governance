@@ -1,5 +1,5 @@
 #!/bin/bash
-# PreToolUse/Bash, main only: big whole reads and big heredoc writes into the project
+# 🔴 praguri BIG_LINES/BODY_LINES — RETETE «Scripturi»
 BIG_LINES=300
 BODY_LINES=20
 LOG_DIR=/tmp/claude-hooks
