@@ -97,7 +97,7 @@ implementer to Opus 5 low effort after the "simplu" experiment — see `docs/exp
 lot, vs opus-medium 4/4/3, eval 9–10/11, $2.52 (confounds listed in the same section); added
 `implementer-complex` (Opus medium) as the plan-time choice for multi-file logic.
 
-## v1.7 EXPERIMENTAL (2026-09-02)
+## v1.7.1 EXPERIMENTAL (2026-09-02)
 
 Two additions, both gated by a trigger, not always-on. An **advisor** agent (Fable 5.1
 high, read-only) is called only for risky plans — see `orchestrare-v17.md` for the exact
@@ -121,6 +121,15 @@ Judged over ≥3 real sessions with `/rate`, $ spent by main per phase, and the 
 **Known limitations**: switching effort currently needs a manual `/effort low` — the
 running session's settings.json is not reloaded live, this was measured, not assumed; no
 evidence yet either way for running main itself on low effort.
+
+**v1.7.1 (2026-09-02, evening) — bugs found**: (1) `session-start.sh` reset effort to
+medium on any `source` but `resume`; a fork (`source=fork`) hit it and WARN pointed the
+wrong way — fixed (blacklist resume|fork|compact, 5 tests); (2) the analyzer saw only the
+pre-fork part of a forked session (SessionEnd passes the origin path, fork messages carry
+the new id) — fixed (`continued-in` chain, `forked_to`, one record); (3) Anthropic side:
+Claude Code auto-forks main when it goes background with live subagents, undocumented,
+rewrites the conversation cache (~63k tokens) — feedback filed 2026-09-02. Measured: a
+real `/effort` rewrites the messages cache once (~52k); writing settings.json does not.
 
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000
