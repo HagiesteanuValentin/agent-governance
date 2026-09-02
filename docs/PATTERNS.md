@@ -44,3 +44,17 @@ ar veni din toate sesiunile, numitorul doar din cele noi. În tabele afișează 
    must not reset per-phase state (e.g. effort level) set by the session it resumes.
 Sursa: code.claude.com/docs (hooks, sub-agents, model-config, settings-reference).
 - Measured 02.09: editing `settings.json` from a hook does NOT change the live effort (main stayed medium after the hook wrote low); only `/effort` does. PostToolUse does not fire when the tool exits non-zero (PostToolUseFailure does) — a check hook stays silent on failed calls.
+
+## Baseline de efort: ture, nu linii
+Un mesaj assistant e scris pe mai multe linii în `.jsonl` (una per bloc: thinking, text,
+tool_use), toate cu același `message.id` și același `usage`. Numărat pe linii, corpusul dă
+n=1033 și mediană output 785; numărat pe ture (deduplicat pe `message.id` global peste
+corpus — o sesiune reluată copiază turele părintelui) dă n=403 și mediană 502. Contrafactualul
+înlocuiește output-ul unei TURE, deci folosește 502; `effort-baseline.json` păstrează și
+cifrele pe linii, ca să nu pară o regresie.
+
+## Efort din transcript
+Câmpul `effort` e scris pe linia din `.jsonl` (nu în obiectul `message`); `thinking_tokens`
+stă sub `message.usage.output_tokens_details`, nu direct sub `usage`. Cine parsează
+transcriptul pentru efort/tokeni citește ambele la nivelul lor corect, altfel iese `None`
+tăcut în loc de eroare.

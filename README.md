@@ -108,7 +108,8 @@ injected by a third, separate `SessionStart` hook call because the existing
 `orchestrare.md` is already near the 10k-character cap per hook command. Second: effort
 now switches by phase — medium while planning, low while implementing — flipped by hooks
 around `EnterPlanMode`/`ExitPlanMode`, with a `WARN` line when the setting and the actual
-effort disagree. Live-agent cap raised 4 → 6.
+effort disagree. Live-agent cap raised 4 → 6. Metrici: secțiunea «T-v17» din
+`docs/experiments.md` + `metrics-local/V17.md`.
 
 **What we're testing**: Vali's theory is that heavy reasoning earns its cost at plan time;
 at implementation time governance (briefs, audit, hooks) already does the reasoning's job,

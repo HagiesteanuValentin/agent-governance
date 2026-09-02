@@ -76,6 +76,7 @@ THRESHOLDS = {
     "late_first_edit_reads": 15,     # reading calls before the first write
     "main_read_before_agent": 20000, # chars main read itself before launching any agent
     "edit_via_bash_calls": 2,        # heredoc writes into source files, with no Edit/Write
+    "effort_lag_turns": 3,           # main turns after ExitPlanMode still not on low
 }
 
 FLAG_TEXT = {
@@ -111,6 +112,12 @@ FLAG_TEXT = {
     "max_without_sendmessage": "implementer-max launched without a SendMessage first",
     "agent_read_plan_whole": "worker read the whole plan file instead of its brief",
     "edit_via_bash": "worker edited source files through Bash instead of Edit/Write",
+    "advisor_mandatory_missed": "two auditor reports with ABATERI in a row and no advisor "
+                                "before the next brief",
+    "advisor_trigger_b_missed": "plan touches hooks/config/migration and no advisor was "
+                                "called before ExitPlanMode (heuristic on the plan text)",
+    "effort_lag_high": "the low phase started too many turns after ExitPlanMode",
+    "no_low_phase": "v1.7 session with a plan approved and no low turn",
 }
 
 # base gravity per code; wasted tokens can only push it up (see severity_of)
@@ -125,6 +132,10 @@ SEVERITY_BASE = {
     "late_first_edit": "high",
     "main_read_before_first_agent": "high",
     "max_without_sendmessage": "high",
+    "advisor_mandatory_missed": "high",
+    "no_low_phase": "high",
+    "advisor_trigger_b_missed": "medium",
+    "effort_lag_high": "medium",
     "agent_read_plan_whole": "medium",
     "edit_via_bash": "medium",
     "big_tool_result_main": "medium",
@@ -319,9 +330,15 @@ def load_rating(path):
     score = clean_score(data.get("score"))
     if score is None:
         return None
+    try:
+        mistakes = int(data.get("mistakes"))
+    except (TypeError, ValueError):
+        mistakes = None
     return {"score": score, "note": str(data.get("note") or "").strip(),
             "project": str(data.get("project") or "").strip(),
-            "ts": str(data.get("ts") or "").strip()}
+            "ts": str(data.get("ts") or "").strip(),
+            "advisor_score": clean_score(data.get("advisor_score")),
+            "mistakes": mistakes}
 
 
 def session_project(session):
@@ -338,7 +355,9 @@ def rating_matches(rating, session):
 
 
 def quality_of(rating):
-    return {"score": rating["score"], "note": rating["note"], "rated_at": rating["ts"]}
+    return {"score": rating["score"], "note": rating["note"], "rated_at": rating["ts"],
+            "advisor_score": rating.get("advisor_score"),
+            "mistakes": rating.get("mistakes")}
 
 
 def quality_score(session):
@@ -699,6 +718,7 @@ def new_doc(path, label):
         "groups": collections.OrderedDict(),
         "calls": [], "turn_ms": 0, "turns": 0, "slash": [],
         "user_prompts": 0, "sendmessages": 0, "sendmessage_ts": [],
+        "sendmessage_calls": [], "agent_ids": {}, "plan_edits": [],
         "results": [], "agent_launches": [], "agent_results": {},
         "reads": collections.Counter(), "read_chars": collections.Counter(),
         "read_events": [],
@@ -799,6 +819,7 @@ def parse_file(path, label, tool_names, tool_inputs):
                 for b in blocks(msg):
                     if b.get("type") == "tool_result" and isinstance(b.get("tool_use_id"), str):
                         doc["agent_results"][b["tool_use_id"]] = tur
+                        doc["agent_ids"][b["tool_use_id"]] = tur["agentId"]
                         break
 
         for b in blocks(msg):
@@ -830,6 +851,8 @@ def parse_file(path, label, tool_names, tool_inputs):
                         if cb:
                             doc["comment_writes"].append(cb)
                     is_plan = isinstance(fp, str) and "/.claude/plans/" in fp
+                    if is_plan and isinstance(ts, str):
+                        doc["plan_edits"].append(ts)
                     if (isinstance(body, str) and not is_plan
                             and body.count("\n") + 1 > THRESHOLDS["fable_code_lines"]):
                         doc["code_writes"].append({"path": fp or "?",
@@ -844,6 +867,7 @@ def parse_file(path, label, tool_names, tool_inputs):
                     doc["sendmessages"] += 1
                     if isinstance(ts, str):
                         doc["sendmessage_ts"].append(ts)
+                    doc["sendmessage_calls"].append({"id": b.get("id"), "to": to, "at": ts})
                     if isinstance(b.get("id"), str):
                         doc["agent_call_ids"].add(b["id"])
                 elif name == "Agent":
@@ -870,6 +894,7 @@ def parse_file(path, label, tool_names, tool_inputs):
                     aid = AGENT_ID_RE.search(body)
                     if aid:
                         live_agents.add(aid.group(1))
+                        doc["agent_ids"].setdefault(tuid, aid.group(1))
                 if (label is None and isinstance(tuid, str)
                         and tuid in doc["agent_call_ids"]
                         and MAX_TURNS_RE.search(body[:4000])):
@@ -916,11 +941,17 @@ def parse_file(path, label, tool_names, tool_inputs):
                 "residual_poll": pending_residual,
                 "inherited": inherited,
                 "effort": obj.get("effort"),
+                "thinking": ((usage.get("output_tokens_details") or {}).get("thinking_tokens")
+                             if isinstance(usage.get("output_tokens_details"), dict) else 0),
             }
             pending_residual = False
         else:
             grp["usage"]["output_tokens"] = max(grp["usage"].get("output_tokens") or 0,
                                                 usage.get("output_tokens") or 0)
+            det = usage.get("output_tokens_details")
+            if isinstance(det, dict):
+                grp["thinking"] = max(grp.get("thinking") or 0,
+                                      det.get("thinking_tokens") or 0)
         for b in blocks(msg):
             if b.get("type") == "text" and isinstance(b.get("text"), str):
                 grp["texts"].append(b["text"])
@@ -949,6 +980,9 @@ def parse_file(path, label, tool_names, tool_inputs):
             "cache_read": usage.get("cache_read_input_tokens") or 0,
             "cache_creation": usage.get("cache_creation_input_tokens") or 0,
             "output": usage.get("output_tokens") or 0,
+            "effort": grp.get("effort"),
+            "thinking": grp.get("thinking") or 0,
+            "inherited": bool(grp.get("inherited")),
             "has_tool_use": bool(grp["tools"]),
             "prev_human": grp.get("prev_human") or "user",
             "agents_live": bool(grp.get("agents_live")),
@@ -1543,9 +1577,377 @@ def concurrency(workers):
     return max(peak, 0), overlaps
 
 
+# ---------------------------------------------------------------- v1.7 (effort phases)
+
+EFFORT_KEYS = ("high", "medium", "low", "unknown")
+EFFORT_BASELINE_DEFAULT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                       "effort-baseline.json")
+BASELINE_MODEL = "claude-fable-5-1"
+ADVISOR_TYPE = "advisor"
+VERDICT_RE = re.compile(r"VERDICT\s*[:\-]\s*(.+)")
+ABATERI_RE = re.compile(r"ABATERI\s*\((\d+)\)")
+TRIGGER_B_RE = re.compile(r"hooks/|settings\.json|migr", re.I)
+ADVISOR_REASON_RE = re.compile(r"^\s*advisor\s*:\s*(.+)$", re.M | re.I)
+ADVISOR_HEADER_RE = re.compile(r"^\s*(?:VERDICT|CHANGES|SCHIMB\w*|RISK|RISC|EDGE|MARGIN\w*|"
+                               r"IMPROVEMENTS|[IÎ]MBUN\w*|NEED|NEVOI\w*)\s*:", re.I)
+CHANGES_RE = re.compile(r"^\s*(?:CHANGES|SCHIMB\w*)\s*:", re.I)
+IMPROVE_RE = re.compile(r"^\s*(?:IMPROVEMENTS|[IÎ]MBUN\w*)\s*:", re.I)
+CF_HIGH_NOTE = ("estimare: output-ul turelor non-high înlocuit cu mediana turelor high din "
+                "corpus; nu prinde turele în plus cauzate de greșeli")
+V17_VERSION_PREFIX = "v1.7"
+
+
+def median(values):
+    vals = sorted(v for v in values if v is not None)
+    if not vals:
+        return None
+    mid = len(vals) // 2
+    if len(vals) % 2:
+        return vals[mid]
+    return (vals[mid - 1] + vals[mid]) / 2.0
+
+
+def load_effort_baseline(path):
+    """Corpus medians for the high turns; missing or malformed -> no counterfactual."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+    except (OSError, ValueError):
+        return None
+    if not isinstance(data, dict) or data.get("median_output_tokens") is None:
+        return None
+    return data
+
+
+def build_effort_baseline(directory, out_path, model=BASELINE_MODEL, effort="high"):
+    """Median output/thinking over the level-1 transcripts' main turns run at one effort."""
+    if not os.path.isdir(directory):
+        print("nu e director: %s" % directory, file=sys.stderr)
+        return 2
+    outs, thinks, line_outs = [], [], []
+    # 🔴 o sesiune reluată copiază turele părintelui: dedupe peste tot corpusul, nu per fișier — PATTERNS «Sesiuni reluate»
+    seen = {}
+    for name in sorted(os.listdir(directory)):
+        if not name.endswith(".jsonl"):
+            continue
+        for obj in read_lines(os.path.join(directory, name)):
+            if obj.get("type") != "assistant" or obj.get("isSidechain"):
+                continue
+            if obj.get("effort") != effort:
+                continue
+            msg = obj.get("message") if isinstance(obj.get("message"), dict) else {}
+            if msg.get("model") != model:
+                continue
+            usage = msg.get("usage")
+            if not isinstance(usage, dict):
+                continue
+            det = usage.get("output_tokens_details")
+            det = det if isinstance(det, dict) else {}
+            key = msg.get("id") or obj.get("uuid")
+            line_outs.append(usage.get("output_tokens") or 0)
+            prev = seen.get(key) or (0, 0)
+            seen[key] = (max(prev[0], usage.get("output_tokens") or 0),
+                         max(prev[1], det.get("thinking_tokens") or 0))
+    for o, t in seen.values():
+        outs.append(o)
+        thinks.append(t)
+    # 🔴 o tură = un message.id, nu o linie assistant — PATTERNS «Baseline de efort: ture, nu linii»
+    data = {
+        "model": model, "effort": effort, "n": len(outs),
+        "median_output_tokens": median(outs), "median_thinking_tokens": median(thinks),
+        "n_assistant_lines": len(line_outs),
+        "median_output_tokens_per_line": median(line_outs),
+        "built_at": datetime.datetime.now(datetime.timezone.utc)
+                    .strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source_dir": directory,
+    }
+    with open(out_path, "w", encoding="utf-8") as fh:
+        fh.write(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+    print("effort-baseline: n=%d, median output %s, median thinking %s -> %s"
+          % (data["n"], data["median_output_tokens"], data["median_thinking_tokens"], out_path),
+          file=sys.stderr)
+    return 0
+
+
+def effort_of(call):
+    e = call.get("effort")
+    return e if e in ("high", "medium", "low") else "unknown"
+
+
+def turn_cost(call, pricing):
+    # 🔴 turele moștenite au fost facturate la sesiunea-părinte — PATTERNS «Sesiuni reluate»
+    if call.get("inherited"):
+        return 0.0
+    return cost_of({"input": call["input"], "output": call["output"],
+                    "cache_read": call["cache_read"],
+                    "cache_creation": call["cache_creation"]},
+                   rates_for(pricing, call["model"]))
+
+
+EMPTY_ITEM_RE = re.compile(r"^(?:niciuna|niciun\w*|nimic|none|n/?a|-{1,3}|—|\.)$", re.I)
+
+
+def advisor_section_count(text, header_re):
+    """Lines under one header of the advisor's fixed format, up to the next header."""
+    n, started = 0, False
+    for raw in (text or "").splitlines():
+        if header_re.match(raw):
+            started = True
+            tail = raw.split(":", 1)[1].strip() if ":" in raw else ""
+            if tail and not EMPTY_ITEM_RE.match(tail):
+                n += 1
+            continue
+        if not started:
+            continue
+        if ADVISOR_HEADER_RE.match(raw):
+            break
+        line = raw.strip()
+        if line and not EMPTY_ITEM_RE.match(line):
+            n += 1
+    return n
+
+
+def v17_block(main_doc, workers, docs_by_scope, tool_inputs, pricing, version,
+              flags, baseline, total_cost_usd):
+    """The v1.7 numbers: effort phases, plan lag, advisor, low phase. (block, new flags)."""
+    new_flags = []
+    all_main = [c for c in main_doc["calls"] if not c["side"]]
+    # 🔴 turele moștenite au fost facturate la sesiunea-părinte — PATTERNS «Sesiuni reluate»
+    turns = [c for c in all_main if not c.get("inherited")]
+    inherited_turns = len(all_main) - len(turns)
+    if not turns:
+        return None, new_flags
+    is_v17 = str(version or "").startswith(V17_VERSION_PREFIX)
+
+    counts, out_tok, think_tok, tcalls = (collections.Counter() for _ in range(4))
+    cost = collections.defaultdict(float)
+    runs = []
+    pos_of_tool, exit_pos, enter_pos = {}, [], []
+    for i, c in enumerate(turns):
+        e = effort_of(c)
+        counts[e] += 1
+        out_tok[e] += c["output"]
+        think_tok[e] += c.get("thinking") or 0
+        tcalls[e] += len(c["tool_names"])
+        cost[e] += turn_cost(c, pricing)
+        if runs and runs[-1]["effort"] == e:
+            runs[-1]["turns"] += 1
+            runs[-1]["to"] = i
+            runs[-1]["tool_calls"] += len(c["tool_names"])
+        else:
+            runs.append({"effort": e, "turns": 1, "from": i, "to": i,
+                         "tool_calls": len(c["tool_names"])})
+        for name, tid in zip(c["tool_names"], c["tool_ids"]):
+            if tid:
+                pos_of_tool[tid] = i
+            if name == "ExitPlanMode":
+                exit_pos.append((i, tid))
+            elif name == "EnterPlanMode":
+                enter_pos.append(i)
+
+    low_pos = [i for i, c in enumerate(turns) if effort_of(c) == "low"]
+    lags = []
+    for i, _tid in exit_pos:
+        after = [j for j in low_pos if j > i]
+        lags.append(after[0] - i - 1 if after else None)
+    approved = exit_pos[0][0] if exit_pos else None
+    mismatch = None
+    if is_v17 and approved is not None:
+        mismatch = sum(1 for j, c in enumerate(turns)
+                       if (j > approved and effort_of(c) != "low")
+                       or (j < approved and effort_of(c) != "medium"))
+
+    # ---- advisor
+    launches = main_doc["agent_launches"]
+    adv_launches = [l for l in launches if l["type"] == ADVISOR_TYPE]
+    adv_ids = set()
+    for l in adv_launches:
+        aid = main_doc["agent_ids"].get(l["tool_use_id"])
+        if aid:
+            adv_ids.add(aid)
+    adv_sm = [sm for sm in main_doc["sendmessage_calls"] if sm.get("to") in adv_ids]
+    adv_workers = [w for w in workers if w["type"] == ADVISOR_TYPE]
+    adv_text = "\n".join((docs_by_scope.get(w["scope"]) or {}).get("final_text") or ""
+                         for w in adv_workers)
+    vm = VERDICT_RE.search(adv_text)
+    # 🔴 primul raport, nu ultimul: runda 2 ar înghiți edit-urile dintre rapoarte — DECIZII «v1.7 — advisor + efort pe faze»
+    adv_ends = [w["ended"] for w in adv_workers if w.get("ended")]
+    adv_end = min(adv_ends) if adv_ends else None
+    reason = None
+    for grp in main_doc["groups"].values():
+        if grp.get("side") or reason:
+            continue
+        for t in grp.get("texts") or []:
+            rm = ADVISOR_REASON_RE.search(t or "")
+            if rm:
+                reason = rm.group(1).strip()[:200]
+                break
+    advisor = {
+        "calls": len(adv_launches),
+        "sendmessages": len(adv_sm),
+        "cost_usd": round(sum(w["cost_usd"] for w in adv_workers), 4),
+        "share_pct": round(100.0 * sum(w["cost_usd"] for w in adv_workers)
+                           / (total_cost_usd or 1.0), 1),
+        "reason_line": reason,
+        "verdict": vm.group(1).strip()[:60] if vm else None,
+        "n_schimbari": advisor_section_count(adv_text, CHANGES_RE),
+        "n_imbunatatiri": advisor_section_count(adv_text, IMPROVE_RE),
+        "n_scope_plus": sum(1 for ln in adv_text.splitlines() if "scope+" in ln.lower()),
+        "plan_edits_after": sum(1 for t in main_doc["plan_edits"]
+                                if adv_end and isinstance(t, str) and t > adv_end),
+        "rounds": len(adv_launches) + len(adv_sm),
+        "score": None,
+    }
+
+    # ---- low phase
+    low_start = turns[low_pos[0]]["at"] if low_pos else None
+    worker_at = {w["scope"]: (w.get("launched_at") or w.get("started")) for w in workers}
+    low_flags = []
+    if low_start:
+        for f in flags:
+            ev = f.get("evidence")
+            at = ev.get("at") if isinstance(ev, dict) else None
+            at = at or worker_at.get(f["scope"])
+            if isinstance(at, str) and at >= low_start:
+                low_flags.append(f["code"])
+    seen_briefs, reruns = set(), 0
+    for w in workers:
+        if not (w["type"].startswith("implementer") or w["type"].startswith("scripter")):
+            continue
+        key = brief_key(w["description"]) or w["scope"]
+        at = w.get("launched_at") or w.get("started")
+        if key in seen_briefs and low_start and isinstance(at, str) and at >= low_start:
+            reruns += 1
+        seen_briefs.add(key)
+    audits = [(w, (docs_by_scope.get(w["scope"]) or {}).get("final_text") or "")
+              for w in workers if w["type"] == "auditor"]
+    abateri_total, audit_ok = 0, 0
+    for _w, txt in audits:
+        found = [int(x) for x in ABATERI_RE.findall(txt)]
+        abateri_total += sum(found)
+        if not sum(found) and re.search(r"\bOK\b", txt):
+            audit_ok += 1
+    low_phase = {
+        "flags": sorted(collections.Counter(low_flags).items()),
+        "sendmessage_resends": sum(1 for sm in main_doc["sendmessage_calls"]
+                                   if low_start and isinstance(sm.get("at"), str)
+                                   and sm["at"] >= low_start),
+        "reruns": reruns,
+        "audit_abateri_total": abateri_total,
+        "audit_ok": audit_ok,
+        "mistakes": None,
+    }
+
+    # ---- flags of the version itself
+    adv_events = sorted([w.get("launched_at") or w.get("started") for w in adv_workers
+                         if (w.get("launched_at") or w.get("started"))]
+                        + [sm["at"] for sm in adv_sm if isinstance(sm.get("at"), str)])
+    impl_events = sorted([w.get("launched_at") or w.get("started") for w in workers
+                          if (w["type"].startswith("implementer")
+                              or w["type"].startswith("scripter"))
+                          and (w.get("launched_at") or w.get("started"))]
+                         + [sm["at"] for sm in main_doc["sendmessage_calls"]
+                            if isinstance(sm.get("at"), str)])
+    bad_audits = sorted(w["ended"] for w, txt in audits
+                        if w.get("ended") and sum(int(x) for x in ABATERI_RE.findall(txt)))
+    # 🔴 advisorul există doar din v1.7 — DECIZII «v1.7 — advisor + efort pe faze»
+    for a, b in (zip(bad_audits, bad_audits[1:]) if is_v17 else ()):
+        nxt = [t for t in impl_events if t > b]
+        if not nxt:
+            continue
+        if not any(b <= t <= nxt[0] for t in adv_events):
+            new_flags.append(flag("advisor_mandatory_missed", "main",
+                                  "two auditor reports with ABATERI (%s, %s) and no advisor "
+                                  "before the next brief" % (local_str(a, "%H:%M"),
+                                                             local_str(b, "%H:%M")),
+                                  {"at": b}, 0))
+            break
+    adv_turns = sorted(pos_of_tool.get(l["tool_use_id"]) for l in adv_launches
+                       if pos_of_tool.get(l["tool_use_id"]) is not None)
+    for i, tid in (exit_pos if is_v17 else ()):
+        plan_txt = (tool_inputs.get(tid) or {}).get("plan") or ""
+        if not TRIGGER_B_RE.search(plan_txt):
+            continue
+        if any(p <= i for p in adv_turns):
+            continue
+        new_flags.append(flag("advisor_trigger_b_missed", "main",
+                              "plan mentions hooks/settings/migration and no advisor was "
+                              "called before ExitPlanMode (heuristic on the plan text)",
+                              {"at": turns[i]["at"], "turn": i}, 0))
+        break
+    for k, lag in enumerate(lags):
+        if lag is not None and lag > THRESHOLDS["effort_lag_turns"]:
+            new_flags.append(flag("effort_lag_high", "main",
+                                  "%d main turns after ExitPlanMode #%d before the first low "
+                                  "turn (warn %d)"
+                                  % (lag, k + 1, THRESHOLDS["effort_lag_turns"]),
+                                  {"lag": lag}, 0))
+            break
+    if is_v17 and exit_pos and not low_pos:
+        new_flags.append(flag("no_low_phase", "main",
+                              "v1.7 session with ExitPlanMode and no low turn at all",
+                              None, 0))
+
+    # ---- counterfactual: everything at high
+    cf_high = None
+    if baseline and baseline.get("median_output_tokens") is not None:
+        med = float(baseline["median_output_tokens"])
+        actual = est = 0.0
+        for c in turns:
+            rates = rates_for(pricing, c["model"])
+            a = turn_cost(c, pricing)
+            actual += a
+            if effort_of(c) != "high" and str(c["model"]).startswith("claude-fable"):
+                orate = float(rates.get("output", 0.0)) / 1_000_000.0
+                est += a - c["output"] * orate + med * orate
+            else:
+                est += a
+        cf_high = {
+            "basis_n": baseline.get("n"),
+            "median_output_high": baseline.get("median_output_tokens"),
+            "median_thinking_high": baseline.get("median_thinking_tokens"),
+            "cost_if_high_est_usd": round(est, 4),
+            "cost_saved_est_usd": round(est - actual, 4),
+            "note": CF_HIGH_NOTE,
+        }
+
+    block = {
+        "is_v17": is_v17,
+        "inherited_turns": inherited_turns,
+        "effort_turns": {k: counts.get(k, 0) for k in EFFORT_KEYS},
+        "effort_cost_usd": {k: round(cost.get(k, 0.0), 4) for k in EFFORT_KEYS},
+        "effort_output_tokens": {k: out_tok.get(k, 0) for k in EFFORT_KEYS},
+        "effort_thinking_tokens": {k: think_tok.get(k, 0) for k in EFFORT_KEYS},
+        "effort_tool_calls": {k: tcalls.get(k, 0) for k in EFFORT_KEYS},
+        "effort_runs": runs,
+        "plan": {"exit_plan_count": len(exit_pos), "enter_plan_count": len(enter_pos),
+                 "lag_turns_to_low": lags, "mismatch_turns": mismatch},
+        "advisor": advisor,
+        "low_phase": low_phase,
+        "counterfactual_high": cf_high,
+    }
+    return block, new_flags
+
+
+def apply_quality_to_v17(session):
+    """advisor.score / low_phase.mistakes live in the rating, attached after analyze()."""
+    v = session.get("v17")
+    if not isinstance(v, dict):
+        return
+    q = session.get("quality") or {}
+    v.setdefault("advisor", {})["score"] = clean_score(q.get("advisor_score"))
+    mistakes = q.get("mistakes")
+    try:
+        mistakes = int(mistakes)
+    except (TypeError, ValueError):
+        mistakes = None
+    v.setdefault("low_phase", {})["mistakes"] = mistakes
+
+
 def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             as_model=None, rot_at=ROT_AT_DEFAULT, window=WINDOW_DEFAULT,
-            versions=None, browser_threshold=BROWSER_THRESHOLD_DEFAULT):
+            versions=None, browser_threshold=BROWSER_THRESHOLD_DEFAULT,
+            effort_baseline=None):
     if versions is None:
         versions = []
     if ctx_warn is None:
@@ -1926,6 +2328,13 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
                           % (max_concurrent, THRESHOLDS["max_live_agents"]),
                           {"max_concurrent": max_concurrent}, 0))
 
+    version = version_of(first_ts, versions)
+    v17, v17_flags = v17_block(main_doc, workers,
+                               {sc: d for sc, d, _r in worker_scopes},
+                               tool_inputs, pricing, version, flags,
+                               effort_baseline, totals["cost_usd"])
+    flags.extend(v17_flags)
+
     postmortem = postmortem_block(main_doc, workers, flags, main, by_type)
     cf = counterfactual_block(main_doc, [(sc, d) for sc, d, _r in worker_scopes],
                               pricing, as_model, rot_at, window, totals["cost_usd"])
@@ -1951,7 +2360,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         "path": jsonl_path,
         "started": first_ts,
         "ended": last_ts,
-        "version": version_of(first_ts, versions),
+        "version": version,
         "main_tool_calls": main_tool_calls,
         "browser_calls": browser_calls,
         "browser_share": browser_share,
@@ -1979,6 +2388,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         "flags": flags,
         "postmortem": postmortem,
         "counterfactual": cf,
+        "v17": v17,
     }
 
 
@@ -2197,6 +2607,8 @@ def session_report(s):
                       fmt(r["cache_creation"]), r["cost_usd"]))
     out.append("")
 
+    out.extend(v17_lines(s))
+
     rr = s["rereads"]
     if rr["main"] or rr["agents"]:
         out.append("## Re-reads")
@@ -2222,6 +2634,176 @@ def session_report(s):
             for im in s["images"]))
         out.append("")
     return out
+
+
+V17_BENCH_NOTE = ("Benchmark, nu criteriu de fail: cifrele de cost compară configurații, "
+                  "nu promovează/pică o sesiune.")
+
+
+def v17_lines(s):
+    """`## v1.7` section: effort phases, plan lag, advisor, low phase, counterfactual."""
+    v = s.get("v17")
+    if not isinstance(v, dict):
+        return []
+    et = v.get("effort_turns") or {}
+    if not sum(et.get(k, 0) for k in ("high", "medium", "low")):
+        return []
+    head = "## v1.7 — effort phases & advisor"
+    inh = v.get("inherited_turns") or 0
+    if inh:
+        head += " (%d ture moștenite, facturate la părinte, în afara cifrelor)" % inh
+    out = [head, "", V17_BENCH_NOTE, "",
+           "| effort | turns | tool calls | output tok | thinking tok | $ |",
+           "|---|---:|---:|---:|---:|---:|"]
+    for k in EFFORT_KEYS:
+        if not et.get(k):
+            continue
+        out.append("| %s | %d | %d | %s | %s | %.2f |"
+                   % (k, et[k], (v.get("effort_tool_calls") or {}).get(k, 0),
+                      tok((v.get("effort_output_tokens") or {}).get(k, 0)),
+                      tok((v.get("effort_thinking_tokens") or {}).get(k, 0)),
+                      (v.get("effort_cost_usd") or {}).get(k, 0.0)))
+    out.append("")
+    runs = v.get("effort_runs") or []
+    if runs:
+        out.append("Phases: " + " → ".join("%s %dt (%d–%d, %d tool calls)"
+                                           % (r["effort"], r["turns"], r["from"], r["to"],
+                                              r["tool_calls"]) for r in runs[:12]))
+    p = v.get("plan") or {}
+    lags = ", ".join("—" if l is None else str(l) for l in (p.get("lag_turns_to_low") or [])) or "—"
+    out.append("Plan: ExitPlanMode %d · EnterPlanMode %d · lag to low %s turns · mismatch turns %s"
+               % (p.get("exit_plan_count", 0), p.get("enter_plan_count", 0), lags,
+                  "—" if p.get("mismatch_turns") is None else p["mismatch_turns"]))
+    a = v.get("advisor") or {}
+    out.append("Advisor: %d calls · %d SendMessage · $%.2f (%.1f%% of the session) · verdict %s "
+               "· changes %d · improvements %d (scope+ %d) · plan edits after %d · rounds %d "
+               "· score %s"
+               % (a.get("calls", 0), a.get("sendmessages", 0), a.get("cost_usd", 0.0),
+                  a.get("share_pct", 0.0), a.get("verdict") or "—",
+                  a.get("n_schimbari", 0), a.get("n_imbunatatiri", 0), a.get("n_scope_plus", 0),
+                  a.get("plan_edits_after", 0), a.get("rounds", 0), a.get("score") or "—"))
+    if a.get("reason_line"):
+        out.append("Advisor reason: %s" % a["reason_line"])
+    lp = v.get("low_phase") or {}
+    fl = ", ".join("%s×%d" % (c, n) for c, n in (lp.get("flags") or [])) or "none"
+    out.append("Low phase: flags %s · SendMessage resends %d · reruns %d · audit ABATERI %d "
+               "· audits OK %d · mistakes %s"
+               % (fl, lp.get("sendmessage_resends", 0), lp.get("reruns", 0),
+                  lp.get("audit_abateri_total", 0), lp.get("audit_ok", 0),
+                  "—" if lp.get("mistakes") is None else lp["mistakes"]))
+    cf = v.get("counterfactual_high")
+    if cf:
+        out.append("If everything had run at high: $%.2f (estimate, n=%s · median output %s tok) "
+                   "→ saved $%.2f · %s"
+                   % (cf.get("cost_if_high_est_usd", 0.0), cf.get("basis_n"),
+                      cf.get("median_output_high"), cf.get("cost_saved_est_usd", 0.0),
+                      cf.get("note", "")))
+    else:
+        out.append("If everything had run at high: no baseline (run --build-effort-baseline)")
+    out.append("")
+    return out
+
+
+V17_GROUPS = ("v1.7", "high permanent", "medium permanent")
+
+
+def v17_group_of(s):
+    """Which comparison column a session belongs to; None = mixed, not comparable."""
+    # 🔴 o sesiune fără ture main proprii are v17 = null — PATTERNS «Câmpuri noi în recorduri vechi»
+    if not isinstance(s.get("v17"), dict):
+        return None
+    v = s["v17"]
+    et = v.get("effort_turns") or {}
+    total = sum(et.values())
+    if str(s.get("version") or "").startswith(V17_VERSION_PREFIX):
+        return "v1.7"
+    if not total:
+        return None
+    if et.get("high", 0) / float(total) >= 0.9:
+        return "high permanent"
+    if et.get("medium", 0) / float(total) >= 0.9:
+        return "medium permanent"
+    return None
+
+
+def v17_session_metrics(s):
+    v = s.get("v17") or {}
+    et = v.get("effort_turns") or {}
+    turns = sum(et.values())
+    cost = (s.get("totals") or {}).get("cost_usd") or 0.0
+    main_cost = (s.get("main") or {}).get("cost_usd") or 0.0
+    return {
+        "cost_usd": cost,
+        "cost_per_main_turn": round(main_cost / turns, 4) if turns else None,
+        "main_turns": turns,
+        "main_tool_calls": s.get("main_tool_calls") or 0,
+        "agents": len(s.get("workers") or []),
+        "flags": len(s.get("flags") or []),
+        "rate": quality_score(s),
+        "abateri": (v.get("low_phase") or {}).get("audit_abateri_total"),
+    }
+
+
+V17_COMPARE = (("cost/session $", "cost_usd", "$"), ("cost/main turn $", "cost_per_main_turn", "$"),
+               ("main turns", "main_turns", "n"), ("main tool calls", "main_tool_calls", "n"),
+               ("agents launched", "agents", "n"), ("flags/session", "flags", "n"),
+               ("rate", "rate", "n"), ("audit ABATERI", "abateri", "n"))
+
+
+def v17_md(sessions):
+    """metrics-local/V17.md: one row per v1.7 session + medians against the older setups."""
+    rows = [s for s in sessions if v17_group_of(s) == "v1.7"]
+    out = ["# V17 — effort phases & advisor (%d v1.7 sessions)" % len(rows), "",
+           V17_BENCH_NOTE, ""]
+    out.append("| session | rate | mistakes | advisor calls/score/verdict | turns med/low | "
+               "$ med | $ low | $ if high | saved | ABATERI | low flags | lag |")
+    out.append("|---|---:|---:|---|---:|---:|---:|---:|---:|---:|---|---:|")
+    if not rows:
+        out.append("| _no v1.7 session yet_ | | | | | | | | | | | |")
+    for s in sorted(rows, key=lambda s: s.get("started") or ""):
+        v = s["v17"]
+        et, ec = v.get("effort_turns") or {}, v.get("effort_cost_usd") or {}
+        a, lp, p = v.get("advisor") or {}, v.get("low_phase") or {}, v.get("plan") or {}
+        cf = v.get("counterfactual_high") or {}
+        fl = ", ".join("%s×%d" % (c, n) for c, n in (lp.get("flags") or [])) or "—"
+        lag = ", ".join("—" if l is None else str(l)
+                        for l in (p.get("lag_turns_to_low") or [])) or "—"
+        out.append("| %s | %s | %s | %d/%s/%s | %d/%d | %.2f | %.2f | %s | %s | %d | %s | %s |"
+                   % (s.get("name") or s.get("session"), quality_score(s) or "—",
+                      "—" if lp.get("mistakes") is None else lp["mistakes"],
+                      a.get("calls", 0), a.get("score") or "—", a.get("verdict") or "—",
+                      et.get("medium", 0), et.get("low", 0),
+                      ec.get("medium", 0.0), ec.get("low", 0.0),
+                      "%.2f" % cf["cost_if_high_est_usd"] if cf else "—",
+                      "%.2f" % cf["cost_saved_est_usd"] if cf else "—",
+                      lp.get("audit_abateri_total", 0), fl, lag))
+    out.append("")
+    groups = collections.OrderedDict((g, []) for g in V17_GROUPS)
+    for s in sessions:
+        g = v17_group_of(s)
+        if g:
+            groups[g].append(v17_session_metrics(s))
+    out.append("## Medians per setup")
+    out.append("")
+    out.append("| metric | " + " | ".join("%s (n=%d)" % (g, len(groups[g])) for g in V17_GROUPS)
+               + " |")
+    out.append("|---|" + "---:|" * len(V17_GROUPS))
+    for label, key, unit in V17_COMPARE:
+        cells = []
+        for g in V17_GROUPS:
+            med = median([m[key] for m in groups[g] if m.get(key) is not None])
+            if med is None:
+                cells.append("—")
+            elif unit == "$":
+                cells.append("%.2f" % med)
+            else:
+                cells.append("%g" % med)
+        out.append("| %s | %s |" % (label, " | ".join(cells)))
+    out.append("")
+    out.append("«high permanent» = pre-v1.7 sessions with ≥90% high turns, «medium permanent» "
+               "≥90% medium; mixed sessions are in neither column.")
+    out.append("")
+    return "\n".join(out)
 
 
 def aggregate_table(sessions):
@@ -2883,7 +3465,14 @@ def write_trends(directory, versions, threshold):
     with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(text)
     os.replace(tmp, os.path.join(directory, "TRENDS.md"))
-    print("TRENDS.md: %d sessions, %d skipped" % (len(sessions), skipped), file=sys.stderr)
+    # trends_md marks the excluded ones; V17.md sees the same corpus
+    kept = [s for s in sessions if not s.get("exclude_reason")]
+    tmp17 = os.path.join(directory, "V17.md.tmp")
+    with open(tmp17, "w", encoding="utf-8") as fh:
+        fh.write(v17_md(kept) + "\n")
+    os.replace(tmp17, os.path.join(directory, "V17.md"))
+    print("TRENDS.md: %d sessions, %d skipped · V17.md: %d kept"
+          % (len(sessions), skipped, len(kept)), file=sys.stderr)
     return 0
 
 
@@ -2894,9 +3483,13 @@ def rate_session(out_dir, name, score, note, versions, threshold):
     if rec is None:
         print("nu gasesc sesiunea: %s" % path, file=sys.stderr)
         return 1
+    old_q = rec.get("quality") or {}
     rec["quality"] = {"score": score, "note": note,
                       "rated_at": datetime.datetime.now(datetime.timezone.utc)
-                      .strftime("%Y-%m-%dT%H:%M:%SZ")}
+                      .strftime("%Y-%m-%dT%H:%M:%SZ"),
+                      "advisor_score": old_q.get("advisor_score"),
+                      "mistakes": old_q.get("mistakes")}
+    apply_quality_to_v17(rec)
     write_record(out_dir, name, rec)
     print("%s: quality %d/5" % (name, score), file=sys.stderr)
     return write_trends(out_dir, versions, threshold)
@@ -3048,6 +3641,13 @@ def main(argv=None):
                          % out_dir_default)
     ap.add_argument("--note", default="", help="with --rate: one-line note stored next to "
                                                "the score")
+    ap.add_argument("--build-effort-baseline", dest="build_effort_baseline", metavar="DIR",
+                    help="scan DIR's level-1 transcripts for the %s turns at effort high and "
+                         "write the medians to --effort-baseline, then exit" % BASELINE_MODEL)
+    ap.add_argument("--effort-baseline", dest="effort_baseline",
+                    default=EFFORT_BASELINE_DEFAULT,
+                    help="corpus medians used by the v1.7 'all at high' estimate; missing "
+                         "file means no estimate (default %s)" % EFFORT_BASELINE_DEFAULT)
     ap.add_argument("--pricing", default=os.path.join(here, "pricing.json"))
     ap.add_argument("--versions", default=os.path.join(here, "versions.json"),
                     help="workflow versions (name + start day) used to group sessions "
@@ -3066,6 +3666,10 @@ def main(argv=None):
             return 2
         rename_dir(args.rename, args.force)
         return 0
+
+    if args.build_effort_baseline:
+        return build_effort_baseline(os.path.expanduser(args.build_effort_baseline),
+                                     args.effort_baseline)
 
     if args.migrate_names:
         return migrate_names(args.migrate_names, args.yes, versions, args.browser_threshold)
@@ -3098,9 +3702,10 @@ def main(argv=None):
         print("niciun .jsonl gasit", file=sys.stderr)
         return 1
 
+    baseline = load_effort_baseline(args.effort_baseline)
     sessions = [analyze(p, pricing, args.ctx_warn, args.agents_dir,
                         args.as_model, args.rot_at, args.window,
-                        versions, args.browser_threshold) for p in targets]
+                        versions, args.browser_threshold, baseline) for p in targets]
     sessions.sort(key=lambda s: s.get("started") or "")
 
     rating = load_rating(args.rating_file) if args.rating_file else None
@@ -3120,6 +3725,7 @@ def main(argv=None):
                 old = (read_record(json_path) or {}).get("quality") or stale_quality
                 if old:
                     s["quality"] = old
+            apply_quality_to_v17(s)
             if args.json:
                 with open(json_path, "w", encoding="utf-8") as fh:
                     fh.write(json.dumps([s], indent=2, ensure_ascii=False) + "\n")

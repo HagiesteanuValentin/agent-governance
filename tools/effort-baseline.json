@@ -1,0 +1,11 @@
+{
+  "model": "claude-fable-5-1",
+  "effort": "high",
+  "n": 403,
+  "median_output_tokens": 502,
+  "median_thinking_tokens": 129,
+  "n_assistant_lines": 1033,
+  "median_output_tokens_per_line": 785,
+  "built_at": "2026-09-02T13:53:27Z",
+  "source_dir": "/home/vali/.claude/projects/-home-vali-workflow-proiecte-agent-governance"
+}

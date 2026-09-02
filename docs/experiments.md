@@ -201,6 +201,18 @@ already in the corpus. Confound to note explicitly: the tasks are not identical 
 sessions (real work, not synthetic cells) — treat differences in $ as directional, not proof,
 until the advisor and the effort-phase switch have both been observed working end-to-end.
 
+Metrics (record key `v17`, benchmark not fail criterion): `effort_turns/effort_cost_usd/effort_runs`,
+`plan.lag_turns_to_low/mismatch_turns`, `advisor.{calls,sendmessages,cost_usd,verdict,n_schimbari,
+plan_edits_after,score}`, `low_phase.{flags,sendmessage_resends,audit_abateri_total,mistakes}`.
+`counterfactual_high`: output-ul fiecărei ture non-high a lui main înlocuit cu mediana turelor
+high din corpus (estimare — nu prinde turele în plus cauzate de greșeli). Flag-uri noi, doar la
+v1.7: `advisor_mandatory_missed`, `advisor_trigger_b_missed`, `effort_lag_high`, `no_low_phase`
+(heuristice, nu verdicte). `python3 tools/session_metrics.py --trends metrics-local` scrie
+`metrics-local/V17.md` (tabel per sesiune v1.7 + mediane v1.7 vs high permanent vs medium
+permanent) — folosit ca benchmark alături de `/rate`, nu ca prag de trecere/pică.
+„Greșeli evitabile" = valoarea dată la `/rate N --advisor M --mistakes K`, salvată în
+`pending-rating.json` ca `mistakes` (împreună cu `advisor_score`).
+
 ## How to rerun
 
 Create the cell agents in `~/.claude/agents/` as copies with a different `effort`/`model`.
