@@ -135,6 +135,52 @@ Confounds:
 - `verify` column in cells.md counts greps/seds on the verifier as verification runs (hook regex `VERIF` in `~/.claude/hooks/context-agent.sh:96`)
 - r1 (dossier design) is not comparable and not averaged in
 
+## 2026-09-02 — orchestrator (Fable 5.1): effort medium vs high, real task T-metrics
+
+Protocol: one real task (prompt in `metrics-local/experiments/plan/T-metrics/task.md`: session naming order +
+new metrics in `tools/session_metrics.py`), two real main sessions in separate windows from the same repo
+state (commit 42aeb97), `claude --effort medium --permission-mode plan` vs `claude --effort high
+--permission-mode plan`, identical prompt, questions answered "decide yourself and note the assumption", plan
+rejected at ExitPlanMode, `/exit`. Plans copied blind as plan-K/plan-M
+(`metrics-local/experiments/plan/T-metrics/r1/`, mapping in `mapping.txt`), compared by an Opus auditor on a
+rubric, then judged by Vali without the mapping.
+
+| criterion | K (high, s8) | M (medium, s9) |
+|---|---|---|
+| agent/rules | 2×impl-complex + scribe for docs OK; no dossier (2.9k-line script), gives ranges in brief; implementer writes DECIZII.md | 2×impl-complex; dossier `docs/dosar/session-metrics-naming.md` with line numbers OK; README/RETETE/PATTERNS written by implementer, not scribe |
+| briefs/files/order | 3 briefs · 3/1/4 files · sequential declared | 2 briefs · 3/2 files · sequential declared |
+| 6/6 mandatory fields | B1 6/6; B2 refers to "rules as in Brief 1" (not self-contained); B3 no verification | B1 6/6, B2 6/6; docs prohibitions verbatim in both |
+| pasted code | no (1 line, index.json schema) | no (1 regex + 1 format string) |
+| explicit assumptions | 6 (H1–H6), separate section | 8 numbered, ~6 real assumptions, rest are metric/agent choices |
+| metrics | 10; 9 straight from JSONL, saved_usd derived; formula for all | 9; 8 from JSONL, saved_usd derived; formula for all |
+| e2e verification | runnable, with numbers on a copy: 84 records, renumber idempotence, quality before/after, py_compile | runnable + exact expected values (effort high, scripter.runs 5, 134 inherited), normalized TRENDS diff, backup |
+
+Missing from both (Opus auditor, blind):
+- scripter savings not checked against a real implementer run (no control case)
+- no real SessionEnd hook run (CLI on a copy only); `pending-rating.json` and old session-name references in docs/HANDOFF not checked
+- neither reads `scripts/SCRIPTS.md` or picks scripter-complex for migrating the 84 json+md files
+
+| session | effort | $ actual | main output % | wasted % | peak ctx | calls |
+|---|---|---:|---:|---:|---:|---:|
+| s8 (27eea473) | high | 4.29 | 99.6% | 2.2% | 85.8k | 8/13 |
+| s9 (eade8082) | medium | 4.03 | 95.9% | 5.1% | 84.8k | 12/18 |
+
+Verdict: Vali said "equal, you decide". Main (Fable high) chose **M = medium** on rule conformance:
+dossier first for a 2.9k-line script (>300 lines rule), both briefs self-contained with 6/6
+mandatory fields, verification with exact expected values + backup; K breaks two hard rules
+(Brief 2 refers to Brief 1's rules, Brief 3 has no verification). Cost nearly equal ($4.03 vs $4.29).
+
+Confounds: one pair only (decision should wait for ≥3 pairs on successive real tasks); partial blinding (Vali
+knew which window was which); medium session's explorer tried to write `docs/dosar/` in plan mode and was
+blocked, leaving a plan-file artifact (`~/.claude/plans/salut-am-de-modificat-snoopy-bubble-agent-*.md`) and
+5.1% wasted; both sessions saw the same HANDOFF; judge = Fable high on the rubric, not a blind human.
+
+Phase 2 (pending): execute plan-M in a fresh session started with `claude --effort medium`; measure
+on that session: analyzer flags (`fable_wrote_code`, `parallel_over_cap`, commit without audit),
+repair rounds, `$ main out` (new column from the task itself), `/rate`. At the final audit add the
+two cheap checks the auditor flagged: grep for old session names in docs/HANDOFF and one real
+SessionEnd run. Kill switch back to high: any flag above.
+
 ## How to rerun
 
 Create the cell agents in `~/.claude/agents/` as copies with a different `effort`/`model`.
