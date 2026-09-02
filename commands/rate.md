@@ -2,6 +2,9 @@ Rate the session: $ARGUMENTS
 Format: /rate N [note]. N is an integer 1-5; note is optional free text.
 
 Validate N is an integer between 1 and 5. If not, say so and stop — no tool calls.
+Scale: 5 complete on the first try, zero repairs · 4 one round of small repairs · 3 two
+rounds or a deviation caught · 2 partial, repaired or relaunched · 1 unusable; rate the
+result, not the cost. Later: `python3 tools/session_metrics.py --rate <session-name> N`.
 
 Otherwise, run exactly ONE Bash command that writes
 `${AGENT_GOVERNANCE_DIR:-$HOME/agent-governance}/metrics-local/pending-rating.json` with:

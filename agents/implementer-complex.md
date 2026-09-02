@@ -1,12 +1,12 @@
 ---
-name: implementer
-description: The implementer. DEFAULT for any brief, including logic, Opus 5 LOW effort, chosen after the "simplu" experiment (docs/experiments.md «r2–r4 results»); `implementer-complex` (Opus medium) is picked at plan for multi-file logic or declared debugging; `implementer-sonnet` covers cheap-verifier briefs; `implementer-max` stays the re-send after a non-conforming audit.
+name: implementer-complex
+description: The complex implementer (Opus 5 medium). Chosen AT PLAN by the orchestrator when the brief has logic across several JS/TS files, a non-trivial verifier, or declared debugging; `implementer` (Opus low) is the default for everything else; escalation after a failed re-send stays `implementer-max`.
 model: opus
-effort: low
+effort: medium
 maxTurns: 100
 permissionMode: auto
 disallowedTools: Agent
-color: blue
+color: orange
 ---
 
 You are the implementer. The orchestrator gave you a BRIEF: goal, step-by-step plan, the

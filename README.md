@@ -37,8 +37,10 @@ The orchestrator plans, writes briefs, audits diffs, reports. It does not write 
 else runs in a disposable subagent context on the cheapest model that can do the job. Only
 conclusions cross back.
 
-There are three executors. `implementer` (Opus, medium effort, 100 calls) is the DEFAULT for
-any brief, logic included. `implementer-sonnet` (Sonnet 5, high effort, 100 calls) is chosen
+There are four executors. `implementer` (Opus 5, low effort, 100 calls) is the DEFAULT for
+any brief, logic included. `implementer-complex` (Opus 5, medium effort, 100 calls) is chosen
+at plan time for multi-file logic, a non-trivial verifier, or declared debugging.
+`implementer-sonnet` (Sonnet 5, high effort, 100 calls) is chosen
 at plan time only for briefs with a cheap checker (a `verifica-*.mjs` script, build, test, a
 grep that catches failure) and no cross-file JS/TS debugging. `implementer-max` (Opus, high
 effort, 120 calls) is an escalation, not a default: only a re-send after a failed audit on
@@ -89,14 +91,18 @@ turns from 62 to 11 (5 of them residual). v1.6 (2026-09-02) added `bash-mare.sh`
 `--scope main` mode plus opt-in per-type thresholds (`--praguri-tip`) — see `docs/DECIZII.md`
 «v1.6 — hook-uri pentru orchestrator (02.09.2026)». Smoke-tested live 2026-09-02: deny hooks
 enforce, ask hooks (commit gate, live-agent cap) are advisory under auto permission mode by
-design; v1.6 is tuned for Fable 5.1 as orchestrator.
+design; v1.6 is tuned for Fable 5.1 as orchestrator. v1.6.1 (2026-09-02) moved the default
+implementer to Opus 5 low effort after the "simplu" experiment — see `docs/experiments.md`
+«r2–r4 results»: opus-low audit 4/4/4 and eval 11/0 in all three lots at a mean $2.35 per
+lot, vs opus-medium 4/4/3, eval 9–10/11, $2.52 (confounds listed in the same section); added
+`implementer-complex` (Opus medium) as the plan-time choice for multi-file logic.
 
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000
 characters, demanding the compressed fixed format — it fires for background agents too (verified 2026-08-30; the earlier version was silently ignored because it emitted a top-level `decision` instead of `hookSpecificOutput`); the cap is enforced by the brief's report format, and the metric (`long_agent_report`) shows how often it holds. A `PreToolUse` hook on `Read`
-denies re-reading a file already read in main, and denies a 300+ line read without
-`offset`/`limit` (plans and images stay a warning). Another on `Agent` warns
-when a brief exceeds 7,000 characters — the signal that one brief is really three. A third,
+(`read-mare.sh`) denies re-reading a file already read in main, and denies a 300+ line read
+without `offset`/`limit` (plans and images stay a warning). Another on `Agent` (`brief-mare.sh`)
+warns when a brief exceeds 7,000 characters — the signal that one brief is really three. A third,
 `context-agent.sh`, tracks a subagent's own context: a reminder at 150k to wrap up, a deny
 on every tool but `Bash` at 220k. A `PostToolUse` hook on `Edit`/`Write`, the only one active in
 main and in every worker, flags comment blocks the call just added — a new comment is one
@@ -104,8 +110,8 @@ pointer line, the explanation belongs in `PATTERNS`/`DECIZII` — without ever b
 logs them for `/handoff` (`comment_bloat` in the analyzer).
 
 **3. Telemetry — offline, zero tokens.**
-A `SessionEnd` hook runs a plain-Python analyzer over the session's JSONL transcript and
-writes a JSON report to a gitignored directory. No model call, no tokens, no network. It
+A `SessionEnd` hook (`session-metrics.sh`) runs a plain-Python analyzer over the session's
+JSONL transcript and writes a JSON report to a gitignored directory. No model call, no tokens, no network. It
 reports tokens and cost per model, the share of output produced in subagents, per-agent
 final-report lengths, the largest tool results, and files read more than once.
 
@@ -318,7 +324,7 @@ session data never leaves the machine.
 ## Layout
 
 ```
-agents/     the agent definitions (explorer, implementer, implementer-max,
+agents/     the agent definitions (explorer, implementer, implementer-complex, implementer-max,
             implementer-sonnet, scripter, scripter-complex, scribe, auditor, design-lead,
             design-lead-expert) — model, effort, maxTurns, allowed tools, fixed report format
 commands/   slash commands (polish, rate) — mirrors ~/.claude/commands/

@@ -1,6 +1,6 @@
 ---
 name: implementer-max
-description: The escalation implementer — ONLY (a) a re-send after a failed audit on the same brief, or (b) debugging declared at plan time with a written reason. Not a default: `implementer` (medium) covers every brief, logic included.
+description: The escalation implementer — ONLY (a) a re-send after a failed audit on the same brief, or (b) debugging declared at plan time with a written reason. Not a default: `implementer` (low) covers every brief; `implementer-complex` (medium) is the plan-time choice for multi-file logic.
 model: opus
 effort: high
 maxTurns: 120

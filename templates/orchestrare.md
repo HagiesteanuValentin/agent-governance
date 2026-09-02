@@ -9,13 +9,14 @@ session only.
   change scope silently.
 
 ## Agents
-- explorer, explorer-max, implementer, implementer-max, implementer-sonnet, scripter,
+- explorer, explorer-max, implementer, implementer-complex, implementer-max, implementer-sonnet, scripter,
   scripter-complex, scribe, auditor, design-lead and design-lead-expert (both only through
   `/polish`) — nothing else without my OK.
 - Models: explorer* Sonnet 5 medium, read-only (max: report ≤6k, table-shaped answers) ·
-  auditor Opus 5 high · implementer Opus 5 medium, DEFAULT for any brief, logic included ·
-  implementer-max Opus 5 high · implementer-sonnet Sonnet 5 high · scripter Sonnet 5 high ·
-  scripter-complex Opus 5 medium.
+  auditor Opus 5 high · implementer Opus 5 low, DEFAULT for any brief, including logic ·
+  implementer-complex Opus 5 medium, chosen AT PLAN for multi-file logic, non-trivial verifier
+  or declared debugging · implementer-max Opus 5 high · implementer-sonnet Sonnet 5 high ·
+  scripter Sonnet 5 high · scripter-complex Opus 5 medium.
 - maxTurns: implementer* 100 (max 120), scripter* 80-100, explorer-max 60.
 - implementer-sonnet ONLY with a cheap verifier (script, build, test, grep), no debugging and
   no JS/TS logic across multiple files: CSS, markup, config, docs, mechanical items. AT PLAN
@@ -106,8 +107,8 @@ session only.
   the dependency between briefs.
 
 ## Caps
-- At most 2 re-sends to implementer per task (3 runs total); one implementer-sonnet or
-  scripter run counts toward them.
+- At most 2 re-sends to implementer per task (3 runs total); one implementer-sonnet,
+  implementer-complex or scripter run counts toward them.
 - SendMessage to a live agent is not a re-send; it's the first option for small deviations.
 - At most 3 explorer runs per task, can run parallel.
 - An agent stopped by `maxTurns` = the brief is too big; split it, don't relaunch it as is.
@@ -140,7 +141,4 @@ session only.
 - HANDOFF.md is not part of the task commit (`/handoff` commits it). The final report gives
   the hash and what to check on live.
 
-- At the close of a session with a task delivered, run `/rate N` — 5 complete on the first
-  try, zero repairs · 4 one round of small repairs · 3 two rounds or a deviation I caught · 2
-  partial, I repaired or relaunched it · 1 unusable; you rate the result, not the cost.
-  Later: `python3 tools/session_metrics.py --rate <session-name> N`.
+- `/rate N` and `/handoff` are run by me, not by main.

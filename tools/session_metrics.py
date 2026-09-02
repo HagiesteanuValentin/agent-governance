@@ -51,7 +51,7 @@ THRESHOLDS = {
     "long_agent_report": 2000,       # chars of a worker's final message
     "long_agent_report_explorer_max": 6000,  # hooks/raport-lung.sh: explorer-max* cap
     "long_brief": 7000,              # chars of Agent.input.prompt
-    "max_implementer_runs": 3,       # implementer + implementer-max + implementer-sonnet + scripter + scripter-complex per session
+    "max_implementer_runs": 3,       # implementer + implementer-complex + implementer-max + implementer-sonnet + scripter + scripter-complex per session
     "max_live_agents": 4,             # hard cap on concurrently running sub-agents; over it = parallel_over_cap
     "max_explorer_runs": 3,
     "fable_code_lines": 20,          # lines written by Edit/Write in main
@@ -207,7 +207,7 @@ def report_limit_for(agent_type):
 def severity_of(code, scope, wasted):
     """Escalation moves a code up one step at most; a worker reading its own target does not."""
     sev = SEVERITY_BASE.get(code, "low")
-    if code == "full_read_big_file" and scope.split("#")[0] in ("implementer", "implementer-max", "implementer-sonnet", "scripter", "scripter-complex"):
+    if code == "full_read_big_file" and scope.split("#")[0] in ("implementer", "implementer-complex", "implementer-max", "implementer-sonnet", "scripter", "scripter-complex"):
         return "low"
     if sev == "high":
         return "high"
@@ -1745,7 +1745,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         "slash_commands": len(main_doc["slash"]),
         "slash_names": main_doc["slash"],
         "agent_runs_by_type": dict(sorted(by_type.items())),
-        "implementer_runs": by_type.get("implementer", 0) + by_type.get("implementer-max", 0) + by_type.get("implementer-sonnet", 0)
+        "implementer_runs": by_type.get("implementer", 0) + by_type.get("implementer-complex", 0) + by_type.get("implementer-max", 0) + by_type.get("implementer-sonnet", 0)
                             + by_type.get("scripter", 0) + by_type.get("scripter-complex", 0),
         "sendmessage_continuations": main_doc["sendmessages"],
     }
