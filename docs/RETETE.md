@@ -99,3 +99,13 @@ Dacă un hook blochează greșit o comandă uzuală: nu-l dezactivezi, notezi co
 HANDOFF «Neclar».
 
 Apoi pașii 1–7 din docs/experiments.md «simplu — lessons from r1 and how to resume».
+
+## Experiment ferestre: orchestrator la două efforturi
+Prompt scris orb în `task.md`, în vocea lui Vali, fără soluție. Pornești două sesiuni din
+același commit: `claude --effort <x> --permission-mode plan` (o dată per effort). La orice
+întrebare a orchestratorului: „decide tu și notează ipoteza". `ExitPlanMode` se respinge —
+ieși cu `/exit`, nu cu kill. Planurile ajung în `~/.claude/plans/`; le găsești cu
+`grep -o '/home/vali/.claude/plans/[^"]*\.md' <sesiune>.jsonl` și le copiezi orb ca
+plan-K/plan-M + un `mapping.txt` (scris în bash, nu în fish — sintaxa diferă). Auditorul
+judecă după rubrica din `docs/experiments.md`; Vali alege effort-ul câștigător fără să vadă
+maparea K/M → effort real.
