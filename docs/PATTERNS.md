@@ -43,3 +43,4 @@ ar veni din toate sesiunile, numitorul doar din cele noi. În tabele afișează 
 9. SessionStart stdin carries `source`: startup|resume|clear|compact. A resumed session
    must not reset per-phase state (e.g. effort level) set by the session it resumes.
 Sursa: code.claude.com/docs (hooks, sub-agents, model-config, settings-reference).
+- Measured 02.09: editing `settings.json` from a hook does NOT change the live effort (main stayed medium after the hook wrote low); only `/effort` does. PostToolUse does not fire when the tool exits non-zero (PostToolUseFailure does) — a check hook stays silent on failed calls.
