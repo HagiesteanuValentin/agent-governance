@@ -48,21 +48,31 @@ Registered in `settings.json` (see `hooks/settings.example.json`).
 | `session-start.sh` | SessionStart | — | injects `HANDOFF*.md` from the project root |
 | `read-mare.sh` | PreToolUse / Read | main only: re-read of a file already read this session, or >300 lines without `offset`/`limit`; **everyone** (v1.4.1): `file_path` under `/tool-results/` | denies (image without `-small`, plans, and short `.md` stay a reminder) |
 | `brief-mare.sh` | PreToolUse / Agent | brief >7,000 characters | reminder: "split it into phases" |
-| `context-agent.sh` | PreToolUse / * | sub-agent only (`implementer*`/`scripter*`): its own real transcript context (v1.4.1 fix — was reading main's), ≥150k / ≥220k; plus a verification-command counter (3rd `astro check`/`npm test`/`verifica-*.mjs`/etc. on the same agent transcript) | ≥150k: reminder to wrap up (once); ≥220k: denies every tool but `Bash`; 3rd verification: one-time `additionalContext` nudge, never blocks |
+| `bash-mare.sh` | PreToolUse / Bash | main only: whole-file reads >300 lines and heredoc writes >20 body lines run through Bash instead of Read/Write/Edit | denies, points at the proper tool |
+| `write-mare.sh` | PreToolUse / Write\|Edit | main only: >20 written lines | denies, points at scribe/implementer |
+| `commit-gate.sh` | PreToolUse / Bash | main only: `git commit` (incl. `git -C <dir> commit`) with staged/unstaged diff touching `.ts/.tsx/.js/.jsx/.mjs/.astro`, no fresh `audit-ok-<session_id>` marker | `ask`: run `/audit` on the commit range first |
+| `agenti-vii.sh check` | PreToolUse / Agent | ≥4 agents alive (state file `/tmp/claude-hooks/live-<session_id>`, 5 min grace) | `ask`, lists type/id of the live agents |
+| `agenti-vii.sh start`/`stop` | SubagentStart / SubagentStop | — | writes/removes the agent's row in the state file |
+| `context-agent.sh --scope main` | PreToolUse / * | main session, own context, same defaults ≥150k / ≥220k (overridable with `--warn`/`--deny`) | same effect as the agent-scope row below, scoped to main |
+| `context-agent.sh --praguri-tip` | PreToolUse / * | sub-agent only (`implementer*`/`scripter*`): its own real transcript context (v1.4.1 fix — was reading main's), ≥150k / ≥220k, or ≥100k/≥150k for `implementer-sonnet`/`scripter` with `--praguri-tip`; plus a verification-command counter (3rd `astro check`/`npm test`/`verifica-*.mjs`/etc. on the same agent transcript) | ≥150k (or ≥100k per-type): reminder to wrap up (once); ≥220k (or ≥150k): denies every tool but `Bash`; 3rd verification: one-time `additionalContext` nudge, never blocks |
 | `comentarii-cod.sh` | PostToolUse / Edit\|Write | main **and** sub-agents: a comment block of ≥2 added lines, an added comment line >160 chars, or >25% comments in the added lines (≥5 added) | never blocks: `additionalContext` with the pointer rule + one JSONL line in `/tmp/claude-hooks/comentarii-<session>.jsonl` |
 | `raport-lung.sh` | SubagentStop | final report >2,000 characters | blocks once, asks for compression (background agents too — verified 2026-08-30 after switching the output to `hookSpecificOutput` + `last_assistant_message`) |
 | `session-metrics.sh` | SessionEnd | — | runs the offline analyzer, zero tokens |
 
 Three design notes:
 
-- `read-mare.sh` and `brief-mare.sh` skip subagents (`agent_id` present in the hook input).
-  Reading a lot is exactly what a subagent is *for*; the rule targets the orchestrator.
+- `read-mare.sh`, `brief-mare.sh`, `bash-mare.sh`, `write-mare.sh`, and `commit-gate.sh` skip
+  subagents (`agent_id` present in the hook input). Reading/writing a lot is exactly what a
+  subagent is *for*; the rule targets the orchestrator.
 - `comentarii-cod.sh` is the only hook that runs everywhere, main and workers alike, and
   the only one that never denies: the writer is told while its context is still alive, and
   the JSONL log lets `/handoff` move the explanations into `PATTERNS`/`DECIZII` later.
-- `context-agent.sh` is the mirror: it skips main (no `agent_id`) and only watches
-  `implementer`/`implementer-sonnet`/`implementer-max` — the escalation carries the same
-  thresholds, maxTurns is not an exemption.
+- `context-agent.sh` is wired twice: `--scope main` skips any call with `agent_id` set;
+  `--praguri-tip` skips main and only watches `implementer*`/`scripter*` — the escalation
+  carries the same thresholds, maxTurns is not an exemption.
+- `agenti-vii.sh check` runs on main's `PreToolUse/Agent`; `start`/`stop` run on the
+  subagent's own `SubagentStart`/`SubagentStop`, so the state file is written by the worker,
+  not guessed by main.
 - `raport-lung.sh` guards on `stop_hook_active`, so a stubborn agent cannot get stuck in a
   block/retry loop. It blocks at most once per stop.
 

@@ -29,21 +29,59 @@
         ]
       },
       {
+        "_note": "main only: big whole reads and big heredoc writes into the project, plus the commit gate before git commit",
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/bash-mare.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/commit-gate.sh"
+          }
+        ]
+      },
+      {
+        "_note": "main only: over 20 written lines in Write/Edit belong to scribe/implementer",
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/write-mare.sh"
+          }
+        ]
+      },
+      {
         "matcher": "Agent",
         "hooks": [
           {
             "type": "command",
             "command": "$HOME/.claude/hooks/brief-mare.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/agenti-vii.sh check"
           }
         ]
       },
       {
-        "_note": "implementer*/scripter* sub-agents only, measured on the worker transcript <dir(transcript_path)>/<session_id>/subagents/agent-<agent_id>.jsonl: warns once at 150000 tokens of context, denies every tool except Bash at 220000, and nudges once on the 3rd build/test/verifica-* Bash call; triggers logged in /tmp/claude-hooks/context-agent.jsonl",
+        "_note": "main session, every tool: context guard scoped to main",
         "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/context-agent.sh"
+            "command": "$HOME/.claude/hooks/context-agent.sh --scope main"
+          }
+        ]
+      },
+      {
+        "_note": "implementer*/scripter* sub-agents only, measured on the worker transcript <dir(transcript_path)>/<session_id>/subagents/agent-<agent_id>.jsonl: warns once at 150000 tokens of context, denies every tool except Bash at 220000, and nudges once on the 3rd build/test/verifica-* Bash call; per-type thresholds are opt-in via --praguri-tip; triggers logged in /tmp/claude-hooks/context-agent.jsonl",
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/context-agent.sh --praguri-tip"
           }
         ]
       }
@@ -60,12 +98,26 @@
         ]
       }
     ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/agenti-vii.sh start"
+          }
+        ]
+      }
+    ],
     "SubagentStop": [
       {
         "hooks": [
           {
             "type": "command",
             "command": "$HOME/.claude/hooks/raport-lung.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/agenti-vii.sh stop"
           }
         ]
       }

@@ -56,6 +56,14 @@ real transcripts at every disagreement. Hook `raport-lung.sh` with a 6,000 cap f
 
 Both reports complete (6 agents × 6 fields); both passed the 6k hook at >2k (the old 2k cap would have blocked both). Conclusion: `explorer-max` = Sonnet 5 medium, maxTurns 60, report ≤6k; Opus low not adopted (1.6× cost, more errors on exact numbers).
 
+## v1.6 note on the `simplu` cells
+
+r2 and r3 of the `brief-3.*` cells run with the fixed brief (`docs/dosar/simplu/` read on
+intervals, ≤150 lines per Read, files 02–08 only the sections named per item) plus the new
+v1.6 hooks (`bash-mare.sh`, `write-mare.sh`, `commit-gate.sh`, `agenti-vii.sh`, and
+`context-agent.sh --scope main`). r1 ran without either, so r1 numbers are not directly
+comparable to r2/r3 — treat r1 as a separate baseline, not the "before" half of a before/after.
+
 ## How to rerun
 
 Create the cell agents in `~/.claude/agents/` as copies with a different `effort`/`model`.

@@ -366,3 +366,14 @@ for name, ok, got in results:
 print("%d/%d passed" % (len(results) - len(failed), len(results)))
 sys.exit(1 if failed else 0)
 PY
+rc=$?
+
+for t in test-read-mare-agent.sh test-main-guards.sh test-context-main.sh test-agenti-vii.sh test-commit-gate.sh; do
+    bash "$HOOKS_DIR/$t"
+    tc=$?
+    if [ "$tc" -ne 0 ]; then
+        rc=$tc
+    fi
+done
+
+exit "$rc"
