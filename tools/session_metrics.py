@@ -879,6 +879,32 @@ def human_side_kind(obj, msg, agent_call_ids):
     return "user"
 
 
+_PARENT_UUIDS = {}
+
+
+def parent_uuids(path, sid):
+    """Uuid-urile din `<dir(path)>/<sid>.jsonl`; set gol dacă părintele lipsește."""
+    parent = os.path.join(os.path.dirname(os.path.abspath(path)), sid + ".jsonl")
+    ids = _PARENT_UUIDS.get(parent)
+    if ids is None:
+        ids = set()
+        try:
+            with open(parent, encoding="utf-8", errors="replace") as fh:
+                for line in fh:
+                    if '"uuid"' not in line:
+                        continue
+                    try:
+                        u = json.loads(line).get("uuid")
+                    except ValueError:
+                        continue
+                    if isinstance(u, str):
+                        ids.add(u)
+        except OSError:
+            pass
+        _PARENT_UUIDS[parent] = ids
+    return ids
+
+
 def parse_file(path, label, tool_names, tool_inputs, chain=None):
     """One pass over a transcript; usage grouping identical to the original analyze()."""
     doc = new_doc(path, label)
@@ -1031,9 +1057,10 @@ def parse_file(path, label, tool_names, tool_inputs, chain=None):
                 doc["last_assistant_ts"] = ts
         inherited = False
         if label is None:
-            sid = obj.get("session_id")
-            # 🔴 mesajele moștenite au fost deja facturate la sesiunea-părinte — PATTERNS «Sesiuni reluate»
-            if isinstance(sid, str) and sid not in own_ids:
+            sid = obj.get("session_id") or obj.get("sessionId")
+            # 🔴 moștenit = session_id străin ȘI uuid copiat din părinte — PATTERNS «sessionId vs session_id în jsonl»
+            if (isinstance(sid, str) and sid not in own_ids
+                    and obj.get("uuid") in parent_uuids(path, sid)):
                 inherited = True
                 doc["inherited_msgs"] += 1
                 if doc["resumed_from"] is None:
@@ -2040,19 +2067,64 @@ def v17_block(main_doc, workers, docs_by_scope, tool_inputs, pricing, version,
     return block, new_flags
 
 
+# 🔴 formula e normativă, nu se ajustează local — DECIZII «Rate: advisor_score și mistakes automate»
+def derive_quality(v17, low_phase=None):
+    """advisor_score (1-5 or None) + mistakes + breakdown, computed from the v1.7 block."""
+    v = v17 if isinstance(v17, dict) else {}
+    adv = v.get("advisor") or {}
+    lp = low_phase if isinstance(low_phase, dict) else (v.get("low_phase") or {})
+    flags = dict(lp.get("flags") or [])
+    breakdown = {"audit_abateri_total": int(lp.get("audit_abateri_total") or 0),
+                 "low_flags": sum(int(n or 0) for n in flags.values()),
+                 "reruns": int(lp.get("reruns") or 0)}
+    mistakes = sum(breakdown.values())
+    verdict = str(adv.get("verdict") or "").strip()
+    if not verdict:
+        return None, mistakes, breakdown
+    score = 3
+    if int(adv.get("n_schimbari") or 0) >= 1 and int(adv.get("plan_edits_after") or 0) >= 1:
+        score += 1
+    if breakdown["audit_abateri_total"] == 0:
+        score += 1
+    if breakdown["audit_abateri_total"] >= 3:
+        score -= 1
+    if "NO-GO" in verdict.upper() and any((r or {}).get("effort") == "low"
+                                          for r in (v.get("effort_runs") or [])):
+        score -= 1
+    return max(1, min(5, score)), mistakes, breakdown
+
+
+def _manual(quality, key):
+    """A value from /rate; what a previous run wrote back is marked <key>_src: auto."""
+    if not isinstance(quality, dict) or quality.get(key + "_src") == "auto":
+        return None
+    return quality.get(key)
+
+
 def apply_quality_to_v17(session):
-    """advisor.score / low_phase.mistakes live in the rating, attached after analyze()."""
+    """advisor.score / low_phase.mistakes: auto from the v1.7 block, /rate only overrides."""
     v = session.get("v17")
     if not isinstance(v, dict):
         return
-    q = session.get("quality") or {}
-    v.setdefault("advisor", {})["score"] = clean_score(q.get("advisor_score"))
-    mistakes = q.get("mistakes")
+    q = session.get("quality")
+    auto_score, auto_mistakes, breakdown = derive_quality(v, v.get("low_phase"))
+    man_score = clean_score(_manual(q, "advisor_score"))
     try:
-        mistakes = int(mistakes)
+        man_mistakes = int(_manual(q, "mistakes"))
     except (TypeError, ValueError):
-        mistakes = None
-    v.setdefault("low_phase", {})["mistakes"] = mistakes
+        man_mistakes = None
+    a = v.setdefault("advisor", {})
+    a["score"] = auto_score if man_score is None else man_score
+    a["advisor_score_src"] = "auto" if man_score is None else "manual"
+    lp = v.setdefault("low_phase", {})
+    lp["mistakes"] = auto_mistakes if man_mistakes is None else man_mistakes
+    lp["mistakes_src"] = "auto" if man_mistakes is None else "manual"
+    lp["mistakes_breakdown"] = breakdown
+    if isinstance(q, dict):
+        q["advisor_score"] = a["score"]
+        q["advisor_score_src"] = a["advisor_score_src"]
+        q["mistakes"] = lp["mistakes"]
+        q["mistakes_src"] = lp["mistakes_src"]
 
 
 def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
@@ -2060,6 +2132,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             versions=None, browser_threshold=BROWSER_THRESHOLD_DEFAULT,
             # 🔴 effort_baseline e acceptat, dar ignorat — DECIZII «Counterfactual înlocuit»
             effort_baseline=None):
+    _PARENT_UUIDS.clear()  # 🔴 cache per rulare, altfel crește pe tot corpusul — PATTERNS «sessionId vs session_id în jsonl»
     if versions is None:
         versions = []
     if ctx_warn is None:
@@ -3736,8 +3809,11 @@ def read_record(path):
 
 def write_record(out_dir, name, rec):
     """Rewrite <name>.json and, if present, <name>.md from one session record."""
-    with open(os.path.join(out_dir, name + ".json"), "w", encoding="utf-8") as fh:
+    json_path = os.path.join(out_dir, name + ".json")
+    tmp = json_path + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(json.dumps([rec], indent=2, ensure_ascii=False) + "\n")
+    os.replace(tmp, json_path)
     md_path = os.path.join(out_dir, name + ".md")
     if os.path.isfile(md_path):
         try:
@@ -3745,8 +3821,10 @@ def write_record(out_dir, name, rec):
         except (KeyError, TypeError, ValueError):
             text = None
         if text:
-            with open(md_path, "w", encoding="utf-8") as fh:
+            tmp_md = md_path + ".tmp"
+            with open(tmp_md, "w", encoding="utf-8") as fh:
                 fh.write(text)
+            os.replace(tmp_md, md_path)
 
 
 def refresh_versions(directory, versions):
@@ -3807,7 +3885,9 @@ def rate_session(out_dir, name, score, note, versions, threshold):
                       "rated_at": datetime.datetime.now(datetime.timezone.utc)
                       .strftime("%Y-%m-%dT%H:%M:%SZ"),
                       "advisor_score": old_q.get("advisor_score"),
-                      "mistakes": old_q.get("mistakes")}
+                      "advisor_score_src": old_q.get("advisor_score_src"),
+                      "mistakes": old_q.get("mistakes"),
+                      "mistakes_src": old_q.get("mistakes_src")}
     apply_quality_to_v17(rec)
     write_record(out_dir, name, rec)
     print("%s: quality %d/5" % (name, score), file=sys.stderr)

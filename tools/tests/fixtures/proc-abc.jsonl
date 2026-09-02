@@ -1,0 +1,1 @@
+{"type":"assistant","timestamp":"2026-09-02T17:00:00Z","sessionId":"proc-abc","session_id":"proc-abc","uuid":"u-copiat","message":{"id":"p1","model":"claude-fable-5-1","usage":{"input_tokens":100,"output_tokens":900,"cache_read_input_tokens":1000,"cache_creation_input_tokens":0},"content":[{"type":"text","text":"originalul"}]}}

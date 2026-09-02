@@ -211,8 +211,8 @@ v1.7: `advisor_mandatory_missed`, `advisor_trigger_b_missed`, `effort_lag_high`,
 (heuristice, nu verdicte). `python3 tools/session_metrics.py --trends metrics-local` scrie
 `metrics-local/V17.md` (tabel per sesiune v1.7 + mediane v1.7 vs high permanent vs medium
 permanent) — folosit ca benchmark alături de `/rate`, nu ca prag de trecere/pică.
-„Greșeli evitabile" = valoarea dată la `/rate N --advisor M --mistakes K`, salvată în
-`pending-rating.json` ca `mistakes` (împreună cu `advisor_score`).
+„Greșeli evitabile" = `mistakes`, derivat automat de session_metrics din blocul v1.7
+(la `/rate N` se dă doar nota și o frază); stă în record lângă `advisor_score`.
 
 Confound: sesiunile 1-3 T-v17 sunt R&D pe workflow-ul agent-governance însuși, nu task
 normal (`task_class = governance-rd`). Comparațiile de cost se fac în clasa `governance-rd`,

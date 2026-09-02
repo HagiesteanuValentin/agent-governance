@@ -140,7 +140,52 @@ def test_rating_feeds_advisor_score_and_mistakes():
     assert s["v17"]["low_phase"]["mistakes"] == 2
     s["quality"] = {"score": 3}
     sm.apply_quality_to_v17(s)
-    assert s["v17"]["advisor"]["score"] is None
+    # no manual value left -> the auto formula fills both
+    assert s["v17"]["advisor"]["score"] == 3
+    assert s["v17"]["low_phase"]["mistakes"] == 2
+
+
+def _v17(verdict, n_schimbari=0, plan_edits_after=0, abateri=0, flags=(), reruns=0,
+         effort_runs=()):
+    return {"advisor": {"verdict": verdict, "n_schimbari": n_schimbari,
+                        "plan_edits_after": plan_edits_after},
+            "effort_runs": [{"effort": e} for e in effort_runs],
+            "low_phase": {"audit_abateri_total": abateri, "flags": list(flags),
+                          "reruns": reruns}}
+
+
+def test_derive_quality_without_an_advisor_report():
+    score, mistakes, breakdown = sm.derive_quality(_v17(None, abateri=1, reruns=1))
+    assert score is None
+    assert mistakes == 2 and breakdown["reruns"] == 1
+
+
+def test_derive_quality_on_session_1609():
+    # GO, 3 SCHIMBARI but no plan edit after, 1 ABATERI, one late_first_edit flag
+    v = _v17("GO", n_schimbari=3, plan_edits_after=0, abateri=1,
+             flags=[("late_first_edit", 1)])
+    assert sm.derive_quality(v) == (3, 2, {"audit_abateri_total": 1, "low_flags": 1,
+                                           "reruns": 0})
+    # a NO-GO plan implemented anyway loses a point
+    assert sm.derive_quality(_v17("NO-GO: plan neclar", effort_runs=("medium", "low")))[0] == 3
+    assert sm.derive_quality(_v17("NO-GO: plan neclar"))[0] == 4
+
+
+def test_manual_rating_overrides_auto_and_is_marked():
+    s = analyzed()
+    s["quality"] = {"score": 4, "advisor_score": 5, "mistakes": 9}
+    sm.apply_quality_to_v17(s)
+    v = s["v17"]
+    assert (v["advisor"]["score"], v["advisor"]["advisor_score_src"]) == (5, "manual")
+    assert (v["low_phase"]["mistakes"], v["low_phase"]["mistakes_src"]) == (9, "manual")
+    # what apply_ wrote back into quality is marked auto and must not look manual next run
+    s2 = analyzed()
+    s2["quality"] = {"score": 4}
+    sm.apply_quality_to_v17(s2)
+    assert s2["quality"]["mistakes"] == 2 and s2["quality"]["mistakes_src"] == "auto"
+    sm.apply_quality_to_v17(s2)
+    assert s2["v17"]["advisor"]["advisor_score_src"] == "auto"
+    assert s2["v17"]["low_phase"]["mistakes"] == 2
 
 
 def test_inherited_turns_are_outside_the_figures():
@@ -277,6 +322,13 @@ def test_wasted_pct_cell_is_na_not_a_huge_number():
     sess = sm.version_block("v1.5", [broken], {"v1.5": [broken]}, None, {})
     assert not any("4807400" in l for l in sess), [l for l in sess if "4807400" in l]
     assert any("n/a of main input volume" in l for l in sess)
+
+
+def test_inherited_needs_the_uuid_copied_from_the_parent():
+    # proc-abc.jsonl are doar u-copiat; u-nou-1/2 sunt proprii deși session_id e străin
+    s = analyzed(BASELINE, os.path.join(HERE, "fixtures", "v17-sessionid.jsonl"))
+    assert s["v17"]["inherited_turns"] == 1
+    assert s["totals"]["main_cost_usd"] > 0
 
 
 if __name__ == "__main__":

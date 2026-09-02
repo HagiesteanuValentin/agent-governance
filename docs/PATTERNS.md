@@ -74,3 +74,17 @@ Fallback-ul `x / (total or 1)` transformă asta în procente absurde (v1.5: 4.80
 Numitorul 0 înseamnă „nu se poate calcula": sesiunea iese din numărător ȘI din numitor,
 iar celula se afișează `n/a`. Regula ține și pentru procentul salvat în record, nu doar
 pentru cel calculat la agregare.
+
+## Hook-uri SessionStart rulează în paralel
+`session-start.sh` are mai multe branch-uri (`rules`, `handoff`, `v17`) care pot fi apelate
+separat. Dacă logica de reset a efortului (case-ul pe `source`: resume|fork|compact păstrează,
+altfel `medium`) trăiește doar într-un branch, celelalte branch-uri citesc `settings.json`
+înainte ca reset-ul să fi rulat și afișează valoarea veche. Logica stă într-o singură funcție
+(`reset_effort_for_source`) apelată de FIECARE branch care citește efortul, înainte de citire.
+
+## sessionId vs session_id în jsonl
+`sessionId` (camelCase) e egal cu numele fișierului, dar e REscris pe liniile copiate la
+resume; `session_id` (snake_case) e id de proces, supraviețuiește `/clear` și poate fi străin
+pe linii proprii. Niciunul singur nu distinge originalul de copie: o linie e moștenită doar
+dacă `session_id` e străin ȘI `uuid`-ul ei apare în `<dir>/<session_id>.jsonl` (deja facturată
+acolo). Părinte lipsă → linie proprie; uuid-urile lui se citesc o dată, în `_PARENT_UUIDS`.

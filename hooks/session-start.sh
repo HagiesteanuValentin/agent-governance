@@ -12,7 +12,19 @@ try:
 except Exception:
     print('')
 " 2>/dev/null)
+# 🔴 hook-urile SessionStart rulează în paralel — PATTERNS «Hook-uri SessionStart rulează în paralel»
+reset_effort_for_source() {
+  eph="$(dirname "$0")/effort-phase.sh"
+  # 🔴 fork/resume/compact keep effort; unknown source resets — PATTERNS «Claude Code — limite verificate în docs (02.09.2026)»
+  if [ -f "$eph" ]; then
+    case "$src" in
+      resume|fork|compact) ;;
+      *) sh "$eph" medium >/dev/null 2>&1 </dev/null ;;
+    esac
+  fi
+}
 if [ "${1:-rules}" = "v17" ]; then
+  reset_effort_for_source
   if [ -f "$v" ]; then
     echo "=== ORCHESTRATION v1.7 (injected by SessionStart; main session only) ==="
     cat "$v"
@@ -24,14 +36,7 @@ if [ "${1:-rules}" = "v17" ]; then
   exit 0
 fi
 if [ "${1:-rules}" != "handoff" ]; then
-  eph="$(dirname "$0")/effort-phase.sh"
-  # 🔴 fork/resume/compact keep effort; unknown source resets — PATTERNS «Claude Code — limite verificate în docs (02.09.2026)»
-  if [ -f "$eph" ]; then
-    case "$src" in
-      resume|fork|compact) ;;
-      *) sh "$eph" medium >/dev/null 2>&1 </dev/null ;;
-    esac
-  fi
+  reset_effort_for_source
   if [ -f "$o" ]; then
     echo "=== ORCHESTRATION (injected by SessionStart; main session only) ==="
     cat "$o"
