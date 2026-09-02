@@ -71,3 +71,21 @@ sesiunii lui). R = `metrics-local/experiments/simplu/r<k>`. Pași:
 
 Verificatorul văzut de celule = `scripts/verifica-simplu.mjs` (doar I1–I8); capcanele T1–T5
 sunt doar în `scripts/evalueaza-simplu.mjs`, nu se expun celulelor.
+
+## Smoke hook-uri v1.6 și reluarea lotului
+Smoke, sesiune NOUĂ, în ordinea asta:
+1) `cat tools/session_metrics.py` din main → deny „>300 lines in main → explorer";
+   `sed -n '1,40p' tools/session_metrics.py` → trece.
+2) Ceri main-ului să scrie 30 de linii cu Write în `docs/smoke.md` → deny „>20 lines from
+   main → scribe/implementer".
+3) `touch smoke.mjs && git add smoke.mjs && git commit -m smoke` → harness-ul ÎNTREABĂ
+   (commit gate, fără marker audit-ok); răspunzi NU, apoi `git reset smoke.mjs && rm smoke.mjs`.
+4) 4 explorer-i cu prompt „răspunde ok" lansați într-un mesaj, apoi al 5-lea → harness-ul
+   ÎNTREABĂ (agenti-vii).
+5) `ls /tmp/claude-hooks/live-* /tmp/claude-hooks/audit-ok-*` după un audit cu VERDICT: OK
+   → markerul există.
+
+Dacă un hook blochează greșit o comandă uzuală: nu-l dezactivezi, notezi comanda în
+HANDOFF «Neclar».
+
+Apoi pașii 1–7 din docs/experiments.md «simplu — lessons from r1 and how to resume».

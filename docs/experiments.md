@@ -56,13 +56,38 @@ real transcripts at every disagreement. Hook `raport-lung.sh` with a 6,000 cap f
 
 Both reports complete (6 agents × 6 fields); both passed the 6k hook at >2k (the old 2k cap would have blocked both). Conclusion: `explorer-max` = Sonnet 5 medium, maxTurns 60, report ≤6k; Opus low not adopted (1.6× cost, more errors on exact numbers).
 
-## v1.6 note on the `simplu` cells
+## simplu — lessons from r1 and how to resume (2026-09-02)
 
-r2 and r3 of the `brief-3.*` cells run with the fixed brief (`docs/dosar/simplu/` read on
-intervals, ≤150 lines per Read, files 02–08 only the sections named per item) plus the new
-v1.6 hooks (`bash-mare.sh`, `write-mare.sh`, `commit-gate.sh`, `agenti-vii.sh`, and
-`context-agent.sh --scope main`). r1 ran without either, so r1 numbers are not directly
-comparable to r2/r3 — treat r1 as a separate baseline, not the "before" half of a before/after.
+**What r1 showed**: peak context — opus-low 277.6k, opus-medium 314.1k, sonnet-medium 288.1k,
+sonnet-low 121.3k; grades 4/4/3/2. No quality cliff up to 300k for Opus (retry 0, all 5 Edit
+failures = "File has not been read yet"). Cost per call is linear in context: Sonnet
+$0.03→$0.146 at 250–300k, Opus $0.17–0.25 above 200k. All four cells reported traps T1–T3 as
+NOT RUN (r1/audit.md).
+
+**Why it went off the rails (5 causes → fix in place)**: (1) brief line 10 said "read the
+whole dossier" (20 files, 6,671 lines) → Opus at 191–217k before the first Edit → r2/r3
+briefs now say ranges, ≤150 lines per Read, files 02–08 only the sections named per item;
+(2) no context hook on `cell-*` (name filter) → frontmatter hooks in `~/.claude/agents/cell-*.md`:
+opus warn 150k / deny 220k, sonnet 100k / 150k; (3) sonnet-medium read 14 src files whole,
+Galerie3D 3× → `read-mare.sh` now denies whole reads >300 lines and whole re-reads for
+`cell-*`; (4) Edit before Read → brief must say "Read the range, then Edit"; (5) main ran 6
+agents at once and hit 251k → `agenti-vii` cap 4 means: launch the 4 cells and NOTHING else
+in parallel, auditor only after the cells finish.
+
+**Comparability**: r1 = baseline without enforcement; r2/r3 run with the fixed brief + hooks.
+Do not average r1 with r2/r3; report r1 separately. Under the caps an Opus cell may be cut at
+220k — count items delivered before the cap as the result, not as a failure of the model.
+
+**Resume protocol (r2, then r3)**: 0. new session, smoke the hooks first (RETETE «Smoke
+hook-uri v1.6 și reluarea lotului»); 1. usage window <70% of 5h (a lot ≈ $36, ~20 min);
+2. `scripts/cell-teardown.sh simplu r2 --yes` → `scripts/cell-setup.sh simplu r2 --dosar
+metrics-local/experiments/simplu/dosar` → `r2/env.txt` (`claude --version`, `date -Iseconds`);
+3. one message, 4 Agent calls cell-opus-low/cell-opus-medium/cell-sonnet-low/cell-sonnet-medium
+with prompt „Brief: metrics-local/experiments/simplu/input/brief-3.\<cell\>-r2.md. Îl citești
+integral și îl execuți. Nu faci commit/push."; 4. wait for all four; 5. RETETE «Experiment
+celule — evaluarea unui lot» (cell_metrics.py, evalueaza-simplu.mjs, auditor); killed agents
+→ r2/EXCLUDE.txt + `--min-calls 2`; 6. r3 identical; 7. scribe → aggregated table here +
+confounds from r1/audit.md, no default decision.
 
 ## How to rerun
 
