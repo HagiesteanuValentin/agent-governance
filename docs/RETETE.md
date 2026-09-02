@@ -71,6 +71,9 @@ sesiunii lui). R = `metrics-local/experiments/simplu/r<k>`. Pași:
 
 Verificatorul văzut de celule = `scripts/verifica-simplu.mjs` (doar I1–I8); capcanele T1–T5
 sunt doar în `scripts/evalueaza-simplu.mjs`, nu se expun celulelor.
+În fish, `--exclude-agent` se dă repetat direct în comandă, nu printr-o variabilă cu spații
+(argparse îl vede ca un singur argument). `--results-dir` trebuie să conțină JSON-urile
+TUTUROR rundelor din sesiune (copiază `r2/*.json` în `r3/`, etc.), altfel status `-`.
 
 ## Smoke hook-uri v1.6 și reluarea lotului
 Smoke, sesiune NOUĂ, în ordinea asta:
