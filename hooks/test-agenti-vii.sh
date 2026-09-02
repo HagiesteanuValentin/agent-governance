@@ -81,29 +81,29 @@ def rows(sid):
 
 A = lambda n, t="explorer", row=10, js=10: ("a%d" % n, t, row, js)
 
-# 1) 3 live -> allow
-check_case("3 live agents -> allow", "s1", [A(1), A(2), A(3)], "allow")
+# 1) 5 live -> allow
+check_case("5 live agents -> allow", "s1", [A(1), A(2), A(3), A(4), A(5)], "allow")
 
-# 2) 4 live -> ask
-check_case("4 live agents -> ask", "s2", [A(1), A(2), A(3), A(4)], "ask",
-           "4 agenți vii")
+# 2) 6 live -> ask
+check_case("6 live agents -> ask", "s2", [A(1), A(2), A(3), A(4), A(5), A(6)], "ask",
+           "6 agenți vii")
 case("message lists type/id", "explorer/a1" in
      decide("check", {"session_id": "s2", "transcript_path": tp("s2"),
                       "tool_name": "Agent", "tool_input": {}})[1], "lista")
 
-# 3) 4 live, one with jsonl older than 5 min -> allow + row disappears
-check_case("4 live, 1 with jsonl older than 5 min -> allow", "s3",
-           [A(1), A(2), A(3), ("a4", "scribe", 900, 900)], "allow")
-case("stale row is cleaned from file", len(rows("s3")) == 3,
+# 3) 6 live, one with jsonl older than 5 min -> allow + row disappears
+check_case("6 live, 1 with jsonl older than 5 min -> allow", "s3",
+           [A(1), A(2), A(3), A(4), A(5), ("a6", "scribe", 900, 900)], "allow")
+case("stale row is cleaned from file", len(rows("s3")) == 5,
      "%d rânduri" % len(rows("s3")))
 
-# 4) 4 live, one with no jsonl and an old row -> allow
-check_case("4 live, 1 with no jsonl and old row -> allow", "s4",
-           [A(1), A(2), A(3), ("a4", "scribe", 900, None)], "allow")
+# 4) 6 live, one with no jsonl and an old row -> allow
+check_case("6 live, 1 with no jsonl and old row -> allow", "s4",
+           [A(1), A(2), A(3), A(4), A(5), ("a6", "scribe", 900, None)], "allow")
 
-# 5) 4 live, one with no jsonl but just started -> ask (grace period)
-check_case("4 live, 1 with no jsonl but fresh -> ask", "s5",
-           [A(1), A(2), A(3), ("a4", "scribe", 5, None)], "ask", "4 agenți vii")
+# 5) 6 live, one with no jsonl but just started -> ask (grace period)
+check_case("6 live, 1 with no jsonl but fresh -> ask", "s5",
+           [A(1), A(2), A(3), A(4), A(5), ("a6", "scribe", 5, None)], "ask", "6 agenți vii")
 
 # 6) start adds the row in the format agent_id\tagent_type\ttimestamp
 sid = "s6"

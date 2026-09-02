@@ -1,7 +1,7 @@
 #!/bin/bash
 # 🔴 state file per session, fail-open — docs/DECIZII.md «v1.6 — hook-uri pentru orchestrator (02.09.2026)»
 MODE=${1:-check}
-CAP=${AGENTI_VII_CAP:-4}
+CAP=${AGENTI_VII_CAP:-6}
 STALE_SEC=${AGENTI_VII_STALE:-300}
 MARKER_DIR=${CLAUDE_HOOKS_DIR:-/tmp/claude-hooks}
 input=$(cat)

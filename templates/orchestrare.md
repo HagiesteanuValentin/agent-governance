@@ -99,7 +99,7 @@ session only.
   (c) auditor on Brief N while the implementer runs Brief N+1, ONLY if N+1 doesn't touch N's
   files and doesn't depend on its verdict — declared at plan time;
   (d) an explorer while an implementer runs, only on areas the brief doesn't touch.
-- HARD CAP: at most 4 live agents at once, any type — the analyzer flags `parallel_over_cap`.
+- HARD CAP: at most 6 live agents at once, any type — the analyzer flags `parallel_over_cap`.
 - I want to see only the plan and the conclusion, not the execution. Audit after parallel
   runs: brief by brief.
 - Worktree (`isolation: worktree`) only when declared at plan time, when the lists can't be
@@ -112,7 +112,7 @@ session only.
 - SendMessage to a live agent is not a re-send; it's the first option for small deviations.
 - At most 3 explorer runs per task, can run parallel.
 - An agent stopped by `maxTurns` = the brief is too big; split it, don't relaunch it as is.
-- Past the cap (4th explorer, 4th run, past 4 live agents): don't decide alone — ask me with
+- Past the cap (4th explorer, 4th run, past 6 live agents): don't decide alone — ask me with
   AskUserQuestion: how many agents, what model, why the cap isn't enough. The approval holds
   only for the current task.
 

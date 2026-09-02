@@ -190,6 +190,17 @@ Flags, total main $ out and /rate: to be filled from `metrics-local/` after this
 (record of f5db2a97). Kill-switch check: no fable_wrote_code (main edited only .gitignore +1
 line), no parallel_over_cap (max 1 agent live), no commit without audit.
 
+## T-v17 — design (not yet run)
+Benchmark, not a fail criterion (see "Plans: benchmark, not fail criteria"): compare main $
+with plan-phase effort medium / implementation-phase effort low (v1.7's automated split,
+`hooks/effort-phase.sh`) against the existing medium-integral sessions (whole session at
+medium, no phase switch). Judge with `/rate` after each session, not a synthetic score.
+Protocol: at least 3 real sessions on real tasks, same prompt style as T-metrics, `/rate`
+recorded each time; compare main $ and % against the medium-integral baseline sessions
+already in the corpus. Confound to note explicitly: the tasks are not identical across
+sessions (real work, not synthetic cells) — treat differences in $ as directional, not proof,
+until the advisor and the effort-phase switch have both been observed working end-to-end.
+
 ## How to rerun
 
 Create the cell agents in `~/.claude/agents/` as copies with a different `effort`/`model`.

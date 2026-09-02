@@ -21,3 +21,25 @@ files_changed, $/edit) — altfel o sesiune reluată dublează cifrele.
 Recordurile din `metrics-local/` nu se re-analizează la fiecare rulare, deci un câmp nou
 lipsește din cele vechi. La agregate (medii, $/edit) le sari, nu le trata ca 0: numărătorul
 ar veni din toate sesiunile, numitorul doar din cele noi. În tabele afișează `—`.
+
+## Claude Code — limite verificate în docs (02.09.2026)
+1. Output hook ≤10.000 caractere PER hook-comandă; peste → fișier + preview. Alternative
+   fără plafon hard: CLAUDE.md `@import`, `.claude/rules/`.
+2. Efortul main îl schimbă doar userul: `/effort` (persistă per model în settings),
+   `effortLevel`/`modelSettings.<model>.effortLevel`, env `CLAUDE_CODE_EFFORT_LEVEL`;
+   modelul n-are tool; reîncărcarea settings.json pe viu NU e documentată.
+3. Hook-urile primesc în stdin `effort.level` (PreToolUse/PostToolUse/Stop/SubagentStop),
+   `permission_mode`, `transcript_path`, `session_id`.
+4. Frontmatter subagent: `model: sonnet|opus|haiku|fable|inherit|<id>`,
+   `effort: low|medium|high|xhigh|max`, `maxTurns`, `tools`, `disallowedTools`.
+5. Subagenții pot lansa subagenți (adâncime 3, `CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH`) —
+   în proiect e interzis prin `tools` fără Agent.
+6. SendMessage către un subagent terminat îl reia cu istoric complet.
+7. PostToolUse/PreToolUse hooks run inside subagents as well; stdin carries `agent_id`;
+   main-only hooks must guard on it.
+8. Multiple PostToolUse hook entries matching the same tool call run without guaranteed
+   ordering; a "check the write" hook must gate on `tool_name`, not assume it runs after
+   a sibling "do the write" hook for that same call.
+9. SessionStart stdin carries `source`: startup|resume|clear|compact. A resumed session
+   must not reset per-phase state (e.g. effort level) set by the session it resumes.
+Sursa: code.claude.com/docs (hooks, sub-agents, model-config, settings-reference).

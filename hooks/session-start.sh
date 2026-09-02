@@ -1,11 +1,39 @@
 #!/bin/sh
-# 🔴 SessionStart, $1=rules|handoff (one output >10KB → persisted, 2KB preview) — DECIZII «v1.5.2 — split SessionStart»
+# 🔴 SessionStart, $1=rules|handoff|v17 (one output >10KB → persisted, 2KB preview) — DECIZII «v1.5.2 — split SessionStart»
 d="${CLAUDE_PROJECT_DIR:-$PWD}"
 o="$HOME/.claude/orchestrare.md"
-if [ "${1:-rules}" != "handoff" ] && [ -f "$o" ]; then
-  echo "=== ORCHESTRATION (injected by SessionStart; main session only) ==="
-  cat "$o"
-  echo
+v="$HOME/.claude/orchestrare-v17.md"
+# 🔴 resume must not snap effort back to medium — PATTERNS «Claude Code — limite verificate în docs (02.09.2026)»
+in="$(cat 2>/dev/null)"
+src=$(printf '%s' "$in" | python3 -c "
+import json, sys
+try:
+    print(json.load(sys.stdin).get('source') or '')
+except Exception:
+    print('')
+" 2>/dev/null)
+if [ "${1:-rules}" = "v17" ]; then
+  if [ -f "$v" ]; then
+    echo "=== ORCHESTRATION v1.7 (injected by SessionStart; main session only) ==="
+    cat "$v"
+    echo
+  fi
+  s="$HOME/.claude/settings.json"
+  x=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['modelSettings']['claude-fable-5-1']['effortLevel'])" "$s" 2>/dev/null)
+  echo "effort main (settings): ${x:-unknown}"
+  exit 0
+fi
+if [ "${1:-rules}" != "handoff" ]; then
+  eph="$(dirname "$0")/effort-phase.sh"
+  [ -f "$eph" ] && [ "$src" != "resume" ] && sh "$eph" medium >/dev/null 2>&1 </dev/null
+  if [ -f "$o" ]; then
+    echo "=== ORCHESTRATION (injected by SessionStart; main session only) ==="
+    cat "$o"
+    echo
+  fi
+  s="$HOME/.claude/settings.json"
+  x=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['modelSettings']['claude-fable-5-1']['effortLevel'])" "$s" 2>/dev/null)
+  echo "effort main (settings): ${x:-unknown}"
 fi
 # In a worktree this also picks up its own mini-handoff (HANDOFF-<name>.md); on the main
 # branch, after a merge, it picks up mini-handoffs that are not consolidated yet.

@@ -52,7 +52,7 @@ THRESHOLDS = {
     "long_agent_report_explorer_max": 6000,  # hooks/raport-lung.sh: explorer-max* cap
     "long_brief": 7000,              # chars of Agent.input.prompt
     "max_implementer_runs": 3,       # implementer + implementer-complex + implementer-max + implementer-sonnet + scripter + scripter-complex per session
-    "max_live_agents": 4,             # hard cap on concurrently running sub-agents; over it = parallel_over_cap
+    "max_live_agents": 6,             # hard cap on concurrently running sub-agents; over it = parallel_over_cap
     "max_explorer_runs": 3,
     "fable_code_lines": 20,          # lines written by Edit/Write in main
     "high_context_end": 150000,      # main context at the last API call
@@ -175,7 +175,7 @@ RECOMMENDATION = {
                             "fixes, not after every edit.",
     "agent_ctx_high": "{detail} - split the brief at plan time; the hook wraps the agent "
                       "up at 150k.",
-    "parallel_over_cap": "{detail} - launch at most 4 agents at once; parallel beyond that "
+    "parallel_over_cap": "{detail} - launch at most 6 agents at once; parallel beyond that "
                          "only multiplies reports and audits landing in main together.",
     "tool_results_read": "{detail} - Bash output too large; re-run the command on a "
                          "narrower range instead of reading the saved file.",

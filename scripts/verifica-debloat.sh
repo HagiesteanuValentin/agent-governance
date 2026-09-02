@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.." || exit 1
 FAIL=0
 GLOBAL=templates/CLAUDE.global.md
 ORCH=templates/orchestrare.md
+ORCHV17=templates/orchestrare-v17.md
 HOOK=hooks/session-start.sh
 
 pass() { echo "PASS $*"; }
@@ -16,6 +17,8 @@ n=$(wc -c < "$GLOBAL")
 [ "$n" -le 3500 ] && pass "$GLOBAL = ${n}B ≤ 3500" || fail "$GLOBAL = ${n}B > 3500"
 n=$(wc -c < "$ORCH")
 [ "$n" -le 9800 ] && pass "$ORCH = ${n}B ≤ 9800" || fail "$ORCH = ${n}B > 9800"
+n=$(wc -c < "$ORCHV17")
+[ "$n" -le 3500 ] && pass "$ORCHV17 = ${n}B ≤ 3500" || fail "$ORCHV17 = ${n}B > 3500"
 
 # 2. șiruri interzise în cele două template-uri
 BANNED=('Motiv (' '30.08' '29.08' 'Playwright' 'Preview redus' 'verifica-' 'docs/polish/*.md nu' '-mic.png' '$7.8' '$79' '/home/' 'vali' 'DECIZII' 'RETETE' 'dosar/')
@@ -28,7 +31,7 @@ for s in "${BANNED[@]}"; do
 done
 
 # 3. cuvinte-cheie obligatorii în orchestrare.md
-KEYS=('explorer-max' 'implementer-sonnet' 'implementer-max' 'scripter-complex' 'scribe' 'auditor' 'design-lead-expert' 'escalation:' 'git diff --stat' '--force' '150k' '220k' '3 runs' '4 live agents' 'SendMessage' 'dossier' '/rate' 'worktree' '## Brief' 'Fable' '--stat' 'Co-Authored-By' 'plan mode' 'SCRIPTS.md' '1.5k')
+KEYS=('explorer-max' 'implementer-sonnet' 'implementer-max' 'scripter-complex' 'scribe' 'auditor' 'design-lead-expert' 'escalation:' 'git diff --stat' '--force' '150k' '220k' '3 runs' '6 live agents' 'SendMessage' 'dossier' '/rate' 'worktree' '## Brief' 'Fable' '--stat' 'Co-Authored-By' 'plan mode' 'SCRIPTS.md' '1.5k')
 for k in "${KEYS[@]}"; do
   if grep -qF -- "$k" "$ORCH"; then
     pass "cuvânt-cheie prezent: «$k»"
@@ -64,7 +67,7 @@ esac
 rm -rf "$TMP" "$TMP2"
 
 # 6. fără diacritice românești în templates traduse și în agents/*.md
-for f in "$GLOBAL" "$ORCH" agents/*.md; do
+for f in "$GLOBAL" "$ORCH" "$ORCHV17" agents/*.md; do
   c=$(grep -o '[ăâîșțĂÂÎȘȚ]' "$f" | wc -l)
   [ "$c" -eq 0 ] && pass "$f fără diacritice RO" || fail "$f are $c diacritice RO"
 done
