@@ -549,6 +549,93 @@ def session_id_of(jsonl_path):
     return os.path.basename(jsonl_path)[:-len(".jsonl")]
 
 
+FORK_HOOK_NAME = "SessionStart:fork"
+FORK_TAIL_BYTES = 262144
+
+
+def _continued_in(path):
+    """Id of the session this transcript was forked into, from its last continued-in line."""
+    child = None
+    for obj in read_lines(path):
+        if obj.get("type") == "continued-in" and isinstance(obj.get("continuedInSessionId"), str):
+            child = obj["continuedInSessionId"]
+    return child
+
+
+def _fork_parent(path):
+    """Sibling transcript whose tail says it continued into this one."""
+    directory = os.path.dirname(path) or "."
+    needle = '"continuedInSessionId":"%s"' % session_id_of(path)
+    for entry in sorted(os.listdir(directory)):
+        if not entry.endswith(".jsonl") or entry == os.path.basename(path):
+            continue
+        cand = os.path.join(directory, entry)
+        try:
+            with open(cand, "rb") as fh:
+                fh.seek(0, os.SEEK_END)
+                fh.seek(max(0, fh.tell() - FORK_TAIL_BYTES))
+                tail = fh.read().decode("utf-8", "replace")
+        except OSError:
+            continue
+        if needle in tail:
+            return cand
+    return None
+
+
+def chain_origin(jsonl_path):
+    """The transcript that owns the record: walk continued-in backwards from a fork."""
+    path, seen = jsonl_path, {jsonl_path}
+    while True:
+        parent = _fork_parent(path)
+        if not parent or parent in seen:
+            return path
+        seen.add(parent)
+        path = parent
+
+
+def fork_chain(jsonl_path):
+    """[origin, fork, fork, ...] linked by continued-in; only files that exist."""
+    chain, seen = [jsonl_path], {session_id_of(jsonl_path)}
+    directory = os.path.dirname(jsonl_path) or "."
+    while True:
+        child = _continued_in(chain[-1])
+        if not child or child in seen:
+            return chain
+        path = os.path.join(directory, child + ".jsonl")
+        if not os.path.isfile(path):
+            return chain
+        seen.add(child)
+        chain.append(path)
+
+
+def _fork_start(path):
+    """Line index of the SessionStart:fork hook; None when the fork carries no marker."""
+    for i, obj in enumerate(read_lines(path)):
+        att = obj.get("attachment")
+        if isinstance(att, dict) and att.get("hookName") == FORK_HOOK_NAME:
+            return i
+    return None
+
+
+def read_chain_lines(chain):
+    """Origin in full, then each fork from its fork marker on: the head is a copy of the origin."""
+    last_ts = None
+    for i, path in enumerate(chain):
+        # 🔴 fără tăietură, primele ~100 de mesaje ale fork-ului se numără de două ori — PATTERNS «Sesiuni reluate»
+        start = None if i == 0 else _fork_start(path)
+        for j, obj in enumerate(read_lines(path)):
+            if i and start is None:
+                ts = obj.get("timestamp")
+                if not (isinstance(ts, str) and last_ts and ts > last_ts):
+                    continue
+            elif start is not None and j < start:
+                continue
+            ts = obj.get("timestamp")
+            if isinstance(ts, str) and (last_ts is None or ts > last_ts):
+                last_ts = ts
+            yield obj
+
+
 def session_name(jsonl_path, ts=None, cwd=None, out_dir=None):
     """YYYY-MM-DD-HHMM-<project>, local start time; HHMMSS if that minute is another session."""
     # 🔴 numele nu depinde de fișierele frate — PATTERNS «Nume de sesiune»
@@ -566,26 +653,37 @@ def session_name(jsonl_path, ts=None, cwd=None, out_dir=None):
 
 # ---------------------------------------------------------------- sessions
 
-def session_files(jsonl_path):
-    """Main transcript plus its subagent transcripts (<uuid>/subagents/*.jsonl)."""
+def session_files(jsonl_path, chain=None):
+    """Main transcript plus the subagent transcripts of every link in its fork chain."""
     out = [(jsonl_path, None)]
-    stem = jsonl_path[:-len(".jsonl")]
-    subdir = os.path.join(stem, "subagents")
-    if os.path.isdir(subdir):
+    best = collections.OrderedDict()
+    for main_path in (chain or [jsonl_path]):
+        subdir = os.path.join(main_path[:-len(".jsonl")], "subagents")
+        if not os.path.isdir(subdir):
+            continue
         for name in sorted(os.listdir(subdir)):
             if not name.endswith(".jsonl"):
                 continue
             path = os.path.join(subdir, name)
-            label = None
-            meta_path = path[:-len(".jsonl")] + ".meta.json"
             try:
-                with open(meta_path, encoding="utf-8") as fh:
-                    meta = json.load(fh)
-                if isinstance(meta, dict):
-                    label = meta.get("agentType") or meta.get("description")
-            except (OSError, ValueError):
-                pass
-            out.append((path, label or name[:-len(".jsonl")]))
+                size = os.path.getsize(path)
+            except OSError:
+                continue
+            # 🔴 același agent apare în dirul originii și al fork-ului — PATTERNS «Sesiuni reluate»
+            if name in best and best[name][1] >= size:
+                continue
+            best[name] = (path, size)
+    for name, (path, _size) in best.items():
+        label = None
+        meta_path = path[:-len(".jsonl")] + ".meta.json"
+        try:
+            with open(meta_path, encoding="utf-8") as fh:
+                meta = json.load(fh)
+            if isinstance(meta, dict):
+                label = meta.get("agentType") or meta.get("description")
+        except (OSError, ValueError):
+            pass
+        out.append((path, label or name[:-len(".jsonl")]))
     return out
 
 
@@ -763,16 +861,17 @@ def human_side_kind(obj, msg, agent_call_ids):
     return "user"
 
 
-def parse_file(path, label, tool_names, tool_inputs):
+def parse_file(path, label, tool_names, tool_inputs, chain=None):
     """One pass over a transcript; usage grouping identical to the original analyze()."""
     doc = new_doc(path, label)
     groups = doc["groups"]
-    own_id = session_id_of(path)
+    chain = chain or [path]
+    own_ids = {session_id_of(p) for p in chain}
     last_human = "user"
     # 🔴 a turn with a live async agent is structural, not waste — DECIZII «Narration turns: avoidable»
     live_agents, notified, revived = set(), collections.Counter(), set()
     pending_residual = False
-    for obj in read_lines(path):
+    for obj in read_chain_lines(chain):
         ts = obj.get("timestamp")
         if isinstance(ts, str):
             if doc["first_ts"] is None or ts < doc["first_ts"]:
@@ -916,7 +1015,7 @@ def parse_file(path, label, tool_names, tool_inputs):
         if label is None:
             sid = obj.get("session_id")
             # 🔴 mesajele moștenite au fost deja facturate la sesiunea-părinte — PATTERNS «Sesiuni reluate»
-            if isinstance(sid, str) and sid != own_id:
+            if isinstance(sid, str) and sid not in own_ids:
                 inherited = True
                 doc["inherited_msgs"] += 1
                 if doc["resumed_from"] is None:
@@ -1957,8 +2056,13 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
     if as_model is None:
         as_model = AS_MODEL_DEFAULT
     tool_names, tool_inputs = {}, {}
-    files = session_files(jsonl_path)
-    docs = [(path, label, parse_file(path, label, tool_names, tool_inputs))
+    # 🔴 fork-ul nu are record propriu: recordul e al originii — PATTERNS «Sesiuni reluate»
+    jsonl_path = chain_origin(jsonl_path)
+    chain = fork_chain(jsonl_path)
+    files = session_files(jsonl_path, chain)
+    docs = [(path, label,
+             parse_file(path, label, tool_names, tool_inputs,
+                        chain if label is None else None))
             for path, label in files]
     main_doc = docs[0][2]
     sub_docs = docs[1:]
@@ -2380,6 +2484,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         "workers": workers,
         "scripter": scripter,
         "resumed_from": main_doc["resumed_from"],
+        "forked_to": [session_id_of(p) for p in chain[1:]] or None,
         "inherited_assistant_msgs": main_doc["inherited_msgs"],
         "own_assistant_msgs": main_doc["own_msgs"],
         "parallel": parallel,
@@ -2524,6 +2629,9 @@ def session_report(s):
     if s.get("resumed_from"):
         out.append("resumed from %s · %d inherited msgs (excluded from cost)"
                    % (s["resumed_from"][:8], s.get("inherited_assistant_msgs", 0)))
+    if s.get("forked_to"):
+        out.append("forked into %s (merged into this record)"
+                   % " · ".join(f[:8] for f in s["forked_to"]))
     sc = s.get("scripter") or {}
     if sc.get("runs"):
         out.append("scripter: %d runs · $%.2f · files changed %s"
@@ -3025,6 +3133,7 @@ def version_stats(sessions):
         "scr_runs": sum(sc.get("runs", 0) for sc in scrs),
         "scr_cost": sum(sc.get("cost_usd", 0.0) for sc in scrs),
         "resumed": sum(1 for s in sessions if s.get("resumed_from")),
+        "forked": sum(1 for s in sessions if s.get("forked_to")),
         "rated": len(scores),
         "q_mean": (sum(scores) / float(len(scores))) if scores else None,
         "actual": actual,
@@ -3192,6 +3301,9 @@ def version_block(name, sessions, groups, prev_name, cum, edit_cost=None):
         out.append(delta_line(VERSION_OLDER, version_stats(groups[VERSION_OLDER]), v))
     if v["resumed"]:
         out.append("- **resumed:** %d sessions" % v["resumed"])
+    if v.get("forked"):
+        out.append("- **forked:** %d sessions (fork merged into the origin record)"
+                   % v["forked"])
     out.append("- **Shape:** main output %.1f%% · hands-on %.0f%% · peak ctx %s "
                "· quality %s (%d/%d rated)"
                % (v["out_pct"], v["hands_pct"], tok(v["peak_ctx"]),
@@ -3498,8 +3610,9 @@ def rate_session(out_dir, name, score, note, versions, threshold):
 def unique_name(out_dir, s):
     """<day>-HHMM-<project> unless another session id already holds it; then HHMMSS."""
     name = s["name"]
+    own = {s.get("session")} | set(s.get("forked_to") or ())
     taken = read_record(os.path.join(out_dir, name + ".json"))
-    if not taken or taken.get("session") in (None, s.get("session")):
+    if not taken or taken.get("session") is None or taken.get("session") in own:
         return name
     m = SESSION_NAME_RE.match(name)
     ts = s.get("started")
@@ -3508,17 +3621,19 @@ def unique_name(out_dir, s):
     return "%s-%s-%s" % (local_day(ts), local_str(ts, "%H%M%S"), m.group(1))
 
 
-def drop_stale_records(out_dir, name, session_id):
-    """Same session id saved under another name (old scheme, or a name that moved): delete the
-    stale .json/.md and hand back its quality so the score survives the rewrite."""
+def drop_stale_records(out_dir, name, session_id, also=None):
+    """Same session id saved under another name (old scheme, a name that moved, or a fork now
+    merged into its origin): delete the stale .json/.md and hand back its quality."""
     quality = None
-    if not session_id:
+    ids = {session_id} | set(also or ())
+    ids.discard(None)
+    if not ids:
         return None
     for entry in sorted(os.listdir(out_dir)):
         if not entry.endswith(".json") or entry == name + ".json":
             continue
         rec = read_record(os.path.join(out_dir, entry))
-        if not rec or rec.get("session") != session_id:
+        if not rec or rec.get("session") not in ids:
             continue
         quality = quality or rec.get("quality")
         for ext in (".json", ".md"):
@@ -3701,6 +3816,13 @@ def main(argv=None):
     if not targets:
         print("niciun .jsonl gasit", file=sys.stderr)
         return 1
+    # 🔴 fork și origine dau un singur record — PATTERNS «Sesiuni reluate»
+    origins = []
+    for p in targets:
+        origin = chain_origin(p)
+        if origin not in origins:
+            origins.append(origin)
+    targets = origins
 
     baseline = load_effort_baseline(args.effort_baseline)
     sessions = [analyze(p, pricing, args.ctx_warn, args.agents_dir,
@@ -3716,7 +3838,8 @@ def main(argv=None):
         for s in sessions:
             s["name"] = unique_name(args.out_dir, s)
             json_path = os.path.join(args.out_dir, s["name"] + ".json")
-            stale_quality = drop_stale_records(args.out_dir, s["name"], s.get("session"))
+            stale_quality = drop_stale_records(args.out_dir, s["name"], s.get("session"),
+                                               s.get("forked_to"))
             if rating and not used_rating and rating_matches(rating, s):
                 s["quality"] = quality_of(rating)
                 used_rating = True

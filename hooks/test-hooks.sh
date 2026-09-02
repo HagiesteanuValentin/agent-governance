@@ -320,6 +320,31 @@ rap_case("explorer-max 6500 chars -> block (over 6000)", True, needle="6000",
 rap_case("explorer 2500 chars -> block (over 2000)", True, needle="2000",
          agent_id="rm3", agent_type="explorer", msg="x" * 2500)
 
+# ---------------------------------------------------------------- session-start (effort reset)
+SS_HOOK = os.path.join(HOOKS, "session-start.sh")
+
+def ss_case(name, stdin_text, expect):
+    home = tempfile.mkdtemp(prefix="ss-home-", dir=TMP)
+    os.makedirs(os.path.join(home, ".claude"))
+    open(os.path.join(home, ".claude", "v17-effort-auto"), "w").close()
+    with open(os.path.join(home, ".claude", "settings.json"), "w") as fh:
+        json.dump({"modelSettings": {"claude-fable-5-1": {"effortLevel": "low"}}}, fh)
+    env = dict(os.environ, HOME=home, CLAUDE_PROJECT_DIR=home, CLAUDE_JOB_DIR=home)
+    p = subprocess.run(["sh", SS_HOOK, "rules"], input=stdin_text, text=True,
+                       capture_output=True, env=env)
+    got = ""
+    for line in p.stdout.splitlines():
+        if line.startswith("effort main (settings):"):
+            got = line.split(":", 1)[1].strip()
+    results.append((name, p.returncode == 0 and got == expect,
+                    "%s (rc=%d)" % (got or "none", p.returncode)))
+
+ss_case("session-start startup -> medium", json.dumps({"source": "startup"}), "medium")
+ss_case("session-start stdin gol -> medium", "", "medium")
+ss_case("session-start fork -> low", json.dumps({"source": "fork"}), "low")
+ss_case("session-start resume -> low", json.dumps({"source": "resume"}), "low")
+ss_case("session-start compact -> low", json.dumps({"source": "compact"}), "low")
+
 # ---------------------------------------------------------------- timing (1 MB transcript)
 def timed(hook, payload, n=3):
     best = 1e9

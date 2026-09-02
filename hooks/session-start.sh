@@ -25,7 +25,13 @@ if [ "${1:-rules}" = "v17" ]; then
 fi
 if [ "${1:-rules}" != "handoff" ]; then
   eph="$(dirname "$0")/effort-phase.sh"
-  [ -f "$eph" ] && [ "$src" != "resume" ] && sh "$eph" medium >/dev/null 2>&1 </dev/null
+  # 🔴 fork/resume/compact keep effort; unknown source resets — PATTERNS «Claude Code — limite verificate în docs (02.09.2026)»
+  if [ -f "$eph" ]; then
+    case "$src" in
+      resume|fork|compact) ;;
+      *) sh "$eph" medium >/dev/null 2>&1 </dev/null ;;
+    esac
+  fi
   if [ -f "$o" ]; then
     echo "=== ORCHESTRATION (injected by SessionStart; main session only) ==="
     cat "$o"

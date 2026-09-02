@@ -16,6 +16,8 @@ ori. Recordul păstrează `resumed_from` și `inherited_assistant_msgs` ca urmă
 La fel, lansările de agenți moștenite n-au transcript propriu (`transcript` gol, 0 calls,
 $0). Ele rămân în listă, dar nu intră în numărători sau costuri per agent (scripter runs,
 files_changed, $/edit) — altfel o sesiune reluată dublează cifrele.
+Fork-ul se analizează din origine prin lanțul `continued-in`; fork-ul nu produce record
+propriu.
 
 ## Câmpuri noi în recorduri vechi
 Recordurile din `metrics-local/` nu se re-analizează la fiecare rulare, deci un câmp nou
@@ -40,8 +42,15 @@ ar veni din toate sesiunile, numitorul doar din cele noi. În tabele afișează 
 8. Multiple PostToolUse hook entries matching the same tool call run without guaranteed
    ordering; a "check the write" hook must gate on `tool_name`, not assume it runs after
    a sibling "do the write" hook for that same call.
-9. SessionStart stdin carries `source`: startup|resume|clear|compact. A resumed session
+9. SessionStart stdin carries `source`: startup|resume|clear|compact|fork. A resumed session
    must not reset per-phase state (e.g. effort level) set by the session it resumes.
+10. A real `/effort` command invalidates the messages cache: cache_read 67 818 → 17 234 on
+    the next turn (system + tools stay cached); a hook writing `effortLevel` into
+    settings.json does not touch the cache (63 240 → 67 818). One rewrite of ~52k tokens
+    per switch.
+11. An automatic fork (`SessionStart source=fork`, seen when main goes `sessionKind: bg`
+    with live subagents) invalidates the cache the same way (69 326 → 14 904), also with
+    no effort change (session 1457: 104 536 → 14 904). Undocumented; cannot be disabled.
 Sursa: code.claude.com/docs (hooks, sub-agents, model-config, settings-reference).
 - Measured 02.09: editing `settings.json` from a hook does NOT change the live effort (main stayed medium after the hook wrote low); only `/effort` does. PostToolUse does not fire when the tool exits non-zero (PostToolUseFailure does) — a check hook stays silent on failed calls.
 

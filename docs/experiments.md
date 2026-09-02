@@ -213,6 +213,10 @@ permanent) — folosit ca benchmark alături de `/rate`, nu ca prag de trecere/p
 „Greșeli evitabile" = valoarea dată la `/rate N --advisor M --mistakes K`, salvată în
 `pending-rating.json` ca `mistakes` (împreună cu `advisor_score`).
 
+Status 02.09: switch-ul e oprit din 02.09 (garda ștearsă). Costul switch-ului = o rescriere
+de ~52k la ExitPlanMode. Verdict după record-ul 1609 complet + 2 sesiuni. Sesiunile viitoare
+rulează pe medium până la verdict.
+
 ## How to rerun
 
 Create the cell agents in `~/.claude/agents/` as copies with a different `effort`/`model`.
