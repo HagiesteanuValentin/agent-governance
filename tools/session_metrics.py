@@ -295,7 +295,7 @@ def version_names(versions):
 
 # ---------------------------------------------------------------- quality rating
 
-SESSION_NAME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-s\d+-(.+)$")
+SESSION_NAME_RE = re.compile(r"^\d{4}-\d{2}-\d{2}-(?:s\d+|\d{4}|\d{6})-(.+)$")
 
 
 def clean_score(value):
@@ -325,7 +325,7 @@ def load_rating(path):
 
 
 def session_project(session):
-    """The project as it appears in the session name (<day>-sN-<project>), not the slug dir."""
+    """The project as it appears in the session name (<day>-HHMM-<project>), not the slug dir."""
     m = SESSION_NAME_RE.match(session.get("name") or "")
     return m.group(1) if m else ""
 
@@ -490,8 +490,6 @@ def short_model(model):
 
 # ---------------------------------------------------------------- session name
 
-_FIRST_TS = {}
-
 
 def mtime_ts(path):
     try:
@@ -499,19 +497,6 @@ def mtime_ts(path):
             os.path.getmtime(path)).strftime("%Y-%m-%dT%H:%M:%SZ")
     except OSError:
         return None
-
-
-def first_timestamp(path):
-    """First valid timestamp of a transcript; mtime as fallback. Cheap: siblings only need this."""
-    if path in _FIRST_TS:
-        return _FIRST_TS[path]
-    ts = None
-    for obj in read_lines(path):
-        if isinstance(obj.get("timestamp"), str):
-            ts = obj["timestamp"]
-            break
-    _FIRST_TS[path] = ts or mtime_ts(path)
-    return _FIRST_TS[path]
 
 
 def first_meta(path, max_lines=400):
@@ -528,7 +513,6 @@ def first_meta(path, max_lines=400):
             break
     if ts is None:
         ts = mtime_ts(path)
-    _FIRST_TS[path] = ts
     return ts, cwd
 
 
@@ -542,31 +526,23 @@ def project_of(cwd, jsonl_path):
     return slug.strip("-") or "session"
 
 
-def session_name(jsonl_path, ts=None, cwd=None):
-    """YYYY-MM-DD-sN-<project>; N = rank among sibling sessions started the same local day."""
+def session_id_of(jsonl_path):
+    return os.path.basename(jsonl_path)[:-len(".jsonl")]
+
+
+def session_name(jsonl_path, ts=None, cwd=None, out_dir=None):
+    """YYYY-MM-DD-HHMM-<project>, local start time; HHMMSS if that minute is another session."""
+    # 🔴 numele nu depinde de fișierele frate — PATTERNS «Nume de sesiune»
     if ts is None and cwd is None:
         ts, cwd = first_meta(jsonl_path)
     day = local_day(ts)
     proj = project_of(cwd, jsonl_path)
-    base = os.path.basename(jsonl_path)
-    rank, sibs = 1, []
-    try:
-        names = sorted(os.listdir(os.path.dirname(jsonl_path)))
-    except OSError:
-        names = [base]
-    for name in names:
-        if not name.endswith(".jsonl"):
-            continue
-        sib = os.path.join(os.path.dirname(jsonl_path), name)
-        sts = ts if name == base else first_timestamp(sib)
-        if local_day(sts) == day:
-            sibs.append((sts or "", name))
-    sibs.sort()
-    for i, (_, name) in enumerate(sibs, 1):
-        if name == base:
-            rank = i
-            break
-    return "%s-s%d-%s" % (day, rank, proj)
+    name = "%s-%s-%s" % (day, local_str(ts, "%H%M"), proj)
+    if out_dir:
+        taken = read_record(os.path.join(out_dir, name + ".json"))
+        if taken and taken.get("session") not in (None, session_id_of(jsonl_path)):
+            name = "%s-%s-%s" % (day, local_str(ts, "%H%M%S"), proj)
+    return name
 
 
 # ---------------------------------------------------------------- sessions
@@ -709,9 +685,15 @@ def comment_bloat(path, new, old):
             "chars": sum(len(new_lines[i].strip()) for i in added)}
 
 
+EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
+FILES_CHANGED_RE = re.compile(r"(\d+) files? changed")
+
+
 def new_doc(path, label):
     return {
         "path": path, "label": label,
+        "edit_calls": 0, "files_changed": None,
+        "resumed_from": None, "inherited_msgs": 0, "own_msgs": 0,
         "first_ts": None, "last_ts": None, "last_assistant_ts": None,
         "first_prompt_ts": None, "cwd": None,
         "groups": collections.OrderedDict(),
@@ -765,6 +747,7 @@ def parse_file(path, label, tool_names, tool_inputs):
     """One pass over a transcript; usage grouping identical to the original analyze()."""
     doc = new_doc(path, label)
     groups = doc["groups"]
+    own_id = session_id_of(path)
     last_human = "user"
     # 🔴 a turn with a live async agent is structural, not waste — DECIZII «Narration turns: avoidable»
     live_agents, notified, revived = set(), collections.Counter(), set()
@@ -826,6 +809,8 @@ def parse_file(path, label, tool_names, tool_inputs):
                 if isinstance(b.get("id"), str):
                     tool_names[b["id"]] = name
                     tool_inputs[b["id"]] = inp
+                if name in EDIT_TOOLS:
+                    doc["edit_calls"] += 1
                 if name == "Read":
                     fp = inp.get("file_path")
                     if isinstance(fp, str) and fp:
@@ -875,6 +860,10 @@ def parse_file(path, label, tool_names, tool_inputs):
             elif bt == "tool_result":
                 body = text_of(b.get("content"))
                 tuid = b.get("tool_use_id")
+                for m in FILES_CHANGED_RE.finditer(body or ""):
+                    n_files = int(m.group(1))
+                    if doc["files_changed"] is None or n_files > doc["files_changed"]:
+                        doc["files_changed"] = n_files
                 if (isinstance(tuid, str) and tuid in doc["agent_call_ids"]
                         and not obj.get("isSidechain")
                         and ASYNC_LAUNCH_RE.search(body)):
@@ -898,6 +887,17 @@ def parse_file(path, label, tool_names, tool_inputs):
         if isinstance(ts, str):
             if doc["last_assistant_ts"] is None or ts > doc["last_assistant_ts"]:
                 doc["last_assistant_ts"] = ts
+        inherited = False
+        if label is None:
+            sid = obj.get("session_id")
+            # 🔴 mesajele moștenite au fost deja facturate la sesiunea-părinte — PATTERNS «Sesiuni reluate»
+            if isinstance(sid, str) and sid != own_id:
+                inherited = True
+                doc["inherited_msgs"] += 1
+                if doc["resumed_from"] is None:
+                    doc["resumed_from"] = sid
+            else:
+                doc["own_msgs"] += 1
         usage = msg.get("usage")
         if not isinstance(usage, dict):
             continue
@@ -914,6 +914,8 @@ def parse_file(path, label, tool_names, tool_inputs):
                 "prev_human": last_human,
                 "agents_live": bool(live_agents),
                 "residual_poll": pending_residual,
+                "inherited": inherited,
+                "effort": obj.get("effort"),
             }
             pending_residual = False
         else:
@@ -930,8 +932,9 @@ def parse_file(path, label, tool_names, tool_inputs):
 
     for grp in groups.values():
         usage = grp["usage"]
-        add_usage(doc["usage"], usage)
-        doc["model_counts"][grp["model"]] += 1
+        if not grp.get("inherited"):
+            add_usage(doc["usage"], usage)
+            doc["model_counts"][grp["model"]] += 1
         ctx = ((usage.get("input_tokens") or 0)
                + (usage.get("cache_read_input_tokens") or 0)
                + (usage.get("cache_creation_input_tokens") or 0))
@@ -1559,7 +1562,8 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
     sub_docs = docs[1:]
 
     per_model = collections.defaultdict(zeros)
-    main, side = zeros(), zeros()
+    main: dict = zeros()
+    side = zeros()
     agents = {}
     agent_usage = collections.defaultdict(zeros)
     agent_models = collections.defaultdict(collections.Counter)
@@ -1580,6 +1584,8 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             agent_runs[label] += 1
         for grp in doc["groups"].values():
             usage = grp["usage"]
+            if grp.get("inherited"):
+                continue
             add_usage(per_model[grp["model"]], usage)
             add_usage(side if grp["side"] else main, usage)
             if not grp["side"]:
@@ -1604,7 +1610,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             if isinstance(fp, str) and fp:
                 doc["read_chars"][fp] += r["chars"]
 
-    totals = zeros()
+    totals: dict = zeros()
     models_out = {}
     for model, counts in sorted(per_model.items()):
         rates = rates_for(pricing, model)
@@ -1614,6 +1620,23 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         for k in ("input", "output", "cache_read", "cache_creation", "messages"):
             totals[k] += counts[k]
     totals["cost_usd"] = round(sum(m["cost_usd"] for m in models_out.values()), 4)
+
+    main_groups = [g for g in main_doc["groups"].values()
+                   if not g["side"] and not g.get("inherited")]
+    efforts = [g.get("effort") for g in main_groups if g.get("effort")]
+    main["effort"] = collections.Counter(efforts).most_common(1)[0][0] if efforts else None
+    changes, prev = [], None
+    for g in main_groups:
+        e = g.get("effort")
+        if e and e != prev:
+            if prev is not None:
+                changes.append([local_str(g["at"], "%H:%M"), e])
+            prev = e
+    main["effort_changes"] = changes
+    main_models = collections.Counter(g["model"] for g in main_groups)
+    main_model_name = main_models.most_common(1)[0][0] if main_models else "?"
+    main["cost_usd"] = cost_of(main, rates_for(pricing, main_model_name))
+    totals["main_cost_usd"] = main["cost_usd"]
 
     tool_results.sort(key=lambda x: -x[0])
     top_tools = [{"tool": tool_names.get(tid, "?"), "chars": n, "tool_use_id": tid}
@@ -1687,6 +1710,9 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             "brief_debugging": bool(brief_debugging),
             "final_report_chars": report_chars,
             "tool_calls": len(rows),
+            "edit_calls": doc["edit_calls"] if doc else 0,
+            "files_changed": (doc["files_changed"] if doc and wtype.startswith("scripter")
+                              else None),
             "reads": sum(doc["reads"].values()) if doc else 0,
             "verify_calls": vcalls,
             "verify_with_fix": vfixed,
@@ -1908,6 +1934,16 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
     if ts0 is None and cwd0 is None:
         ts0, cwd0 = first_meta(jsonl_path)
     out_total = totals["output"] or 1
+    totals["agents_cost_usd"] = round(sum(w["cost_usd"] for w in workers), 4)
+    # 🔴 workerii moșteniți n-au transcript propriu (0 calls, $0) — PATTERNS «Sesiuni reluate»
+    scr = [w for w in workers if w["type"].startswith("scripter") and w.get("transcript")]
+    with_files = [w for w in scr if w.get("files_changed")]
+    scripter = {
+        "runs": len(scr),
+        "cost_usd": round(sum(w["cost_usd"] for w in scr), 4),
+        "files_changed": sum(w["files_changed"] for w in with_files) if with_files else None,
+        "runs_with_files": len(with_files),
+    }
     return {
         "session": os.path.basename(jsonl_path)[:-len(".jsonl")],
         "name": session_name(jsonl_path, ts0, cwd0),
@@ -1933,6 +1969,10 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         "iterations": iterations,
         "context": context,
         "workers": workers,
+        "scripter": scripter,
+        "resumed_from": main_doc["resumed_from"],
+        "inherited_assistant_msgs": main_doc["inherited_msgs"],
+        "own_assistant_msgs": main_doc["own_msgs"],
         "parallel": parallel,
         "tool_output": tool_output,
         "rereads": rereads_detail,
@@ -2060,6 +2100,25 @@ def session_report(s):
     q_note = ((s.get("quality") or {}).get("note") or "").strip()
     if q_score and q_note:
         out.append("Quality note: %s" % q_note)
+    m = s.get("main") or {}
+    if m.get("cost_usd") is not None:
+        eff = m.get("effort") or "?"
+        if m.get("effort_changes"):
+            eff += " → " + " → ".join("%s %s" % (at, val) for at, val in m["effort_changes"])
+        line = ("main: $%.2f (effort %s) · agents: $%.2f"
+                % (m["cost_usd"], eff, t.get("agents_cost_usd", 0.0)))
+        split = m["cost_usd"] + (t.get("agents_cost_usd") or 0.0)
+        if abs(split - t["cost_usd"]) > 0.01:
+            line += " · split mismatch: %.2f vs totals %.2f" % (split, t["cost_usd"])
+        out.append(line)
+    if s.get("resumed_from"):
+        out.append("resumed from %s · %d inherited msgs (excluded from cost)"
+                   % (s["resumed_from"][:8], s.get("inherited_assistant_msgs", 0)))
+    sc = s.get("scripter") or {}
+    if sc.get("runs"):
+        out.append("scripter: %d runs · $%.2f · files changed %s"
+                   % (sc["runs"], sc.get("cost_usd", 0.0),
+                      sc["files_changed"] if sc.get("files_changed") else "—"))
     out.append("Main (%s): context at end %s (peak %s) · output %s tokens (%.1f%% of total) · %d API calls"
                % (short_model(ctx["main_model"]), tok(ctx["main_end_tokens"]),
                   tok(ctx["main_peak_tokens"]), tok(ctx["main_output_tokens"]),
@@ -2099,17 +2158,20 @@ def session_report(s):
         out.append("## Workers")
         out.append("")
         out.append("| # | type | model | start | dur | calls/limit | peak ctx | verify | "
-                   "out tok | $ | brief | report | flags |")
-        out.append("|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---|")
+                   "edits | files | out tok | $ | brief | report | flags |")
+        out.append("|---:|---|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|")
         for w in s["workers"]:
             codes = sorted(set(f["code"] for f in flags_by_scope(s, w["scope"])))
             calls = "%d/%s" % (w["api_calls"], w.get("turns_limit") or "?")
-            out.append("| %d | %s | %s | %s | %s | %s | %s | %d/%d | %s | %.2f | %s | %s "
-                       "| %s |"
+            edits = w.get("edit_calls")
+            out.append("| %d | %s | %s | %s | %s | %s | %s | %d/%d | %s | %s | %s | %.2f "
+                       "| %s | %s | %s |"
                        % (w["n"], w["type"], short_model(w["model"]),
                           local_str(w["started"], "%H:%M"), dur(w["duration_s"]),
                           calls, tok(w.get("peak_ctx", 0)),
                           w.get("verify_with_fix", 0), w.get("verify_calls", 0),
+                          "—" if edits is None else edits,
+                          w["files_changed"] if w.get("files_changed") else "—",
                           tok(w["output_tokens"]), w["cost_usd"],
                           fmt(w["brief_chars"]), fmt(w["final_report_chars"]),
                           ", ".join(codes) or "-"))
@@ -2323,6 +2385,32 @@ def group_range(sessions):
     return (days[0] if days else "?", days[-1] if days else "?")
 
 
+def edit_cost_of(sessions):
+    """$ per implementer edit: sum(cost) / sum(edit_calls) over implementer* workers."""
+    cost, edits = 0.0, 0
+    for s in sessions:
+        for w in s.get("workers") or []:
+            # 🔴 recordurile vechi n-au edit_calls; incluse, ar umfla $/edit — PATTERNS «Câmpuri noi în recorduri vechi»
+            if (str(w.get("type") or "").startswith("implementer")
+                    and w.get("edit_calls") is not None and w.get("transcript")):
+                cost += w.get("cost_usd") or 0.0
+                edits += w["edit_calls"]
+    return (cost / edits) if edits else None
+
+
+def scripter_saved(sessions, edit_cost):
+    """Lower bound: files changed by scripts x $/edit - scripter cost; None if not computable."""
+    if not edit_cost:
+        return None
+    total, seen = 0.0, False
+    for s in sessions:
+        sc = s.get("scripter") or {}
+        if sc.get("files_changed"):
+            total += sc["files_changed"] * edit_cost - (sc.get("cost_usd") or 0.0)
+            seen = True
+    return total if seen else None
+
+
 def version_stats(sessions):
     """Per-session figures for one version group; the Versions table and the Δ line share them."""
     n = len(sessions)
@@ -2340,8 +2428,21 @@ def version_stats(sessions):
     wasted = sum(p.get("wasted_total", 0) for p in pms)
     main_in = sum(main_input_of(s) for s in sessions)
     scores = [q for q in (quality_score(s) for s in sessions) if q]
+    # 🔴 numitorul lui main_pct = doar sesiunile care au main.cost_usd — PATTERNS «Câmpuri noi în recorduri vechi»
+    with_main = [s for s in sessions if (s.get("main") or {}).get("cost_usd") is not None]
+    main_sum = sum(s["main"]["cost_usd"] for s in with_main)
+    main_denom = sum((s.get("totals") or {}).get("cost_usd", 0.0) for s in with_main)
+    efforts = collections.Counter((s.get("main") or {}).get("effort")
+                                  for s in sessions if (s.get("main") or {}).get("effort"))
+    scrs = [s.get("scripter") or {} for s in sessions]
     return {
         "n": n,
+        "effort_mix": " · ".join("%s %d" % (k, v) for k, v in efforts.most_common()) or "—",
+        "main_pct": (100.0 * main_sum / main_denom) if (with_main and main_denom) else None,
+        "edit_cost": edit_cost_of(sessions),
+        "scr_runs": sum(sc.get("runs", 0) for sc in scrs),
+        "scr_cost": sum(sc.get("cost_usd", 0.0) for sc in scrs),
+        "resumed": sum(1 for s in sessions if s.get("resumed_from")),
         "rated": len(scores),
         "q_mean": (sum(scores) / float(len(scores))) if scores else None,
         "actual": actual,
@@ -2395,19 +2496,25 @@ def delta_line(base_name, base, cur):
     return "- **vs %s:** %s" % (base_name, " · ".join(parts))
 
 
-def versions_table(order, groups, cum):
+def versions_table(order, groups, cum, edit_cost=None):
     out = ["## Versions", ""]
     out.append("| version | sessions | $ actual | $/session | $ Fable realistic | saved $ "
                "| saved % | saved cumulative | wasted tok/session | wasted % "
-               "| issues/session (H/M/L) | main output % | hands-on | peak ctx | quality |")
-    out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+               "| issues/session (H/M/L) | main output % | hands-on | peak ctx | quality "
+               "| effort | main $ % | $/edit impl | scripter runs / saved $ |")
+    out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:"
+               "|---|---:|---:|---:|")
     for name in order:
-        v = version_stats(groups.get(name) or [])
+        sessions = groups.get(name) or []
+        v = version_stats(sessions)
         if not v["n"]:
-            out.append("| %s | 0 |%s" % (name, " — |" * 13))
+            out.append("| %s | 0 |%s" % (name, " — |" * 17))
             continue
+        saved = scripter_saved(sessions, edit_cost)
+        scr = "%d / %s" % (v["scr_runs"], "—" if saved is None else usd(saved))
         out.append("| %s | %d | %s | %s | %s | %s | %.1f%% | %s | %s | %.1f%% "
-                   "| %.1f (%.1f/%.1f/%.1f) | %.1f%% | %d/%d (%.0f%%) | %s | %s · %d/%d |"
+                   "| %.1f (%.1f/%.1f/%.1f) | %.1f%% | %d/%d (%.0f%%) | %s | %s · %d/%d "
+                   "| %s | %s | %s | %s |"
                    % (name, v["n"], usd(v["actual"]), usd(v["actual_per"]), usd(v["real"]),
                       usd(v["saved"]), v["saved_pct"], usd(cum.get(name, 0.0)),
                       tok(v["wasted_per"]), v["wasted_pct"],
@@ -2415,8 +2522,17 @@ def versions_table(order, groups, cum):
                       v["out_pct"], v["hands"], v["calls"], v["hands_pct"],
                       tok(v["peak_ctx"]),
                       "—" if v["q_mean"] is None else "%.1f" % v["q_mean"],
-                      v["rated"], v["n"]))
+                      v["rated"], v["n"],
+                      v["effort_mix"],
+                      "—" if v["main_pct"] is None else "%.0f%%" % v["main_pct"],
+                      "—" if v["edit_cost"] is None else "$%.2f" % v["edit_cost"],
+                      scr))
     out.append("")
+    if edit_cost:
+        out.append("Scripter saved = files changed by scripts × $%.2f/edit (corpus implementer "
+                   "mean) − scripter cost; lower bound, sessions without a `files changed` "
+                   "line count 0." % edit_cost)
+        out.append("")
     return out
 
 
@@ -2448,7 +2564,7 @@ def deltas_table(order, groups):
     return out
 
 
-def corpus_block(kept, skipped_note):
+def corpus_block(kept, skipped_note, edit_cost=None):
     v = version_stats(kept)
     lo, hi = group_range(kept)
     out = ["## Corpus", ""]
@@ -2461,13 +2577,17 @@ def corpus_block(kept, skipped_note):
     out.append("- **Quality:** %s mean · %d/%d rated"
                % ("—" if v["q_mean"] is None else "%.1f" % v["q_mean"],
                   v["rated"], v["n"]))
+    saved = scripter_saved(kept, edit_cost)
+    out.append("- **Scripter:** %d runs · %s · saved ~%s"
+               % (v["scr_runs"], usd(v["scr_cost"]),
+                  "—" if saved is None else usd(saved)))
     out.append("- **Span:** %s → %s · %d/%d sessions with a counterfactual%s"
                % (lo, hi, v["n_cf"], v["n"], skipped_note))
     out.append("")
     return out
 
 
-def version_block(name, sessions, groups, prev_name, cum):
+def version_block(name, sessions, groups, prev_name, cum, edit_cost=None):
     """The whole per-version section: at a glance, waste families, flag tables, sessions."""
     n = len(sessions)
     lo, hi = group_range(sessions)
@@ -2488,6 +2608,8 @@ def version_block(name, sessions, groups, prev_name, cum):
         out.append(delta_line(prev_name, version_stats(groups[prev_name]), v))
     if name != VERSION_OLDER and prev_name != VERSION_OLDER and groups.get(VERSION_OLDER):
         out.append(delta_line(VERSION_OLDER, version_stats(groups[VERSION_OLDER]), v))
+    if v["resumed"]:
+        out.append("- **resumed:** %d sessions" % v["resumed"])
     out.append("- **Shape:** main output %.1f%% · hands-on %.0f%% · peak ctx %s "
                "· quality %s (%d/%d rated)"
                % (v["out_pct"], v["hands_pct"], tok(v["peak_ctx"]),
@@ -2532,20 +2654,34 @@ def version_block(name, sessions, groups, prev_name, cum):
 
     out.append("**Sessions**")
     out.append("")
-    out.append("| session | $ actual | $ fable-only realistic | saved $ | main output % | "
+    out.append("| session | $ actual | $ main | $ agents | effort | scripter | "
+               "$ fable-only realistic | saved $ | main output % | "
                "hands-on ratio | issues (H/M/L) | wasted tok | wasted % | peak ctx | q |")
-    out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+    out.append("|---|---:|---:|---:|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
     recent = sorted(sessions, key=lambda s: s.get("started") or "", reverse=True)[:15]
-    for s in recent:
+    for s in sorted(recent, key=lambda s: s.get("started") or ""):
         pm = s.get("postmortem") or {}
         cf = s.get("counterfactual") or {}
         sev = pm.get("severity_counts") or {}
         ctx = s.get("context") or {}
+        m = s.get("main") or {}
+        tt = s.get("totals") or {}
+        sc = s.get("scripter") or {}
         q = quality_score(s)
-        act = (s.get("totals") or {}).get("cost_usd", 0.0)
-        out.append("| %s | %.2f | %.2f | %.2f | %.1f%% | %d/%d | %d/%d/%d | %s | %.1f%% | %s | %s |"
+        act = tt.get("cost_usd", 0.0)
+        saved_s = scripter_saved([s], edit_cost)
+        scr = "—" if not sc.get("runs") else "%d/%s/%s" % (
+            sc["runs"], sc["files_changed"] if sc.get("files_changed") else "—",
+            "—" if saved_s is None else usd(saved_s))
+        out.append("| %s | %.2f | %s | %s | %s | %s | %.2f | %.2f | %.1f%% | %d/%d "
+                   "| %d/%d/%d | %s | %.1f%% | %s | %s |"
                    % (s.get("name") or s.get("session") or "?",
-                      act, cf.get("realistic_usd", 0.0),
+                      act,
+                      "—" if m.get("cost_usd") is None else "%.2f" % m["cost_usd"],
+                      "—" if tt.get("agents_cost_usd") is None
+                      else "%.2f" % tt["agents_cost_usd"],
+                      m.get("effort") or "—", scr,
+                      cf.get("realistic_usd", 0.0),
                       cf.get("realistic_usd", 0.0) - act,
                       ctx.get("main_output_pct", 0.0),
                       pm.get("hands_on_calls", 0), pm.get("main_tool_calls", 0),
@@ -2627,15 +2763,16 @@ def trends_md(sessions, skipped, versions=None, threshold=BROWSER_THRESHOLD_DEFA
            "(browser %d · empty %d)"
            % (len(kept), lo, hi, len(excluded), n_browser, len(excluded) - n_browser)]
     out.append("")
-    out.extend(corpus_block(kept, skipped_note))
-    out.extend(versions_table(order, groups, cum))
+    edit_cost = edit_cost_of(kept)
+    out.extend(corpus_block(kept, skipped_note, edit_cost))
+    out.extend(versions_table(order, groups, cum, edit_cost))
     out.extend(deltas_table(order, groups))
     live = [name for name in order if groups.get(name)]
     for i, name in enumerate(live):
         out.append("---")
         out.append("")
         out.extend(version_block(name, groups[name], groups,
-                                 live[i - 1] if i else None, cum))
+                                 live[i - 1] if i else None, cum, edit_cost))
     out.append("---")
     out.append("")
     out.extend(excluded_table(excluded, threshold))
@@ -2662,7 +2799,7 @@ def rename_dir(directory, force=False):
         if not path or not os.path.isfile(path):
             print("skip %s: transcript missing (%s)" % (entry, path), file=sys.stderr)
             continue
-        name = session_name(path)
+        name = session_name(path, out_dir=directory)
         if name + ".json" == entry:
             continue
         stem = entry[:-len(".json")]
@@ -2765,6 +2902,108 @@ def rate_session(out_dir, name, score, note, versions, threshold):
     return write_trends(out_dir, versions, threshold)
 
 
+def unique_name(out_dir, s):
+    """<day>-HHMM-<project> unless another session id already holds it; then HHMMSS."""
+    name = s["name"]
+    taken = read_record(os.path.join(out_dir, name + ".json"))
+    if not taken or taken.get("session") in (None, s.get("session")):
+        return name
+    m = SESSION_NAME_RE.match(name)
+    ts = s.get("started")
+    if not m or not ts or local_day(ts) == "?":
+        return name
+    return "%s-%s-%s" % (local_day(ts), local_str(ts, "%H%M%S"), m.group(1))
+
+
+def drop_stale_records(out_dir, name, session_id):
+    """Same session id saved under another name (old scheme, or a name that moved): delete the
+    stale .json/.md and hand back its quality so the score survives the rewrite."""
+    quality = None
+    if not session_id:
+        return None
+    for entry in sorted(os.listdir(out_dir)):
+        if not entry.endswith(".json") or entry == name + ".json":
+            continue
+        rec = read_record(os.path.join(out_dir, entry))
+        if not rec or rec.get("session") != session_id:
+            continue
+        quality = quality or rec.get("quality")
+        for ext in (".json", ".md"):
+            old = os.path.join(out_dir, entry[:-len(".json")] + ext)
+            if os.path.isfile(old):
+                os.remove(old)
+    return quality
+
+
+OLD_NAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-s\d+-(.+)$")
+
+
+def _new_name(rec, stem, fmt_="%H%M"):
+    """(new stem, reason-if-impossible) for one saved record; fmt_ %H%M%S resolves a clash."""
+    if not rec or not rec.get("session"):
+        return None, "fara session id"
+    ts = rec.get("started")
+    m = SESSION_NAME_RE.match(rec.get("name") or stem)
+    proj = m.group(1) if m else ""
+    if not ts or not proj:
+        path = rec.get("path")
+        if path and os.path.isfile(path):
+            ts2, cwd = first_meta(path)
+            ts = ts or ts2
+            proj = proj or project_of(cwd, path)
+    if not ts or not proj:
+        return None, "fara started sau proiect"
+    day = local_day(ts)
+    if day == "?":
+        return None, "started nedecodabil"
+    return "%s-%s-%s" % (day, local_str(ts, fmt_), proj), None
+
+
+def migrate_names(directory, apply_=False, versions=(), threshold=0.5):
+    """--migrate-names: <day>-sN-<project> -> <day>-HHMM-<project>, renaming only (no re-analysis)."""
+    if not os.path.isdir(directory):
+        print("nu e director: %s" % directory, file=sys.stderr)
+        return 2
+    entries = [e for e in sorted(os.listdir(directory))
+               if e.endswith(".json") and OLD_NAME_RE.match(e[:-len(".json")])]
+    taken = {e[:-len(".json")] for e in sorted(os.listdir(directory)) if e.endswith(".json")}
+    plan, skipped = [], 0
+    for entry in entries:
+        stem = entry[:-len(".json")]
+        rec = read_record(os.path.join(directory, entry))
+        new, why = _new_name(rec, stem)
+        if new is None:
+            print("SKIP %s %s" % (entry, why))
+            skipped += 1
+            continue
+        if new in taken:
+            alt, _why = _new_name(rec, stem, "%H%M%S")
+            if alt is None or alt in taken:
+                print("SKIP %s coliziune pe %s" % (entry, new))
+                skipped += 1
+                continue
+            new = alt
+        taken.discard(stem)
+        taken.add(new)
+        plan.append((stem, new, rec))
+    plan.sort(key=lambda p: p[1])
+    for stem, new, _ in plan:
+        print("%s -> %s" % (stem, new))
+    print("%d de redenumit, %d SKIP%s" % (len(plan), skipped, "" if apply_ else " (dry-run)"),
+          file=sys.stderr)
+    if apply_:
+        for stem, new, rec in plan:
+            for ext in (".json", ".md"):
+                old = os.path.join(directory, stem + ext)
+                if os.path.isfile(old):
+                    os.rename(old, os.path.join(directory, new + ext))
+            rec["name"] = new
+            write_record(directory, new, rec)
+        if plan:
+            write_trends(directory, versions, threshold)
+    return 1 if skipped else 0
+
+
 def main(argv=None):
     here = os.path.dirname(os.path.abspath(__file__))
     out_dir_default = os.path.normpath(os.path.join(here, os.pardir, "metrics-local"))
@@ -2779,6 +3018,11 @@ def main(argv=None):
                     help="rename <uuid>.json/.md in DIR to <name>.json/.md and exit")
     ap.add_argument("--force", action="store_true",
                     help="with --rename: overwrite an existing target name")
+    ap.add_argument("--migrate-names", dest="migrate_names", metavar="DIR",
+                    help="rename <day>-sN-<project>.json/.md in DIR to <day>-HHMM-<project> "
+                         "(dry-run unless --yes), then exit")
+    ap.add_argument("--yes", action="store_true",
+                    help="with --migrate-names: actually rename instead of listing")
     ap.add_argument("--ctx-warn", dest="ctx_warn", type=int,
                     default=THRESHOLDS["high_context_end"],
                     help="flag the session when the main context ends above this (tokens)")
@@ -2823,6 +3067,9 @@ def main(argv=None):
         rename_dir(args.rename, args.force)
         return 0
 
+    if args.migrate_names:
+        return migrate_names(args.migrate_names, args.yes, versions, args.browser_threshold)
+
     if args.trends:
         return write_trends(args.trends, versions, args.browser_threshold)
 
@@ -2854,7 +3101,7 @@ def main(argv=None):
     sessions = [analyze(p, pricing, args.ctx_warn, args.agents_dir,
                         args.as_model, args.rot_at, args.window,
                         versions, args.browser_threshold) for p in targets]
-    sessions.sort(key=lambda s: -s["totals"]["output"])
+    sessions.sort(key=lambda s: s.get("started") or "")
 
     rating = load_rating(args.rating_file) if args.rating_file else None
 
@@ -2862,13 +3109,15 @@ def main(argv=None):
         os.makedirs(args.out_dir, exist_ok=True)
         used_rating = False
         for s in sessions:
+            s["name"] = unique_name(args.out_dir, s)
             json_path = os.path.join(args.out_dir, s["name"] + ".json")
+            stale_quality = drop_stale_records(args.out_dir, s["name"], s.get("session"))
             if rating and not used_rating and rating_matches(rating, s):
                 s["quality"] = quality_of(rating)
                 used_rating = True
             if "quality" not in s:
                 # regeneration must not drop a score written earlier
-                old = (read_record(json_path) or {}).get("quality")
+                old = (read_record(json_path) or {}).get("quality") or stale_quality
                 if old:
                     s["quality"] = old
             if args.json:

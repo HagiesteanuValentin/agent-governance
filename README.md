@@ -303,8 +303,10 @@ python3 tools/session_metrics.py --rename metrics-local/          # rename old <
 per session into `DIR`. `--rename DIR` renames old `<uuid>.json`/`.md` files in `DIR` to the
 new naming scheme, skipping collisions unless `--force` is given. `--ctx-warn N` sets the
 threshold for the `high_context_end` flag (default 150000). Files are named
-`YYYY-MM-DD-sN-<project>.json`/`.md` (local start date, Nth session of that project that day
-by start time, `<project>` = basename of the working directory); the `.md` report includes
+`YYYY-MM-DD-HHMM-<project>.json`/`.md` (local start date and time, `HHMMSS` if another
+session started the same minute, `<project>` = basename of the working directory);
+`--migrate-names DIR` renames files left over from the old `-sN-` scheme (dry-run without
+`--yes`). The `.md` report includes
 the summary plus the "Inefficiencies" list, an automatic "Postmortem" section with severity
 and recommendations, and a Fable-only cost estimate. `--trends DIR` regenerates
 `DIR/TRENDS.md`, a cross-session view of recurring inefficiencies. It opens with an
