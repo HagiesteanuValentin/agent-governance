@@ -115,8 +115,8 @@ Capcană: plan mode blochează `Write` la subagenți (explorer nu poate scrie `d
 
 ## Migrarea numelor de sesiune
 `tools/session_metrics.py --migrate-names DIR [--yes]`: rulezi mai întâi fără `--yes`
-(dry-run), verifici lista, apoi cu `--yes`. Face backup automat `metrics-local.bak-<dată>/`
-înainte de redenumire. Idempotent — o a doua rulare pe recorduri deja redenumite nu schimbă
+(dry-run), verifici lista, apoi cu `--yes`. Backup-ul îl faci TU înainte:
+`cp -r metrics-local metrics-local.bak-<dată>` (scriptul nu face backup; `.gitignore` îl acoperă). Idempotent — o a doua rulare pe recorduri deja redenumite nu schimbă
 nimic. Nume noi: `<zi>-HHMM-<proiect>` (HHMMSS doar la coliziune). Recordurile vechi NU
 primesc câmpurile noi (effort, main $ %, scripter) automat — necesită re-analiză explicită
 cu `--json --md --out-dir metrics-local` (vezi PATTERNS «Câmpuri noi în recorduri vechi»).
