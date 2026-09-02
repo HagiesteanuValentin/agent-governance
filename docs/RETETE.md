@@ -118,6 +118,6 @@ Capcană: plan mode blochează `Write` la subagenți (explorer nu poate scrie `d
 (dry-run), verifici lista, apoi cu `--yes`. Backup-ul îl faci TU înainte:
 `cp -r metrics-local metrics-local.bak-<dată>` (scriptul nu face backup; `.gitignore` îl acoperă). Idempotent — o a doua rulare pe recorduri deja redenumite nu schimbă
 nimic. Nume noi: `<zi>-HHMM-<proiect>` (HHMMSS doar la coliziune). Recordurile vechi NU
-primesc câmpurile noi (effort, main $ %, scripter) automat — necesită re-analiză explicită
-cu `--json --md --out-dir metrics-local` (vezi PATTERNS «Câmpuri noi în recorduri vechi»).
+primesc câmpurile noi (effort, main $ %, scripter) automat — re-analizezi cu
+`scripts/reanalyze-metrics.sh metrics-local` (backup manual înainte).
 Pentru TRENDS cronologic după migrare: `--trends`.
