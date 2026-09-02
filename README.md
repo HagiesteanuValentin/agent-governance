@@ -4,7 +4,10 @@ Governance for Claude Code agent sessions: policies, enforcement hooks, and offl
 telemetry. Cheap models do the work, the expensive model only plans and audits, and hooks
 stop verbose agents from flooding the orchestrator's context.
 
-Current version: **v1.6** — five new enforcement hooks for the orchestrator itself: `bash-mare.sh` and `write-mare.sh` catch main doing big reads/writes through the wrong tool, `commit-gate.sh` asks before a `git commit` on code without a fresh audit marker, `agenti-vii.sh` caps live agents at 4 (`ask`, not deny) via a per-session state file, and `context-agent.sh` now also runs scoped to main (`--scope main`) with opt-in per-type thresholds (`--praguri-tip`). Measured experiments: `docs/experiments.md`. Narration avoidable is defined as a text-only call with no live agent and no question to the user, with a `residual_poll` subtype for the harness re-notifying an already-notified agent.
+Current version: **v1.6** — five new enforcement hooks for the orchestrator itself: `bash-mare.sh` and `write-mare.sh` catch main doing big reads/writes through the wrong tool, `commit-gate.sh` asks before a `git commit` on code without a fresh audit marker, `agenti-vii.sh` caps live agents at 4 (`ask`, not deny) via a per-session state file, and `context-agent.sh` now also runs scoped to main (`--scope main`) with opt-in per-type thresholds (`--praguri-tip`). Measured experiments: `docs/experiments.md`. Narration avoidable is defined as a text-only call with no live agent and no question to the user, with a `residual_poll` subtype for the harness re-notifying an already-notified agent. v1.6
+is tuned for Fable 5.1 as orchestrator (see `docs/postmortem-2026-09-01-fable-5-1.md`) and
+its hooks were smoke-tested live on 2026-09-02: the deny hooks enforce, the ask hooks (commit
+gate, live-agent cap) are advisory under auto permission mode by design.
 
 ## The problem
 
@@ -84,7 +87,9 @@ question to the user, adding a `residual_poll` subtype; across 12 sessions this 
 turns from 62 to 11 (5 of them residual). v1.6 (2026-09-02) added `bash-mare.sh`,
 `write-mare.sh`, `commit-gate.sh`, and `agenti-vii.sh`, and gave `context-agent.sh` a
 `--scope main` mode plus opt-in per-type thresholds (`--praguri-tip`) — see `docs/DECIZII.md`
-«v1.6 — hook-uri pentru orchestrator (02.09.2026)».
+«v1.6 — hook-uri pentru orchestrator (02.09.2026)». Smoke-tested live 2026-09-02: deny hooks
+enforce, ask hooks (commit gate, live-agent cap) are advisory under auto permission mode by
+design; v1.6 is tuned for Fable 5.1 as orchestrator.
 
 **2. Enforcement — hooks, not good intentions.**
 A `SubagentStop` hook measures the final report and blocks it once if it exceeds 2,000

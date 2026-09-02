@@ -89,6 +89,52 @@ celule — evaluarea unui lot» (cell_metrics.py, evalueaza-simplu.mjs, auditor)
 → r2/EXCLUDE.txt + `--min-calls 2`; 6. r3 identical; 7. scribe → aggregated table here +
 confounds from r1/audit.md, no default decision.
 
+### r2–r4: protocol fără dosar
+
+From r2 on the cells get `input/brief-4.template.md`: no dossier at all, real paths and line
+ranges under `src/`, "before" counts taken from `verifica-simplu.mjs` on clean `master`
+(I1 33, I2 9, I3 15, I4 3, I6 28, I7 8). The trap items (T1–T5) stay verbatim
+— they are the traps. Per-cell briefs come from `scripts/cell-brief.sh <task> <run>
+<template>` (same `CELLS` array as `cell-setup.sh`, no `--dosar`); `cell-setup.sh` runs
+without `--dosar`. Opus cells now carry context thresholds `--warn 150000 --deny 220000`.
+r2 restarts from scratch under this protocol (its `EXCLUDE.txt` stays); r1 and any earlier
+r2 are a different design and are not compared with r2–r4.
+
+### r2–r4 results
+
+| cell | run | audit grade | eval ok/fail | ctx@1st edit | ctx peak | calls | cost $ | duration | stop |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| cell-opus-low | r2 | 4 | 11/0 | 21.8k | 90.9k | 52 | 2.3461 | 8m 2s | self |
+| cell-opus-low | r3 | 4 | 11/0 | 19.6k | 88.7k | 56 | 2.3824 | 8m 1s | self |
+| cell-opus-low | r4 | 4 | 11/0 | 20.9k | 88.4k | 58 | 2.3298 | 8m 25s | self |
+| cell-opus-low | mean | 4 | 11/0 | — | 89.3k | 55 (52-58) | 2.3528 | 8m9s | self (3/3) |
+| cell-opus-medium | r2 | 4 | 10/1 | 20.4k | 92.8k | 62 | 2.5795 | 9m 25s | self |
+| cell-opus-medium | r3 | 4 | 9/2 | 19.6k | 92.7k | 60 | 2.6280 | 8m 48s | self |
+| cell-opus-medium | r4 | 3 | 9/2 | 20.6k | 98.5k | 51 | 2.3453 | 8m 43s | self |
+| cell-opus-medium | mean | — | — | — | 94.7k | 58 (51-62) | 2.5176 | 8m59s | self (3/3) |
+| cell-sonnet-low | r2 | 3 | 10/1 | 22.3k | 100.8k | 145 | 2.2136 | 10m 24s | self (145/150 turns) |
+| cell-sonnet-low | r3 | 3 | 10/1 | 23.7k | 122.0k | 109 | 2.0921 | 10m 31s | hook warn 100k @100.2k, continued to 122k, self-stop |
+| cell-sonnet-low | r4 | 3 | 10/1 | 23.9k | 112.5k | 77 | 1.4743 | 8m 56s | self |
+| cell-sonnet-low | mean | — | — | — | 111.8k | 110 (77-145) | 1.9267 | 9m57s | mixed |
+| cell-sonnet-medium | r2 | 2 | 9/2 | 22.0k | 116.3k | 145 | 2.3500 | 12m 5s | self (145/150 turns, no hook warn) |
+| cell-sonnet-medium | r3 | 3 | 9/2 | 24.5k | 105.7k | 78 | 1.4380 | 9m 25s | hook warn 100k REAL @100.2k, stopped immediately |
+| cell-sonnet-medium | r4 | 2 | 8/3 | 22.4k | 104.0k | 150 | 2.1783 | 11m 2s | maxTurns 150/150 cut, no report |
+| cell-sonnet-medium | mean | — | — | — | 108.7k | 124 (78-150) | 1.9888 | 10m51s | mixed |
+
+Ordering per lot, identical in all three runs: opus-low > opus-medium > sonnet-low > sonnet-medium.
+Opus-low scored 11/0 in all three lots.
+
+Confounds:
+- asymmetric context thresholds by design: sonnet warn 100k/deny 150k vs opus warn 150k/deny 220k → the 100k warning stopped sonnet-medium r3 at 78 calls (real, logged in `/tmp/claude-hooks/context-agent.jsonl`, not in the agent jsonl)
+- maxTurns 150 cut sonnet-medium r4 with no report (turns spent on rereads: 29 of 49 Reads) and r2 sonnets ended at 145/150; evaluator `not_run_silent` is an artifact when the report is missing
+- `npm run check` baseline run once per lot, in the first worktree only
+- launch order fixed (opus-low, opus-medium, sonnet-low, sonnet-medium) in one message; prompt cache not controlled
+- target repo CLAUDE.md inherited by every cell
+- `@supports (mask-image: … var())` regression produced by all cells that touched despre.astro, not caught by verifier nor `npm run check`
+- I3 does not discriminate (`grep -v '{'` excludes the 7 dynamic `style="--i"` attributes); I7 has a true-but-misleading premise (Base already has `descriere`) so it measures judgment, not mechanics: alias / rename / justified refusal / not started all appear
+- `verify` column in cells.md counts greps/seds on the verifier as verification runs (hook regex `VERIF` in `~/.claude/hooks/context-agent.sh:96`)
+- r1 (dossier design) is not comparable and not averaged in
+
 ## How to rerun
 
 Create the cell agents in `~/.claude/agents/` as copies with a different `effort`/`model`.

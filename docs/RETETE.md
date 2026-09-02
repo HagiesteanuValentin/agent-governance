@@ -59,13 +59,13 @@ agent-governance: CLAUDE.md-ul proiectului se încarcă, PATTERNS/DECIZII sunt �
 
 ## Experiment celule — evaluarea unui lot
 S = `~/.claude/projects/-home-vali-workflow-proiecte-agent-governance/<sesiune>/subagents`
-(lot 1 = `eb3b7cff-2e84-44ec-b9de-fe02fa88366c`; fiecare lot nou adaugă `--subagents-dir` al
+(lot 1 = `eb3b7cff-2e84-44ec-b9de-fe02fa88366c`; lots 2–4 = `1582af01-4db0-4d07-8298-10b83d183134`; fiecare lot nou adaugă `--subagents-dir` al
 sesiunii lui). R = `metrics-local/experiments/simplu/r<k>`. Pași:
-1. `python3 tools/cell_metrics.py --subagents-dir S… --min-calls 2 --exclude-agent <id din
+1. `python3 tools/cell_metrics.py --subagents-dir S… --first-run k --min-calls 2 --exclude-agent <id din
    r2/EXCLUDE.txt>… --dump-reports R/rapoarte`
 2. `node scripts/evalueaza-simplu.mjs /home/vali/workflow/experimente/simplu/<cell>-r<k>
    --report R/rapoarte/<cell>-r<k>.md --json R/<cell>-r<k>.json` × 4 (câte o dată per celulă)
-3. `python3 tools/cell_metrics.py --subagents-dir S… --min-calls 2 --exclude-agent … \
+3. `python3 tools/cell_metrics.py --subagents-dir S… --first-run k --min-calls 2 --exclude-agent … \
    --results-dir R --md --json --out-dir R`
 4. Auditor (Brief 4 din plan) → `R/audit.md`.
 
@@ -78,12 +78,19 @@ Smoke, sesiune NOUĂ, în ordinea asta:
    `sed -n '1,40p' tools/session_metrics.py` → trece.
 2) Ceri main-ului să scrie 30 de linii cu Write în `docs/smoke.md` → deny „>20 lines from
    main → scribe/implementer".
-3) `touch smoke.mjs && git add smoke.mjs && git commit -m smoke` → harness-ul ÎNTREABĂ
-   (commit gate, fără marker audit-ok); răspunzi NU, apoi `git reset smoke.mjs && rm smoke.mjs`.
-4) 4 explorer-i cu prompt „răspunde ok" lansați într-un mesaj, apoi al 5-lea → harness-ul
-   ÎNTREABĂ (agenti-vii).
+3) Stagiere într-o comandă SEPARATĂ: `touch smoke.mjs && git add smoke.mjs`, apoi
+   `git commit -m smoke` singur; în auto mode NU apare întrebare — verdictul se citește din
+   transcript: `grep -c '"permissionDecision\": \"ask' ~/.claude/projects/-home-vali-workflow-proiecte-agent-governance/<session-id>.jsonl`
+   (session-id = fișierul `/tmp/claude-hooks/live-<sid>`); apoi
+   `git reset --soft HEAD~1 && git reset smoke.mjs && rm smoke.mjs`.
+4) 4 explorer-i rulează `python3 -c "import time; time.sleep(180)"` apoi răspund „ok";
+   verifici `wc -l /tmp/claude-hooks/live-<sid>` = 4 înainte de al 5-lea; al 5-lea trece în
+   auto mode, „ask"-ul se vede în transcript (același grep, PreToolUse:Agent).
 5) `ls /tmp/claude-hooks/live-* /tmp/claude-hooks/audit-ok-*` după un audit cu VERDICT: OK
    → markerul există.
+
+Notă: în auto mode „ask" = decide clasificatorul, nu Vali; doar „deny" oprește. Decizia în
+DECIZII «Autoritate hook + commit gate (31.08.2026)».
 
 Dacă un hook blochează greșit o comandă uzuală: nu-l dezactivezi, notezi comanda în
 HANDOFF «Neclar».
