@@ -109,3 +109,15 @@ ieși cu `/exit`, nu cu kill. Planurile ajung în `~/.claude/plans/`; le găseș
 plan-K/plan-M + un `mapping.txt` (scris în bash, nu în fish — sintaxa diferă). Auditorul
 judecă după rubrica din `docs/experiments.md`; Vali alege effort-ul câștigător fără să vadă
 maparea K/M → effort real.
+
+Capcană: plan mode blochează `Write` la subagenți (explorer nu poate scrie `docs/dosar/`
+în plan mode) — dosarul se scrie după `ExitPlanMode`, sau explorer-ul doar raportează.
+
+## Migrarea numelor de sesiune
+`tools/session_metrics.py --migrate-names DIR [--yes]`: rulezi mai întâi fără `--yes`
+(dry-run), verifici lista, apoi cu `--yes`. Face backup automat `metrics-local.bak-<dată>/`
+înainte de redenumire. Idempotent — o a doua rulare pe recorduri deja redenumite nu schimbă
+nimic. Nume noi: `<zi>-HHMM-<proiect>` (HHMMSS doar la coliziune). Recordurile vechi NU
+primesc câmpurile noi (effort, main $ %, scripter) automat — necesită re-analiză explicită
+cu `--json --md --out-dir metrics-local` (vezi PATTERNS «Câmpuri noi în recorduri vechi»).
+Pentru TRENDS cronologic după migrare: `--trends`.
