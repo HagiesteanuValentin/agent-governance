@@ -97,6 +97,16 @@ implementer to Opus 5 low effort after the "simplu" experiment — see `docs/exp
 lot, vs opus-medium 4/4/3, eval 9–10/11, $2.52 (confounds listed in the same section); added
 `implementer-complex` (Opus medium) as the plan-time choice for multi-file logic.
 
+## v1.7.5 (stable, 2026-09-03)
+
+New entry `v1.7.5` in `tools/versions.json` (from 2026-09-03T13:04 local): sessions from
+now on are grouped separately in TRENDS; v1.7.1–v1.7.4 stay under `v1.7`. The three
+v1.7.4 agent guards were validated live on a real agent (read-mare deny on re-reading its
+own write, bash-mare additionalContext on the 3rd identical run, comentarii-cod deny on a
+2-line comment block); all four offline suites pass (model-gate 25, read-mare 31,
+bash-mare 8, comentarii-cod 12). The "verifier runs once, at the end" rule was already
+present in the agent definitions; nothing added there.
+
 ## v1.7.4 (stable, 2026-09-03)
 
 The effort-split experiment (plan=medium / implementation=low) is dropped; main now runs
