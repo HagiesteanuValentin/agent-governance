@@ -3,6 +3,8 @@
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
+# 🔴 fixture-urile nu depind de modelul din settings — PATTERNS «Modelul în hook-uri»
+export GOV_MODEL=claude-fable-5-1
 python3 - <<'PY'
 import json, os, shutil, subprocess, sys, tempfile, time
 
@@ -262,7 +264,12 @@ case(".md not code -> allow", CMT_HOOK,
 sub_cmt = cmt_in(CODE, old="const a = 1;", new=BLOCK3)
 sub_cmt["agent_id"] = "a-%s-cmt" % RUN
 sub_cmt["agent_type"] = "implementer"
-case("sub-agent flagged too", CMT_HOOK, sub_cmt, "context", "3 lines")
+case("sub-agent block -> deny", CMT_HOOK, sub_cmt, "deny", "3 lines")
+mcmt = cmt_in(CODE, tool="MultiEdit")
+mcmt["tool_input"] = {"file_path": CODE, "edits": [
+    {"old_string": "const a = 1;", "new_string": BLOCK3}]}
+mcmt["agent_id"] = "a-%s-multi" % RUN
+case("MultiEdit sub-agent block -> deny", CMT_HOOK, mcmt, "deny", "3 lines")
 case("300 KB Write payload -> context (no E2BIG)", CMT_HOOK,
      cmt_in(os.path.join(TMP, "huge.js"), tool="Write",
             content="// nota unu\n// nota doi\n" + "const a = 1;\n" * 25000),
@@ -393,7 +400,7 @@ sys.exit(1 if failed else 0)
 PY
 rc=$?
 
-for t in test-read-mare-agent.sh test-main-guards.sh test-context-main.sh test-agenti-vii.sh test-commit-gate.sh; do
+for t in test-read-mare-agent.sh test-bash-mare.sh test-comentarii-cod.sh test-model-gate.sh test-main-guards.sh test-context-main.sh test-agenti-vii.sh test-commit-gate.sh; do
     bash "$HOOKS_DIR/$t"
     tc=$?
     if [ "$tc" -ne 0 ]; then

@@ -91,3 +91,28 @@ pe linii proprii. Niciunul singur nu distinge originalul de copie: o linie e mo�
 dacă `session_id` e străin ȘI `uuid`-ul ei apare în `<dir>/<session_id>.jsonl` (deja facturată
 acolo). Părinte lipsă → linie proprie; uuid-urile lui se citesc o dată, în `_PARENT_UUIDS`.
 Părinte dintr-un alt proiect (alt director) nu e detectat → linia iese proprie.
+
+## Modelul în hook-uri
+`hooks/main-model.sh <transcript>` dă modelul sesiunii: `GOV_MODEL` (teste) → ultima linie
+`"type":"assistant"` cu `"model":"claude-…"` (`tac | grep -m1`, nu `tail -c`: tool_result-urile
+pot conține textul `claude-opus`) → `.model` din settings, fără `[1m]` → `unknown`.
+Gărzile de main (write-mare, brief-mare, blocurile ORCHESTRATION din session-start) acționează
+doar când modelul conține `fable` sau `mythos`; `unknown` e tratat ca Fable (fail-closed).
+Ramura de agent nu se schimbă: agenții au propriile gărzi, indiferent de model.
+Un `--model` dat din CLI nu apare în `settings.json` (rămâne cheia default) — sursa transcript
+prinde totuși modelul real; dacă transcriptul lipsește, garda rămâne activă (fail-closed) chiar
+și pe Opus pornit din CLI. Blocarea (deny) merge doar din hook-uri `PreToolUse`; un hook
+`PostToolUse` poate doar avertiza sau loga, nu poate opri acțiunea.
+
+## comentarii-cod pe MultiEdit
+`MultiEdit` trimite `tool_input.edits[]`, nu `new_string`. Hook-ul lipește `new_string`-urile cu
+o linie goală între ele: linia goală rupe seria de comentarii, deci două pointere de câte un
+rând din edit-uri diferite nu sunt citite ca un bloc de 2 rânduri (deny fals).
+Vechiul `old_string` se lipește la fel, ca mutarea unui comentariu să nu iasă „adăugat".
+
+## Recitire după propria scriere
+În transcriptul agentului, un `Edit` respins (`tool_result.is_error`: «file modified since
+read», «old_string not found») nu e o scriere reușită: agentul chiar are nevoie de un Read.
+Hook-ul îl sare și caută mai departe în urmă. Un `Bash` care conține basename-ul fișierului
+(build/test pe el) resetează contorul: rezultatul poate cere o recitire.
+Read cu `offset`/`limit` pe ≤60 de linii rămâne permis — e verificare punctuală, nu recitire.

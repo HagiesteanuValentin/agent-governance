@@ -84,12 +84,10 @@
             "command": "$HOME/.claude/hooks/context-agent.sh --praguri-tip"
           }
         ]
-      }
-    ],
-    "PostToolUse": [
+      },
       {
-        "_note": "main and every sub-agent: non-blocking signal when an Edit/Write adds a comment block of 2+ lines, a comment line over 160 chars, or over 25% comments in the added lines; logs to /tmp/claude-hooks/comentarii-<session>.jsonl",
-        "matcher": "Edit|Write",
+        "_note": "main and every sub-agent: an Edit/Write/MultiEdit that would add a comment block of 2+ lines, a comment line over 160 chars, or over 25% comments in the added lines; sub-agents are denied on block/long line, main and the ratio criterion only get additionalContext; logs to /tmp/claude-hooks/comentarii-<session>.jsonl",
+        "matcher": "Edit|Write|MultiEdit",
         "hooks": [
           {
             "type": "command",

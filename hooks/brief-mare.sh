@@ -2,10 +2,16 @@
 # PreToolUse on Agent (main session only): brief >7000 characters -> the "split it into
 # phases" reminder from CLAUDE.md, Orchestration section. Does not block.
 input=$(cat)
-python3 - "$input" <<'PY'
-import json, sys
+python3 - "$input" "$(dirname "$0")" <<'PY'
+import json, os, subprocess, sys
 d = json.loads(sys.argv[1])
-if "subagent" in d.get("transcript_path", ""):
+tp = d.get("transcript_path", "")
+if "subagent" in tp:
+    sys.exit(0)
+# 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+model = subprocess.run(["bash", os.path.join(sys.argv[2], "main-model.sh"), tp],
+                       capture_output=True, text=True).stdout.strip().lower()
+if not ("fable" in model or "mythos" in model or model in ("", "unknown")):
     sys.exit(0)
 prompt = d.get("tool_input", {}).get("prompt", "")
 if len(prompt) <= 7000:

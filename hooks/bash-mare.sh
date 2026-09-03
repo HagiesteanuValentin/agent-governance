@@ -6,8 +6,8 @@ LOG_DIR=/tmp/claude-hooks
 mkdir -p "$LOG_DIR" 2>/dev/null
 payload=$(mktemp "$LOG_DIR/bash-mare-XXXXXX" 2>/dev/null || mktemp) || exit 0
 cat > "$payload"
-python3 - "$payload" "$BIG_LINES" "$BODY_LINES" <<'PY'
-import json, os, re, shlex, sys
+python3 - "$payload" "$BIG_LINES" "$BODY_LINES" "$(dirname "$0")" <<'PY'
+import json, os, re, shlex, subprocess, sys
 
 try:
     with open(sys.argv[1], encoding="utf-8", errors="replace") as _fh:
@@ -33,9 +33,71 @@ def deny(reason):
     sys.exit(0)
 
 
+def norm(s):
+    return re.sub(r"\s+", " ", s).strip()
+
+
+def sterile_runs(atp, want, cur_id):
+    """identical Bash runs in the agent transcript after the last Edit/Write."""
+    runs = 0
+    if not atp or not os.path.exists(atp):
+        return 0
+    with open(atp, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if '"tool_use"' not in line:
+                continue
+            try:
+                obj = json.loads(line)
+            except ValueError:
+                continue
+            msg = obj.get("message")
+            if not isinstance(msg, dict):
+                continue
+            content = msg.get("content")
+            if not isinstance(content, list):
+                continue
+            for b in content:
+                if not isinstance(b, dict) or b.get("type") != "tool_use":
+                    continue
+                name = b.get("name")
+                if name in ("Edit", "Write", "MultiEdit"):
+                    runs = 0
+                    continue
+                if name != "Bash" or (cur_id and b.get("id") == cur_id):
+                    continue
+                inp = b.get("input") if isinstance(b.get("input"), dict) else {}
+                c = inp.get("command")
+                if isinstance(c, str) and norm(c) == want:
+                    runs += 1
+    return runs
+
+
 try:
     tp = d.get("transcript_path") or ""
-    if d.get("agent_id") or "subagent" in tp:
+    agent_id = d.get("agent_id") or ""
+    if agent_id or "subagent" in tp:
+        sid = d.get("session_id") or ""
+        ati = d.get("tool_input") if isinstance(d.get("tool_input"), dict) else {}
+        acmd = ati.get("command")
+        if not (agent_id and sid and tp) or not isinstance(acmd, str) or not acmd.strip():
+            sys.exit(0)
+        # 🔴 în sub-agent transcript_path e transcriptul din MAIN — DECIZII «v1.4.1 — 30.08.2026»
+        atp = os.path.join(os.path.dirname(tp), sid, "subagents",
+                           "agent-%s.jsonl" % agent_id)
+        try:
+            runs = sterile_runs(atp, norm(acmd), d.get("tool_use_id"))
+        except OSError:
+            sys.exit(0)
+        if runs >= 2:
+            print(json.dumps({"hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "additionalContext": "a 3-a rulare identică fără nicio modificare; "
+                                     "ori repari, ori raportezi neclar/riscant"}}))
+        sys.exit(0)
+    # 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+    _m = subprocess.run(["bash", os.path.join(sys.argv[4], "main-model.sh"), tp],
+                        capture_output=True, text=True).stdout.strip().lower()
+    if not ("fable" in _m or "mythos" in _m or _m in ("", "unknown")):
         sys.exit(0)
     ti = d.get("tool_input") if isinstance(d.get("tool_input"), dict) else {}
     cmd = ti.get("command")

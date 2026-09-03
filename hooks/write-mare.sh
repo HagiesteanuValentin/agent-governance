@@ -5,8 +5,8 @@ LOG_DIR=/tmp/claude-hooks
 mkdir -p "$LOG_DIR" 2>/dev/null
 payload=$(mktemp "$LOG_DIR/write-mare-XXXXXX" 2>/dev/null || mktemp) || exit 0
 cat > "$payload"
-python3 - "$payload" "$BODY_LINES" <<'PY'
-import json, os, sys
+python3 - "$payload" "$BODY_LINES" "$(dirname "$0")" <<'PY'
+import json, os, subprocess, sys
 
 try:
     with open(sys.argv[1], encoding="utf-8", errors="replace") as _fh:
@@ -26,6 +26,11 @@ BODY_LINES = int(sys.argv[2])
 try:
     tp = d.get("transcript_path") or ""
     if d.get("agent_id") or "subagent" in tp:
+        sys.exit(0)
+    # 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+    model = subprocess.run(["bash", os.path.join(sys.argv[3], "main-model.sh"), tp],
+                           capture_output=True, text=True).stdout.strip().lower()
+    if not ("fable" in model or "mythos" in model or model in ("", "unknown")):
         sys.exit(0)
     ti = d.get("tool_input") if isinstance(d.get("tool_input"), dict) else {}
     path = ti.get("file_path") or ""

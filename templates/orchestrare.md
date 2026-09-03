@@ -3,7 +3,8 @@
 Drop this into `~/.claude/orchestrare.md`; `hooks/session-start.sh` injects it into the main
 session only.
 
-- Only when the main session's model is Fable. On Opus you work directly, no delegation.
+- Main guards and this block appear only on Fable (hook `main-model.sh`); on Opus you work
+  directly, no delegation.
 - Main = planner + verifier. Do NOT write code directly except under ~20 lines in one file.
 - Deliver what was asked, at that scope. See something better → say it in one sentence; don't
   change scope silently.

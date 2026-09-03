@@ -5,8 +5,8 @@ CAP=${AGENTI_VII_CAP:-6}
 STALE_SEC=${AGENTI_VII_STALE:-300}
 MARKER_DIR=${CLAUDE_HOOKS_DIR:-/tmp/claude-hooks}
 input=$(cat)
-python3 - "$input" "$MODE" "$CAP" "$STALE_SEC" "$MARKER_DIR" <<'PY' || exit 0
-import json, os, sys, time
+python3 - "$input" "$MODE" "$CAP" "$STALE_SEC" "$MARKER_DIR" "$(dirname "$0")" <<'PY' || exit 0
+import json, os, subprocess, sys, time
 
 try:
     d = json.loads(sys.argv[1])
@@ -94,6 +94,12 @@ if MODE == "stop":
     sys.exit(0)
 
 # ---- check (PreToolUse/Agent in main)
+# 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+_m = subprocess.run(["bash", os.path.join(sys.argv[6], "main-model.sh"),
+                     d.get("transcript_path") or ""],
+                    capture_output=True, text=True).stdout.strip().lower()
+if not ("fable" in _m or "mythos" in _m or _m in ("", "unknown")):
+    sys.exit(0)
 rows = read_rows()
 if not rows:
     sys.exit(0)

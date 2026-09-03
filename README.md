@@ -97,6 +97,31 @@ implementer to Opus 5 low effort after the "simplu" experiment — see `docs/exp
 lot, vs opus-medium 4/4/3, eval 9–10/11, $2.52 (confounds listed in the same section); added
 `implementer-complex` (Opus medium) as the plan-time choice for multi-file logic.
 
+## v1.7.4 (stable, 2026-09-03)
+
+The effort-split experiment (plan=medium / implementation=low) is dropped; main now runs
+Fable 5.1 medium constant. Reason: a real `/effort` rewrites the prompt cache — a
+top-level effort change invalidates the cache per Anthropic's API docs, while Claude
+Code's docs claimed otherwise (issue `anthropics/claude-code#61984`, unclear whether bug
+or intended). Measured on promo-site 2026-09-02: two switches cost ~$3.2 in cache writes,
+the low phase saved ~$2.0; low was only ~13% cheaper per main turn across 6 v1.7 sessions.
+
+More enforcement: a model gate `hooks/main-model.sh` — on Opus (non-Fable) main, the
+main-only guards (write-mare, read-mare, bash-mare, brief-mare, agenti-vii, commit-gate)
+go silent and `SessionStart` no longer injects ORCHESTRATION; `comentarii-cod.sh` moved
+to `PreToolUse` and now denies ≥2-line comment blocks in agents (warns in main).
+
+`read-mare` now denies a re-read (agent Read on a path it just Wrote/Edited, no legitimate
+Read/Bash-on-basename in between) and denies Read on `.png/.jpg/.jpeg/.webp/.gif` >200 KB in
+main (agents unaffected); `bash-mare` warns in `additionalContext` on the 3rd identical
+Bash command in an agent's transcript with no edit in between (main unaffected).
+
+New test files: `hooks/test-model-gate.sh`, `hooks/test-comentarii-cod.sh`,
+`hooks/test-bash-mare.sh`.
+
+Bug fixes: `settings.json` `effortLevel` restored to medium (the phase hook had left it
+on low); test suites no longer depend on live settings (`GOV_MODEL` env var instead).
+
 ## v1.7.3 EXPERIMENTAL (2026-09-02)
 
 `/rate N [note]` now takes only the score (1-5) and one line of context; `advisor_score`
@@ -246,8 +271,9 @@ cap of 4 live agents of any type; the analyzer flags a session that goes over it
 
 **Comments (v1.4)**: a new code comment is a one-line pointer, `🔴 <constraint> —
 PATTERNS/DECISIONS «section»`, never an explanatory block — the explanation lives in the
-doc section, not the code. Enforced by a non-blocking hook, `hooks/comentarii-cod.sh`
-(fires in main and in every subagent — the same PostToolUse matcher, no `agent_id` filter),
+doc section, not the code. Enforced by `hooks/comentarii-cod.sh` (PreToolUse on
+`Edit|Write|MultiEdit`, main and every subagent; sub-agents are denied on a block or an
+over-long comment line, main only gets a warning),
 which logs every flagged Edit/Write to a JSONL file read by `/handoff`; the analyzer's
 `comment_bloat` flag caught it in 178 of 257 past sessions.
 

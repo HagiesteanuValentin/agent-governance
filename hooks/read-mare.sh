@@ -1,8 +1,8 @@
 #!/bin/bash
 # 🔴 state from transcript, not a state file; rule 0 applies to everyone — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
 input=$(cat)
-python3 - "$input" <<'PY'
-import json, sys, os
+python3 - "$input" "$(dirname "$0")" <<'PY'
+import json, subprocess, sys, os
 
 d = json.loads(sys.argv[1])
 ti = d.get("tool_input") if isinstance(d.get("tool_input"), dict) else {}
@@ -82,6 +82,67 @@ def prior_reads(tpath, skip_sidechain):
     return out
 
 
+def pending_own_write(tpath):
+    """True if the agent's own last event on this file is a write it never re-read."""
+    events = []
+    errors = set()
+    if not tpath or not os.path.exists(tpath):
+        return False
+    with open(tpath, encoding="utf-8", errors="replace") as fh:
+        for line in fh:
+            if '"tool_use"' not in line and '"tool_result"' not in line:
+                continue
+            try:
+                obj = json.loads(line)
+            except ValueError:
+                continue
+            msg = obj.get("message")
+            if not isinstance(msg, dict):
+                continue
+            content = msg.get("content")
+            if not isinstance(content, list):
+                continue
+            for b in content:
+                if not isinstance(b, dict):
+                    continue
+                if b.get("type") == "tool_result":
+                    if b.get("is_error"):
+                        errors.add(b.get("tool_use_id"))
+                    continue
+                if b.get("type") != "tool_use":
+                    continue
+                if cur_id and b.get("id") == cur_id:
+                    continue
+                name = b.get("name")
+                inp = b.get("input") if isinstance(b.get("input"), dict) else {}
+                if name == "Bash":
+                    cmd = inp.get("command")
+                    if base and isinstance(cmd, str) and base in cmd:
+                        events.append(("clear", None))
+                    continue
+                if name not in ("Read", "Write", "Edit", "MultiEdit"):
+                    continue
+                fp = inp.get("file_path")
+                if not isinstance(fp, str) or not fp:
+                    continue
+                try:
+                    same_file = os.path.realpath(fp) == real
+                except OSError:
+                    same_file = fp == path
+                if not same_file:
+                    continue
+                events.append(("clear", None) if name == "Read"
+                              else ("write", b.get("id")))
+    for kind, tid in reversed(events):
+        if kind == "clear":
+            return False
+        # 🔴 Edit cu is_error nu contează ca scriere — docs/PATTERNS.md «Recitire după propria scriere»
+        if tid in errors:
+            continue
+        return True
+    return False
+
+
 def line_count():
     try:
         return sum(1 for _ in open(real, "rb"))
@@ -102,6 +163,19 @@ if agent_id or "subagent" in tp:
     # 🔴 in a sub-agent transcript_path is the MAIN transcript — DECIZII «v1.4.1 — 30.08.2026»
     agent_tp = os.path.join(os.path.dirname(tp), session_id, "subagents",
                             "agent-%s.jsonl" % agent_id)
+    try:
+        lim = int(ti.get("limit") or 0)
+    except (TypeError, ValueError):
+        lim = 0
+    # 🔴 ≤60 de linii = verificare punctuală, nu recitire — docs/PATTERNS.md «Recitire după propria scriere»
+    if not (cur_ranged and 0 < lim <= 60):
+        try:
+            pending = pending_own_write(agent_tp)
+        except Exception:
+            pending = False
+        if pending:
+            deny("ai scris %s; nu-l reciti; verifică punctual cu grep -n sau sed -n "
+                 "pe interval" % base)
     if cur_ranged:
         sys.exit(0)
     if ext in IMG or "/.claude/plans/" in path:
@@ -118,10 +192,23 @@ if agent_id or "subagent" in tp:
         deny("%d lines (>300)%s" % (n, FIX))
     sys.exit(0)
 
+# 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+_m = subprocess.run(["bash", os.path.join(sys.argv[2], "main-model.sh"), tp],
+                    capture_output=True, text=True).stdout.strip().lower()
+if not ("fable" in _m or "mythos" in _m or _m in ("", "unknown")):
+    sys.exit(0)
+
 if ext in IMG:
     low = base.lower()
     if "-small" in low or "-mic" in low:
         sys.exit(0)
+    try:
+        size = os.path.getsize(real)
+    except OSError:
+        size = 0
+    if size > 200 * 1024:
+        deny("%s are %d KB; imaginea o vede explorer sau design-lead și raportează în text"
+             % (base, size // 1024))
     emit(additionalContext=(
         "Reminder (CLAUDE.md): %s is an image - it enters the context and is re-paid on "
         "every following message. Comparing screenshots is the implementer's job; if you "

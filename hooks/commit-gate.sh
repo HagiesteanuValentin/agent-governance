@@ -2,6 +2,8 @@
 # 🔴 markerul audit-ok îl scrie raport-lung.sh la CONFORM — docs/DECIZII.md «Autoritate hook + commit gate (31.08.2026)»
 MARKER_DIR=${CLAUDE_HOOKS_DIR:-/tmp/claude-hooks}
 input=$(cat)
+GOV_HOOKS_DIR=$(dirname "$0")
+export GOV_HOOKS_DIR
 python3 - "$input" "$MARKER_DIR" "$@" <<'PY'
 import json, os, re, subprocess, sys
 from datetime import datetime, timezone
@@ -110,6 +112,13 @@ def run():
     d = json.loads(RAW)
     # 🔴 main only, aceeasi conventie ca read-mare.sh — docs/DECIZII.md «Autoritate hook + commit gate (31.08.2026)»
     if d.get("agent_id") or "subagent" in (d.get("transcript_path") or ""):
+        return
+    # 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+    _m = subprocess.run(["bash", os.path.join(os.environ.get("GOV_HOOKS_DIR", "."),
+                                              "main-model.sh"),
+                         d.get("transcript_path") or ""],
+                        capture_output=True, text=True).stdout.strip().lower()
+    if not ("fable" in _m or "mythos" in _m or _m in ("", "unknown")):
         return
     if d.get("tool_name") != "Bash":
         return

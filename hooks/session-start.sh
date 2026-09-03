@@ -12,6 +12,19 @@ try:
 except Exception:
     print('')
 " 2>/dev/null)
+tpath=$(printf '%s' "$in" | python3 -c "
+import json, sys
+try:
+    print(json.load(sys.stdin).get('transcript_path') or '')
+except Exception:
+    print('')
+" 2>/dev/null)
+# 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+model=$(bash "$(dirname "$0")/main-model.sh" "$tpath" 2>/dev/null | tr 'A-Z' 'a-z')
+case "$model" in
+  *fable*|*mythos*|unknown|"") gov=1 ;;
+  *) gov=0 ;;
+esac
 # 🔴 hook-urile SessionStart rulează în paralel — PATTERNS «Hook-uri SessionStart rulează în paralel»
 reset_effort_for_source() {
   eph="$(dirname "$0")/effort-phase.sh"
@@ -25,7 +38,7 @@ reset_effort_for_source() {
 }
 if [ "${1:-rules}" = "v17" ]; then
   reset_effort_for_source
-  if [ -f "$v" ]; then
+  if [ "$gov" = 1 ] && [ -f "$v" ]; then
     echo "=== ORCHESTRATION v1.7 (injected by SessionStart; main session only) ==="
     cat "$v"
     echo
@@ -37,7 +50,7 @@ if [ "${1:-rules}" = "v17" ]; then
 fi
 if [ "${1:-rules}" != "handoff" ]; then
   reset_effort_for_source
-  if [ -f "$o" ]; then
+  if [ "$gov" = 1 ] && [ -f "$o" ]; then
     echo "=== ORCHESTRATION (injected by SessionStart; main session only) ==="
     cat "$o"
     echo

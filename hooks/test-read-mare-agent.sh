@@ -3,6 +3,8 @@
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
+# 🔴 fixture-urile nu depind de modelul din settings — PATTERNS «Modelul în hook-uri»
+export GOV_MODEL=claude-fable-5-1
 python3 - <<'PY'
 import json, os, shutil, subprocess, sys, tempfile
 
@@ -34,6 +36,24 @@ def read_use(tid, path, offset=None, limit=None):
     return {"type": "tool_use", "id": tid, "name": "Read", "input": inp}
 
 
+def tool_use(tid, name, inp):
+    return {"type": "tool_use", "id": tid, "name": name, "input": inp}
+
+
+def error_result(tid):
+    return {"type": "user", "message": {"role": "user", "content": [
+        {"type": "tool_result", "tool_use_id": tid, "is_error": True,
+         "content": "String to replace not found in file."}]}}
+
+
+def blob(rel, nbytes):
+    p = os.path.join(TMP, rel)
+    os.makedirs(os.path.dirname(p), exist_ok=True)
+    with open(p, "wb") as fh:
+        fh.write(b"\x89PNG\r\n" + b"\0" * (nbytes - 6))
+    return p
+
+
 def assistant(tool_uses, side=False):
     o = {"type": "assistant", "message": {"role": "assistant", "id": "m1",
          "usage": {"input_tokens": 1}, "content": tool_uses}}
@@ -62,6 +82,29 @@ jsonl("proj/%s/subagents/agent-%s.jsonl" % (SID, AGENT), [
     assistant([read_use("r1", big)], side=True),
     assistant([read_use("r2", ranged, offset=1, limit=50)], side=True),
 ])
+
+# --- write-then-reread fixtures: one agent per scenario
+wrote = write("wrote.txt", ["line %d" % i for i in range(10)])
+jsonl("proj/%s/subagents/agent-aw.jsonl" % SID, [
+    assistant([tool_use("w1", "Write", {"file_path": wrote, "content": "x"})], side=True),
+])
+jsonl("proj/%s/subagents/agent-ar.jsonl" % SID, [
+    assistant([tool_use("w1", "Write", {"file_path": wrote, "content": "x"})], side=True),
+    assistant([read_use("r9", wrote)], side=True),
+])
+jsonl("proj/%s/subagents/agent-ae.jsonl" % SID, [
+    assistant([tool_use("e1", "Edit", {"file_path": wrote, "new_string": "x"})], side=True),
+    error_result("e1"),
+])
+jsonl("proj/%s/subagents/agent-ab.jsonl" % SID, [
+    assistant([tool_use("w1", "Write", {"file_path": wrote, "content": "x"})], side=True),
+    assistant([tool_use("b1", "Bash", {"command": "bash wrote.txt"})], side=True),
+])
+jsonl("proj/%s/subagents/agent-ao.jsonl" % SID, [
+    assistant([tool_use("w1", "Write", {"file_path": small, "content": "x"})], side=True),
+])
+bigimg = blob("big.png", 300 * 1024)
+smallimg = blob("small.png", 50 * 1024)
 
 
 # ---------------------------------------------------------------- harness
@@ -138,6 +181,22 @@ case("no own transcript, with offset -> allow",
      agent_in(bigmd, agent_id="missing", offset=1, limit=50), "allow")
 case("no own transcript, small file -> allow", agent_in(fresh, agent_id="missing"),
      "allow")
+
+# ------------------------------------------------- write-then-reread + images
+WROTE = "ai scris wrote.txt"
+case("agent reads back own Write -> deny", agent_in(wrote, agent_id="aw"), "deny", WROTE)
+case("agent spot-check 50 lines after Write -> allow",
+     agent_in(wrote, agent_id="aw", offset=10, limit=50), "allow")
+case("agent 100-line range after Write -> deny",
+     agent_in(wrote, agent_id="aw", offset=10, limit=100), "deny", WROTE)
+case("agent already re-read after Write -> old rule",
+     agent_in(wrote, agent_id="ar"), "deny", "already read at call")
+case("agent after failed Edit -> allow", agent_in(wrote, agent_id="ae"), "allow")
+case("agent after Bash on the file -> allow", agent_in(wrote, agent_id="ab"), "allow")
+case("agent Write on another file -> allow", agent_in(fresh, agent_id="ao"), "allow")
+case("main image 300 KB -> deny", main_in(bigimg), "deny", "explorer sau design-lead")
+case("main image 50 KB -> reminder only", main_in(smallimg), "context", "downscaled")
+case("agent image 300 KB -> allow", agent_in(bigimg), "allow")
 
 # ---------------------------------------------------------------- main regression
 case("main reread whole file -> deny", main_in(small), "deny", "already read at call 1")

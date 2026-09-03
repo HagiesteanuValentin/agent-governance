@@ -3,6 +3,8 @@
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
+# 🔴 fixture-urile nu depind de modelul din settings — PATTERNS «Modelul în hook-uri»
+export GOV_MODEL=claude-fable-5-1
 python3 - <<'PY'
 import json, os, shutil, subprocess, sys, tempfile
 

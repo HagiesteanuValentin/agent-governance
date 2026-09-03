@@ -1,8 +1,8 @@
 #!/bin/bash
-# PostToolUse on Edit|Write, main session AND every sub-agent: flags comment lines ADDED by
-# the call. Never blocks - additionalContext while the writer's context is still alive, plus
-# a JSONL line per signal for /handoff. Rule enforced: a new comment is one pointer line
-# (constraint - PATTERNS/DECIZII section), the explanation lives in the docs, not in the code.
+# PreToolUse on Edit|Write|MultiEdit, main AND every sub-agent: flags comment lines the call
+# would ADD. Sub-agent + block/long line = deny; main and the ratio criterion stay
+# additionalContext, plus a JSONL line per signal for /handoff. Rule: a new comment is one
+# pointer line (constraint - PATTERNS/DECIZII section), the explanation lives in the docs.
 BLOCK_LINES=2
 RATIO=0.25
 MIN_ADDED=5
@@ -44,7 +44,7 @@ LICENSE_RE = re.compile(r"SPDX-License-Identifier|Copyright")
 
 def main():
     tool = d.get("tool_name") or ""
-    if tool not in ("Edit", "Write"):
+    if tool not in ("Edit", "Write", "MultiEdit"):
         return
     ti = d.get("tool_input") if isinstance(d.get("tool_input"), dict) else {}
     path = ti.get("file_path")
@@ -59,6 +59,11 @@ def main():
     if tool == "Edit":
         new = ti.get("new_string") or ""
         old = ti.get("old_string") or ""
+    elif tool == "MultiEdit":
+        edits = ti.get("edits") if isinstance(ti.get("edits"), list) else []
+        # 🔴 edits joined by a blank line, so two 1-line pointers are not read as a block — docs/PATTERNS.md «comentarii-cod pe MultiEdit»
+        new = "\n\n".join(e.get("new_string") or "" for e in edits if isinstance(e, dict))
+        old = "\n\n".join(e.get("old_string") or "" for e in edits if isinstance(e, dict))
     else:
         new = ti.get("content") or ""
         old = head_version(path)
@@ -210,9 +215,20 @@ def signal(path, tool, st):
         head = ("%d of %d added lines are comments in %s: \"%s\"."
                 % (st["comment_added"], st["lines_added"], base, st["snippet"]))
     log(path, tool, st)
-    print(json.dumps({"hookSpecificOutput": {
-        "hookEventName": "PostToolUse",
-        "additionalContext": head + " " + RULE}}))
+    hard = st["max_block"] >= BLOCK_LINES or st["long_line"]
+    if is_agent() and hard:
+        out = {"hookEventName": "PreToolUse", "permissionDecision": "deny",
+               "permissionDecisionReason": head + " " + RULE}
+    else:
+        out = {"hookEventName": "PreToolUse", "additionalContext": head + " " + RULE}
+    print(json.dumps({"hookSpecificOutput": out}))
+
+
+def is_agent():
+    if d.get("agent_id"):
+        return True
+    tp = d.get("transcript_path")
+    return isinstance(tp, str) and "subagent" in tp
 
 
 def log(path, tool, st):
