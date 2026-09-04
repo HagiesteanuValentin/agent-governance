@@ -35,10 +35,6 @@
           {
             "type": "command",
             "command": "$HOME/.claude/hooks/bash-mare.sh"
-          },
-          {
-            "type": "command",
-            "command": "$HOME/.claude/hooks/commit-gate.sh"
           }
         ]
       },

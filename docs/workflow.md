@@ -51,7 +51,7 @@ Registered in `settings.json` (see `hooks/settings.example.json`).
 | `brief-mare.sh` | PreToolUse / Agent | brief >7,000 characters | reminder: "split it into phases" |
 | `bash-mare.sh` | PreToolUse / Bash | main only: whole-file reads >300 lines and heredoc writes >20 body lines run through Bash instead of Read/Write/Edit; sub-agents (v1.7.4): the 3rd identical Bash command with no Edit/Write in between | denies in main, points at the proper tool; sub-agent gets an `additionalContext` nudge, never a block |
 | `write-mare.sh` | PreToolUse / Write\|Edit | main only: >20 written lines | denies, points at scribe/implementer |
-| `commit-gate.sh` | PreToolUse / Bash | main only: `git commit` (incl. `git -C <dir> commit`) with staged/unstaged diff touching `.ts/.tsx/.js/.jsx/.mjs/.astro`, no fresh `audit-ok-<session_id>` marker | `ask`: run `/audit` on the commit range first |
+| `commit-gate.sh` | PreToolUse / Bash | main only: `git commit` (incl. `git -C <dir> commit`) with staged/unstaged diff touching `.ts/.tsx/.js/.jsx/.mjs/.astro`, no fresh `audit-ok-<session_id>` marker | `ask`: run `/audit` on the commit range first. **Disabled live 2026-09-04** (blocks unattended sessions); script kept, not wired in `settings.example.json` |
 | `agenti-vii.sh check` | PreToolUse / Agent | ≥4 agents alive (state file `/tmp/claude-hooks/live-<session_id>`, 5 min grace) | `ask`, lists type/id of the live agents |
 | `agenti-vii.sh start`/`stop` | SubagentStart / SubagentStop | — | writes/removes the agent's row in the state file |
 | `context-agent.sh --scope main` | PreToolUse / * | main session, own context, same defaults ≥150k / ≥220k (overridable with `--warn`/`--deny`) | same effect as the agent-scope row below, scoped to main |
