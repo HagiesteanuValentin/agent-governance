@@ -17,7 +17,28 @@
         ]
       }
     ],
+    "UserPromptSubmit": [
+      {
+        "_note": "main session: a prompt containing plec/nesupravegheat arms autonomous mode (marker per session) and injects its rules; any later prompt without the signal disarms it",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/autonom.sh prompt"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
+      {
+        "_note": "while autonomous mode is armed, questions and plan mode are denied with a reason for the model",
+        "matcher": "AskUserQuestion|EnterPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/autonom.sh gate"
+          }
+        ]
+      },
       {
         "_note": "any Read of a /tool-results/ file is denied for main and sub-agents alike; the rest (image, re-read, whole big file) is main-session only",
         "matcher": "Read",

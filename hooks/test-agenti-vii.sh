@@ -143,6 +143,14 @@ p = subprocess.run(["bash", HOOK, "start"], input=json.dumps({"session_id": "s7"
 case("start without agent_id -> exit 0", p.returncode == 0 and not p.stdout.strip(),
      "rc=%d" % p.returncode)
 
+# 10b) autonomous mode: 6 live agents + marker -> no ask
+make("s11", [A(1), A(2), A(3), A(4), A(5), A(6)])
+os.makedirs(STATE_DIR, exist_ok=True)
+open(os.path.join(STATE_DIR, "autonom-s11"), "w").write("1\n")
+got11, _ = decide("check", {"session_id": "s11", "transcript_path": tp("s11"),
+                            "tool_name": "Agent", "tool_input": {}})
+case("6 live + autonomous marker -> allow", got11 == "allow", got11)
+
 # 10) session isolation: cap reached in s2 doesn't affect s1
 got10, _ = decide("check", {"session_id": "s1", "transcript_path": tp("s1"),
                             "tool_name": "Agent", "tool_input": {}})

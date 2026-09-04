@@ -100,6 +100,9 @@ _m = subprocess.run(["bash", os.path.join(sys.argv[6], "main-model.sh"),
                     capture_output=True, text=True).stdout.strip().lower()
 if not ("fable" in _m or "mythos" in _m or _m in ("", "unknown")):
     sys.exit(0)
+# 🔴 marker autonom-<sid> = fără ask — docs/DECIZII.md «Mod autonom (04.09.2026)»
+if os.path.exists(os.path.join(MARKER_DIR, "autonom-%s" % safe_sid)):
+    sys.exit(0)
 rows = read_rows()
 if not rows:
     sys.exit(0)

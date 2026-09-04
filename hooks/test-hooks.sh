@@ -400,7 +400,7 @@ sys.exit(1 if failed else 0)
 PY
 rc=$?
 
-for t in test-read-mare-agent.sh test-bash-mare.sh test-comentarii-cod.sh test-model-gate.sh test-main-guards.sh test-context-main.sh test-agenti-vii.sh test-commit-gate.sh; do
+for t in test-read-mare-agent.sh test-bash-mare.sh test-comentarii-cod.sh test-model-gate.sh test-main-guards.sh test-context-main.sh test-agenti-vii.sh test-commit-gate.sh test-autonom.sh; do
     bash "$HOOKS_DIR/$t"
     tc=$?
     if [ "$tc" -ne 0 ]; then
