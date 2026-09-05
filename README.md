@@ -4,14 +4,17 @@ Governance for Claude Code agent sessions: policies, enforcement hooks, and offl
 telemetry. Cheap models do the work, the expensive model only plans and audits, and hooks
 stop verbose agents from flooding the orchestrator's context.
 
-Current version: **v1.8** (final) — phase-based effort is back (plan medium /
-implementation low, `/effort` given by hand by Vali, Claude Code 2.1.260), the advisor is
-now mandatory on a wide set of triggers (a-f) and re-reads the plan in round 2,
-`bash-mare.sh` nudges main on the 3rd consecutive small Bash call, Fable 5.1 pricing and
-5m/1h cache billing are corrected in the analyzer, the `/refine` skill (agents `refiner` /
-`refiner-complex`, both Fable 5.1) ships for single-page changes, and
-`orchestrare.md` is kept under 10 KB. Metrics from 2026-09-05T14:45 (local time) onward are
-the ones that count for v1.8.
+Current version: **v1.8** (frozen) — the rules aren't changing anymore, it's now being
+tested on product sessions (≥3 from 2026-09-05T14:45 onward, until a verdict is reached).
+Phase-based effort is back (plan medium / implementation low, `/effort` given by hand by
+Vali, Claude Code 2.1.260), the advisor is now mandatory on a wide set of triggers (a-f) and
+re-reads the plan in round 2, `bash-mare.sh` nudges main on the 3rd consecutive small Bash
+call, Fable 5.1 pricing and 5m/1h cache billing are corrected in the analyzer, the `/refine`
+skill (agents `refiner` / `refiner-complex`, both Fable 5.1) ships for single-page changes,
+and `orchestrare.md` is kept under 10 KB. Phase-based effort now also runs inside `/polish`
+and `/refine` (both commands run the `effort-phase.sh` hook), and the `/refine` scripter
+brief asks for line ranges plus `scripts/masoara-*.mjs`. Metrics from
+2026-09-05T14:45 (local time) onward are the ones that count for v1.8.
 
 ## The problem
 
@@ -128,6 +131,11 @@ or `refiner-complex` (both Fable 5.1) — see the entry below for the shape. Sep
 `~/.claude/orchestrare.md` and `templates/orchestrare.md` are capped at 10 KB, since the
 harness truncates the injected SessionStart block to 2 KB past that size; on 2026-09-05 the
 margin was under 5 bytes, so any new line there needs a compensating cut.
+
+Phase-based effort now also runs inside `/polish` and `/refine`: both commands call the
+`effort-phase.sh` hook, at step 0/1 and again at step 5 after plan approval. The `/refine`
+scripter brief (step 2b) asks for line ranges plus `scripts/masoara-*.mjs`. Metrics from
+14:45 (local time) onward are the ones that count for the v1.8 verdict.
 
 ## v1.7.5 (stable, 2026-09-03)
 
