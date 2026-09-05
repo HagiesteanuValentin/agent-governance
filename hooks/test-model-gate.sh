@@ -263,3 +263,6 @@ for name, ok, got in results:
 print("%d/%d passed" % (len(results) - len(failed), len(results)))
 sys.exit(1 if failed else 0)
 PY
+rc=$?
+rm -f /tmp/claude-hooks/bash-batch-s1* 2>/dev/null
+exit $rc

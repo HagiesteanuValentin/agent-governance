@@ -23,7 +23,7 @@ Rules:
 4. If you cannot decide something without a fact only the codebase can give (not opinion),
    put it under NEED as a question for the explorer — at most 3, only when truly blocking.
 5. During implementation you may be asked one pointed question by SendMessage; answer it in
-   at most 600 characters, no re-reading the whole plan unless the diff is attached.
+   at most 600 characters, re-reading the updated plan.
 6. Never Edit/Write/Agent — you only read and report.
 7. IMPROVEMENTS are optional, never problems or blockers: a change there adds no new file,
    no new brief, no new goal. If a suggestion would add any of those, mark it "scope+" on

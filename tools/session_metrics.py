@@ -33,7 +33,7 @@ BROWSER_THRESHOLD_DEFAULT = 0.5  # share of main tool calls above which the sess
 VERSION_OLDER = "older"
 
 AGENTS_DIR_DEFAULT = "~/.claude/agents"
-AS_MODEL_DEFAULT = "claude-fable-5"
+AS_MODEL_DEFAULT = "claude-fable-5-1"
 ROT_AT_DEFAULT = 0.35            # operator threshold, not an Anthropic figure
 WINDOW_DEFAULT = 1_000_000
 NO_QUALITY = ("no quality claim — the threshold is the operator's, not Anthropic's")
@@ -401,6 +401,12 @@ def cost_of(counts, rates):
     total = 0.0
     for ck, rk in COST_KEYS:
         total += counts.get(ck, 0) * float(rates.get(rk, 0.0)) / 1_000_000.0
+    # 🔴 cache_creation e totalul; portia 5m se retaxeaza la cache_write_5m — DECIZII «v1.8 — prețuri Fable 5.1»
+    n5m = counts.get("cache_creation_5m", 0)
+    if n5m:
+        r_1h = float(rates.get("cache_write", 0.0))
+        r_5m = float(rates.get("cache_write_5m", r_1h))
+        total += n5m * (r_5m - r_1h) / 1_000_000.0
     return round(total, 4)
 
 
@@ -457,7 +463,13 @@ def text_len(value):
 
 
 def zeros():
-    return {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0, "messages": 0}
+    return {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0,
+            "cache_creation_5m": 0, "messages": 0}
+
+
+def cc_5m(usage):
+    cc = usage.get("cache_creation")
+    return (cc.get("ephemeral_5m_input_tokens") or 0) if isinstance(cc, dict) else 0
 
 
 def add_usage(acc, usage):
@@ -465,6 +477,7 @@ def add_usage(acc, usage):
     acc["output"] += usage.get("output_tokens") or 0
     acc["cache_read"] += usage.get("cache_read_input_tokens") or 0
     acc["cache_creation"] += usage.get("cache_creation_input_tokens") or 0
+    acc["cache_creation_5m"] += cc_5m(usage)
     acc["messages"] += 1
 
 
@@ -1123,6 +1136,7 @@ def parse_file(path, label, tool_names, tool_inputs, chain=None):
             "input": usage.get("input_tokens") or 0,
             "cache_read": usage.get("cache_read_input_tokens") or 0,
             "cache_creation": usage.get("cache_creation_input_tokens") or 0,
+            "cache_creation_5m": cc_5m(usage),
             "output": usage.get("output_tokens") or 0,
             "effort": grp.get("effort"),
             "thinking": grp.get("thinking") or 0,
@@ -1607,6 +1621,15 @@ def counterfactual_block(main_doc, worker_docs, pricing, as_model, rot_at, windo
     r_out = float(rates.get("output", 0.0))
     r_cr = float(rates.get("cache_read", 0.0))
     r_cw = float(rates.get("cache_write", 0.0))
+    r_cw5 = float(rates.get("cache_write_5m", r_cw))
+
+    def cw_cost(call, tokens):
+        # 🔴 portia 5m se taxeaza la r_cw5, proportional cu apelul — DECIZII «v1.8 — prețuri Fable 5.1»
+        total = call.get("cache_creation") or 0
+        if not total or not tokens:
+            return 0.0
+        share5 = min(call.get("cache_creation_5m", 0), total) * tokens / total
+        return share5 * r_cw5 + (tokens - share5) * r_cw
     main_calls = sorted([c for c in main_doc["calls"] if not c["side"] and c["at"]],
                         key=lambda c: c["at"])
     runs = []
@@ -1627,7 +1650,7 @@ def counterfactual_block(main_doc, worker_docs, pricing, as_model, rot_at, windo
     floor = 0.0
     for c in main_calls:
         floor += (c["output"] * r_out + c["input"] * r_in
-                  + c["cache_read"] * r_cr + c["cache_creation"] * r_cw) / 1e6
+                  + c["cache_read"] * r_cr + cw_cost(c, c["cache_creation"])) / 1e6
     boot_removed = 0
     for r in runs:
         boot_removed += r["boot"]
@@ -1635,7 +1658,8 @@ def counterfactual_block(main_doc, worker_docs, pricing, as_model, rot_at, windo
             inp = 0 if i == 0 else c["input"]
             ccr = 0 if i == 0 else c["cache_creation"]
             crd = c["cache_read"] if i == 0 else max(c["cache_read"] - r["boot"], 0)
-            floor += (c["output"] * r_out + inp * r_in + crd * r_cr + ccr * r_cw) / 1e6
+            floor += (c["output"] * r_out + inp * r_in + crd * r_cr
+                      + cw_cost(c, ccr)) / 1e6
 
     timeline = []
     for c in main_calls:
@@ -1659,7 +1683,7 @@ def counterfactual_block(main_doc, worker_docs, pricing, as_model, rot_at, windo
                       else c["cache_creation"])
         ctx_cf = max(int(ctx_cf), 0)
         realistic += (c["output"] * r_out + max(ctx_cf - cc_net, 0) * r_cr
-                      + cc_net * r_cw) / 1e6
+                      + cw_cost(c, cc_net)) / 1e6
         peak_cf = max(peak_cf, ctx_cf)
         out_total += c["output"]
         if ctx_cf >= threshold:
@@ -1824,7 +1848,8 @@ def turn_cost(call, pricing):
         return 0.0
     return cost_of({"input": call["input"], "output": call["output"],
                     "cache_read": call["cache_read"],
-                    "cache_creation": call["cache_creation"]},
+                    "cache_creation": call["cache_creation"],
+                    "cache_creation_5m": call.get("cache_creation_5m", 0)},
                    rates_for(pricing, call["model"]))
 
 
@@ -2209,7 +2234,8 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         row = dict(counts)
         row["cost_usd"] = cost_of(counts, rates)
         models_out[model] = row
-        for k in ("input", "output", "cache_read", "cache_creation", "messages"):
+        for k in ("input", "output", "cache_read", "cache_creation",
+                  "cache_creation_5m", "messages"):
             totals[k] += counts[k]
     totals["cost_usd"] = round(sum(m["cost_usd"] for m in models_out.values()), 4)
 
@@ -3152,7 +3178,7 @@ def aggregate_table(sessions):
                       fmt(t["cache_read"]), fmt(t["cache_creation"]),
                       s["sidechain_output_pct"], t["cost_usd"]))
         for k in agg:
-            agg[k] += t[k]
+            agg[k] += t.get(k, 0)
         agg_cost += t["cost_usd"]
         agg_side += s["sidechains"]["output"]
     pct = 100.0 * agg_side / (agg["output"] or 1)

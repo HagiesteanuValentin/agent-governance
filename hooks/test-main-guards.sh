@@ -35,8 +35,13 @@ def call(hook, payload):
                        capture_output=True)
     return p.returncode, p.stdout.strip(), p.stderr.strip()
 
+_SID = [0]
+
 def bash_in(command, agent_id=None):
-    d = {"session_id": "s1", "transcript_path": SUBTP if agent_id else MAIN, "cwd": TMP,
+    # 🔴 sesiune unică per caz de main, altfel intervine nudge-ul — PATTERNS «Batching Bash»
+    _SID[0] += 1
+    d = {"session_id": "s1" if agent_id else "s1-%d" % _SID[0],
+         "transcript_path": SUBTP if agent_id else MAIN, "cwd": TMP,
          "tool_name": "Bash", "tool_use_id": "cur", "tool_input": {"command": command}}
     if agent_id:
         d["agent_id"] = agent_id
@@ -168,3 +173,6 @@ for name, ok, got in results:
 print("%d/%d passed" % (len(results) - len(failed), len(results)))
 sys.exit(1 if failed else 0)
 PY
+rc=$?
+rm -f /tmp/claude-hooks/bash-batch-s1* 2>/dev/null
+exit $rc

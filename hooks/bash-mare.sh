@@ -7,7 +7,7 @@ mkdir -p "$LOG_DIR" 2>/dev/null
 payload=$(mktemp "$LOG_DIR/bash-mare-XXXXXX" 2>/dev/null || mktemp) || exit 0
 cat > "$payload"
 python3 - "$payload" "$BIG_LINES" "$BODY_LINES" "$(dirname "$0")" <<'PY'
-import json, os, re, shlex, subprocess, sys
+import atexit, json, os, re, shlex, subprocess, sys, time
 
 try:
     with open(sys.argv[1], encoding="utf-8", errors="replace") as _fh:
@@ -26,7 +26,25 @@ BIG_LINES = int(sys.argv[2])
 BODY_LINES = int(sys.argv[3])
 
 
+BATCH_MAX = 3
+BATCH_CHARS = 200
+BATCH_IDLE = 90
+# 🔴 sub 3 s = tool_use-uri paralele din același mesaj — PATTERNS «Batching Bash»
+BATCH_GAP = 3
+_NUDGE = [False]
+
+
+def _emit_nudge():
+    if _NUDGE[0]:
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "additionalContext": "3 apeluri Bash mici la rând — comenzile independente "
+                                 "merg într-un singur apel sau în același mesaj; "
+                                 "analizorul marchează batchable_bash"}}))
+
+
 def deny(reason):
+    _NUDGE[0] = False
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse", "permissionDecision": "deny",
         "permissionDecisionReason": reason}}))
@@ -72,6 +90,42 @@ def sterile_runs(atp, want, cur_id):
     return runs
 
 
+def batch_nudge(sid, cmd):
+    # 🔴 „mic" se judecă pe comandă, nu pe output — PATTERNS «Batching Bash»
+    if not sid:
+        return
+    state = os.path.join("/tmp/claude-hooks", "bash-batch-%s" % re.sub(r"[^\w.-]", "_", sid))
+    now = time.time()
+    count, last = 0, 0.0
+    try:
+        with open(state, encoding="utf-8") as fh:
+            parts = fh.read().split()
+        count, last = int(parts[0]), float(parts[1])
+    except (OSError, ValueError, IndexError):
+        count, last = 0, 0.0
+
+    def save(n):
+        try:
+            with open(state, "w", encoding="utf-8") as fh:
+                fh.write("%d %f" % (n, now))
+        except OSError:
+            pass
+
+    small = "<<" not in cmd and len(cmd) < BATCH_CHARS
+    if not small:
+        save(0)
+        return
+    if now - last > BATCH_IDLE:
+        count = 0
+    if last and now - last < BATCH_GAP:
+        return
+    count += 1
+    if count >= BATCH_MAX:
+        _NUDGE[0] = True
+        count = 0
+    save(count)
+
+
 try:
     tp = d.get("transcript_path") or ""
     agent_id = d.get("agent_id") or ""
@@ -104,6 +158,9 @@ try:
     if not isinstance(cmd, str) or not cmd.strip():
         sys.exit(0)
     cwd = d.get("cwd") or os.getcwd()
+    atexit.register(_emit_nudge)
+    # 🔴 contorul stă înaintea ieșirii pe RANGE — PATTERNS «Batching Bash»
+    batch_nudge(d.get("session_id") or "", cmd)
 
     def nlines(path):
         if not isinstance(path, str) or not path:

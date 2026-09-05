@@ -22,6 +22,7 @@ If I want details, I ask.
 # While you work
 - One line when you start something new; zero commentary between tool calls otherwise.
 - When you ask me a question: the question in the first sentence, context after, max 3 lines.
+- Independent Bash commands: one call or the same message, never one per turn.
 
 # Conventions for any agent (main and subagents)
 - A new code comment = a single one-line pointer: `🔴 <constraint> — <DOC> «<section>»`

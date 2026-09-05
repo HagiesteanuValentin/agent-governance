@@ -31,6 +31,9 @@ session only.
 - A command or Read producing over ~3k characters of FACTS → explorer. A table or list that
   doesn't fit in 1.5k → explorer-max, or an explorer that writes a dossier into `docs/dossier/`.
   Not fitting the report is no reason to read directly.
+- Bash: first list what you need, then ALL independent commands in a single call (`;`/`&&`)
+  or the same message — never one per turn; the analyzer flags `batchable_bash`, the bash-mare
+  hook flags the 3rd.
 - Large output (build, tests, diffs) and screenshots stay in the agent's own context: report
   exit code + numbers.
 - Plans under `docs/polish/` aren't read in main; the summary comes from design-lead's report.
@@ -38,6 +41,8 @@ session only.
 ## Flow
 - Flow: plan mode, I approve the plan → brief to implementer → audit per `/audit` →
   repairs (below) → final report; you don't summarize the agent's report for me.
+- Before ExitPlanMode, paste the plan into chat (context + briefs, short, ≤25 lines): in auto
+  mode the approval screen doesn't appear, and exiting plan mode stops auto mode.
 - After a NONCOMPLIANT audit, in this order:
   1. Mechanical deviations ≤20 lines/file, ≤3 files, no new logic → the auditor fixes them
   directly, reported as `FIXED` with the hunk.
@@ -112,7 +117,9 @@ session only.
   implementer-complex or scripter run counts toward them.
 - SendMessage to a live agent is not a re-send; it's the first option for small deviations.
 - At most 3 explorer runs per task, can run parallel.
-- An agent stopped by `maxTurns` = the brief is too big; split it, don't relaunch it as is.
+- An agent stopped by `maxTurns` = partial output; continue it ONCE via SendMessage (sub-agents
+  docs: "message the subagent to continue from where it stopped"), then split the brief,
+  don't relaunch it as is.
 - Past the cap (4th explorer, 4th run, past 6 live agents): don't decide alone — ask me with
   AskUserQuestion: how many agents, what model, why the cap isn't enough. The approval holds
   only for the current task.

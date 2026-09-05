@@ -116,3 +116,10 @@ read», «old_string not found») nu e o scriere reușită: agentul chiar are ne
 Hook-ul îl sare și caută mai departe în urmă. Un `Bash` care conține basename-ul fișierului
 (build/test pe el) resetează contorul: rezultatul poate cere o recitire.
 Read cu `offset`/`limit` pe ≤60 de linii rămâne permis — e verificare punctuală, nu recitire.
+
+## Batching Bash
+PreToolUse vede doar comanda, nu output-ul: „mic" = fără heredoc și sub 200 de caractere.
+Contorul (`/tmp/claude-hooks/bash-batch-<session_id>`) stă înaintea ieșirii pe RANGE, ca
+`sed -n`/`head` să se numere; reset la comandă mare sau după 90 s. Paralelismul nu se poate
+citi din transcript (la PreToolUse mesajul asistent cu `tool_use_id`-ul curent nu e încă
+scris): sub 3 s de la ultimul apel mic = același mesaj — nu incrementează, nu resetează.

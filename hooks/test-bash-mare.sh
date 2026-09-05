@@ -5,8 +5,9 @@ HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
 # 🔴 fixture-urile nu depind de modelul din settings — PATTERNS «Modelul în hook-uri»
 export GOV_MODEL=claude-fable-5-1
+rm -f /tmp/claude-hooks/bash-batch-* 2>/dev/null
 python3 - <<'PY'
-import json, os, shutil, subprocess, sys, tempfile
+import json, os, shutil, subprocess, sys, tempfile, time
 
 HOOK = os.path.join(os.environ["HOOKS_DIR"], "bash-mare.sh")
 TMP = tempfile.mkdtemp(prefix="test-bash-mare-")
@@ -111,6 +112,57 @@ case("JSON invalid -> exit 0, fără output",
      p.returncode == 0 and not p.stdout.strip(),
      "rc=%d out=%r" % (p.returncode, p.stdout.strip()))
 
+# 9-12) nudge de batching în main
+
+# 🔴 gap-ul se simulează prin contorul pre-scris, nu prin sleep — PATTERNS «Batching Bash»
+
+
+def state_path(sid):
+    return "/tmp/claude-hooks/bash-batch-%s" % sid
+
+
+def set_state(sid, count, age):
+    os.makedirs("/tmp/claude-hooks", exist_ok=True)
+    with open(state_path(sid), "w") as fh:
+        fh.write("%d %f" % (count, time.time() - age))
+
+
+def main_call(sid, cmd):
+    return decide({"session_id": sid, "transcript_path": tp(sid), "tool_name": "Bash",
+                   "tool_use_id": "cur", "tool_input": {"command": cmd}})
+
+
+SMALL = "git status --short"
+BIG = "echo " + "x" * 220
+
+set_state("b1", 1, 10)
+got, body = main_call("b1", SMALL)
+case("al 2-lea apel mic -> tăcut", got == "silent", "%s %s" % (got, body))
+
+set_state("b1", 2, 10)
+got, body = main_call("b1", SMALL)
+case("al 3-lea apel mic (gap >=3 s) -> context",
+     got == "context" and "batchable_bash" in body, "%s %s" % (got, body))
+
+set_state("b2", 2, 10)
+main_call("b2", BIG)
+set_state("b2", int(open(state_path("b2")).read().split()[0]), 10)
+got, body = main_call("b2", SMALL)
+case("comandă mare -> contor resetat", got == "silent", "%s %s" % (got, body))
+
+set_state("b3", 0, 10)
+for _i in range(3):
+    got, body = main_call("b3", SMALL)
+case("3 apeluri la <3 s (același mesaj) -> tăcut",
+     got == "silent" and open(state_path("b3")).read().split()[0] == "1",
+     "%s %s state=%s" % (got, body, open(state_path("b3")).read()))
+
+for _f in ("b1", "b2", "b3"):
+    try:
+        os.remove(state_path(_f))
+    except OSError:
+        pass
+
 shutil.rmtree(TMP, ignore_errors=True)
 failed = [r for r in results if not r[1]]
 for name, ok, got in results:
@@ -119,3 +171,6 @@ for name, ok, got in results:
 print("%d/%d passed" % (len(results) - len(failed), len(results)))
 sys.exit(1 if failed else 0)
 PY
+rc=$?
+rm -f /tmp/claude-hooks/bash-batch-* 2>/dev/null
+exit $rc

@@ -39,7 +39,7 @@ reset_effort_for_source() {
 if [ "${1:-rules}" = "v17" ]; then
   reset_effort_for_source
   if [ "$gov" = 1 ] && [ -f "$v" ]; then
-    echo "=== ORCHESTRATION v1.7 (injected by SessionStart; main session only) ==="
+    echo "=== ORCHESTRATION v1.8 (injected by SessionStart; main session only) ==="
     cat "$v"
     echo
   fi

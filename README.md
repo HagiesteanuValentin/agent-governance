@@ -97,6 +97,28 @@ implementer to Opus 5 low effort after the "simplu" experiment — see `docs/exp
 lot, vs opus-medium 4/4/3, eval 9–10/11, $2.52 (confounds listed in the same section); added
 `implementer-complex` (Opus medium) as the plan-time choice for multi-file logic.
 
+## v1.8 (2026-09-05)
+
+Phase-based effort is back: the `~/.claude/v17-effort-auto` flag is set again, since
+changelog 2.1.260 states `/effort` no longer rewrites the prompt cache. Vali still runs
+`/effort` by hand; the hook only warns. Check the first main call after a switch — if
+`cache_read` drops to ~17k and `cache_creation` jumps, remove the flag and go back to
+medium constant. The advisor is now mandatory on triggers a-f (2+ JS/TS briefs, hooks or
+live config or data migration, Vali's own word, any complex/max brief, 3+ briefs, parallel
+implementers or a worktree), and it re-reads the updated plan in round 2. `bash-mare.sh`
+adds a main-side nudge on the 3rd consecutive small Bash call.
+
+`subagentPromptCacheTtl` is deliberately left unset: measured on the 2026-09-03 blueprint,
+agents already write 100% at 5m (2.21M tokens) and main 100% at 1h (293k). Fable 5.1
+pricing is corrected across the analyzer ($10/$50, cache read $1 at 0.1x for calc — Vali is
+on subscription; $0.25 is only the informative API price, write 5m $12.50 / 1h $20;
+`scripts/pricing-cache-5m.py`): the same blueprint goes $65.87 to $57.72 in total (the drop
+comes only from agent 5m writes billed at 1.25x instead of 2x), main stays $19.34 (main
+writes 1h cache). The Fable-only floor now runs on `claude-fable-5-1` too (cache read $1,
+0.1x): floor $89.44 (1.5x), realistic $556.44 — read orchestration savings on `realistic`,
+not floor. Narration was left without a hook: 27 of 88 main calls on that blueprint,
+~$0.73, about 1.5% of the session.
+
 ## v1.7.5 (stable, 2026-09-03)
 
 New entry `v1.7.5` in `tools/versions.json` (from 2026-09-03T13:04 local): sessions from

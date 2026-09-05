@@ -49,7 +49,7 @@ Registered in `settings.json` (see `hooks/settings.example.json`).
 | `session-start.sh` | SessionStart | — | injects `HANDOFF*.md` from the project root |
 | `read-mare.sh` | PreToolUse / Read | main only: re-read of a file already read this session, >300 lines without `offset`/`limit`, or an image over 200 KB; sub-agents (v1.7.4): Read on a file the agent itself just wrote, with no Read/Bash-on-basename in between (a ranged Read of ≤60 lines is allowed); **everyone** (v1.4.1): `file_path` under `/tool-results/` | denies (image without `-small`, plans, and short `.md` stay a reminder) |
 | `brief-mare.sh` | PreToolUse / Agent | brief >7,000 characters | reminder: "split it into phases" |
-| `bash-mare.sh` | PreToolUse / Bash | main only: whole-file reads >300 lines and heredoc writes >20 body lines run through Bash instead of Read/Write/Edit; sub-agents (v1.7.4): the 3rd identical Bash command with no Edit/Write in between | denies in main, points at the proper tool; sub-agent gets an `additionalContext` nudge, never a block |
+| `bash-mare.sh` | PreToolUse / Bash | main only: whole-file reads >300 lines and heredoc writes >20 body lines run through Bash instead of Read/Write/Edit; sub-agents (v1.7.4): the 3rd identical Bash command with no Edit/Write in between; main (v1.8): the 3rd consecutive small Bash call (no heredoc, under 200 chars; calls under 3s apart count as one; reset by a large call or 90s idle) | denies in main, points at the proper tool; the batching case and sub-agents get an `additionalContext` nudge, never a block |
 | `write-mare.sh` | PreToolUse / Write\|Edit | main only: >20 written lines | denies, points at scribe/implementer |
 | `commit-gate.sh` | PreToolUse / Bash | main only: `git commit` (incl. `git -C <dir> commit`) with staged/unstaged diff touching `.ts/.tsx/.js/.jsx/.mjs/.astro`, no fresh `audit-ok-<session_id>` marker | `ask`: run `/audit` on the commit range first. **Disabled live 2026-09-04** (blocks unattended sessions); script kept, not wired in `settings.example.json` |
 | `agenti-vii.sh check` | PreToolUse / Agent | ≥4 agents alive (state file `/tmp/claude-hooks/live-<session_id>`, 5 min grace) | `ask`, lists type/id of the live agents |
@@ -119,6 +119,15 @@ Three design notes:
    synthesizes one backbone concept plus borrowed parts into the plan. Motivated by a
    post-mortem: anti-safe requests still produced 5-9 item, delta-only plans on the previous
    single-phase flow.
+11. v1.8: phase-based effort is back under `~/.claude/v17-effort-auto` (changelog 2.1.260 —
+   `/effort` no longer rewrites the cache; the hook only warns, Vali runs `/effort`); the
+   advisor is mandatory on triggers a-f, not just on 2+ JS/TS briefs; `bash-mare.sh` nudges
+   main on the 3rd consecutive small Bash call; `subagentPromptCacheTtl` is deliberately not
+   set (agents already write 100% at 5m); Fable 5.1 pricing corrected (cache read $1 at
+   0.1x for calc, $0.25 is only the informative API price — blueprint 2026-09-03 goes
+   $65.87 to $57.72, main stays $19.34, floor $89.44 vs realistic $556.44 on
+   `claude-fable-5-1`), so orchestration savings are read on `realistic`, not floor.
+   Narration got no hook: 27 of 88 main calls, about $0.73, roughly 1.5% of the session.
 
 ## What gets measured
 
