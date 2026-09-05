@@ -14,6 +14,9 @@ your head. The flow, in order:
    docs/DECISIONS.md, PATTERNS.md, docs/RECIPES.md), the breakpoints from CLAUDE.md if you
    know them. Concepts path: `docs/polish/<target-slug>.concepts.md` (only the expert uses
    it).
+   Effort: run `bash ~/.claude/hooks/effort-phase.sh medium </dev/null` in the same Bash as
+   the first command of step 1 (ignore its JSON line); if that result carries `WARN effort`,
+   print «You: /effort medium» and wait.
    Choosing the design lead, BEFORE any explorer. `lead=` forces it. Otherwise
    `design-lead-expert` (Opus 5 xhigh, two phases) on ≥1 signal: (a) the target is a site / whole page or the
    request is about direction ("premium", "identity", "atmosphere", "I don't like it"), with
@@ -116,6 +119,9 @@ your head. The flow, in order:
    not launch another lead. Ceiling: 2 such messages per /polish (a 3rd is the CLAUDE.md
    ceiling).
 5. Implementation. Split the approved items into sequential briefs under the normal rules
+   Effort: after the operator's approval, run `bash ~/.claude/hooks/effort-phase.sh low </dev/null`
+   (ignore its JSON line; the WARN comes on this same result), then print «You: /effort low»
+   on its own line and wait for the reply before the first brief.
    (ceiling on files and risk, not on count: CSS items in the same file go 8–10 at a time;
    ≤6 files; JS separate from CSS; MUST first). The verification script comes from the
    design-lead (short route) or from implementer 2b (long route); every brief runs it,

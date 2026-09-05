@@ -10,7 +10,7 @@ now mandatory on a wide set of triggers (a-f) and re-reads the plan in round 2,
 `bash-mare.sh` nudges main on the 3rd consecutive small Bash call, Fable 5.1 pricing and
 5m/1h cache billing are corrected in the analyzer, the `/refine` skill (agents `refiner` /
 `refiner-complex`, both Fable 5.1) ships for single-page changes, and
-`orchestrare.md` is kept under 10 KB. Metrics from 2026-09-05T14:50 (local time) onward are
+`orchestrare.md` is kept under 10 KB. Metrics from 2026-09-05T14:45 (local time) onward are
 the ones that count for v1.8.
 
 ## The problem

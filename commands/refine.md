@@ -8,6 +8,9 @@ your head. The flow, in order:
    `refine: <page|section> → refiner-complex|refiner`
    `refiner-complex` for a whole page or two or more sections; `refiner` for one section or
    one element. Mixed signals → `refiner-complex`. Slug: the target, lowercased, dashes.
+   Effort: run `bash ~/.claude/hooks/effort-phase.sh medium </dev/null` in the same Bash as
+   the first command of step 1 (ignore its JSON line); if that result carries `WARN effort`,
+   print «You: /effort medium» and wait.
 
 1. Preparation (no agents). At most 3 commands (`ls`, `grep -rl <name>` — file lists only) →
    the list of the target's paths. Then name the spec sections: file + heading from the
@@ -42,6 +45,9 @@ your head. The flow, in order:
        Goal: write and run `scripts/verify-<slug>.mjs`, which produces the three screenshots
        and `docs/refine/<slug>.measurements.md`. If a script from /polish already exists for
        this slug, adapt it instead of writing a new one.
+       The brief gives the line ranges to read (server start/stop, screenshots, hover — you
+       take them from `grep -n` on the old script, you do not read it) and names any sibling
+       `scripts/masoara-*.mjs` whose measurement functions are reused.
        Files: `scripts/verify-<slug>.mjs`, `docs/refine/<slug>.measurements.md`,
        `docs/refine/<slug>-{mobile,tablet,desktop}.png`.
        The script: ONE browser for the whole run, `browser.close()` in `finally`. Starts and
@@ -94,6 +100,9 @@ your head. The flow, in order:
    You mark `CUT` only on items that contradict the spec; you do not rewrite items.
 
 5. The operator chooses the items (SHOULD / COULD / MAYBE). Then implementation briefs as in
+   Effort: after the operator's approval, run `bash ~/.claude/hooks/effort-phase.sh low </dev/null`
+   (ignore its JSON line; the WARN comes on this same result), then print «You: /effort low»
+   on its own line and wait for the reply before the first brief.
    /polish step 5: the item numbers + the plan path + the script as the verifier (the "after"
    numbers). The implementer reads its own acceptance criteria from the plan; you do not copy
    them in and you do not read the plan again. The refiner dies after the review; it is not

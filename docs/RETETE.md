@@ -131,6 +131,8 @@ pe medium în settings; resume păstrează; `EnterPlanMode` scrie medium →
 `/effort medium` manual când apare WARN. Oprirea experimentului: `rm ~/.claude/v17-effort-auto`.
 Repornirea: `touch ~/.claude/v17-effort-auto`
 Capcană: `PostToolUse` nu trage la tool cu exit≠0.
+/polish (pasul 1) și /refine (pasul 0): comanda rulează `effort-phase.sh medium`; pasul 5, după
+aprobare, `effort-phase.sh low`; același WARN.
 
 ## Scripturi
 `hooks/bash-mare.sh` (PreToolUse/Bash, doar sesiunea main): blochează citiri întregi mari

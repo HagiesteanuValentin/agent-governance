@@ -41,3 +41,5 @@ the target into settings and warns on mismatch. Main, first line after ExitPlanM
 «You: /effort low»; on EnterPlanMode: «You: /effort medium». Resumed 2026-09-05: Claude Code
 2.1.260 no longer invalidates the cache on `/effort`. Escalation = advisor or re-entering
 plan mode. Reason: `DECIZII «v1.8 — efort pe faze reluat»`.
+In /polish and /refine the command itself runs the hook at step 0 (medium) and 5 (low); same
+«You: /effort».
