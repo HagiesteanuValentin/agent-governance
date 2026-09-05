@@ -123,3 +123,9 @@ Contorul (`/tmp/claude-hooks/bash-batch-<session_id>`) stă înaintea ieșirii p
 `sed -n`/`head` să se numere; reset la comandă mare sau după 90 s. Paralelismul nu se poate
 citi din transcript (la PreToolUse mesajul asistent cu `tool_use_id`-ul curent nu e încă
 scris): sub 3 s de la ultimul apel mic = același mesaj — nu incrementează, nu resetează.
+
+## orchestrare.md sub 10 KB
+`~/.claude/orchestrare.md` și `templates/orchestrare.md` trebuie să stea sub 10.000 bytes:
+peste, harness-ul trunchiază blocul SessionStart la 2 KB și sesiunea pierde reguli. Pe
+05.09 marja era sub 5 bytes (9.996/9.997) — orice rând nou cere o scurtare compensatorie în
+altă parte a fișierului, nu doar adăugare.

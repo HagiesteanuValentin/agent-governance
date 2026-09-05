@@ -4,10 +4,14 @@ Governance for Claude Code agent sessions: policies, enforcement hooks, and offl
 telemetry. Cheap models do the work, the expensive model only plans and audits, and hooks
 stop verbose agents from flooding the orchestrator's context.
 
-Current version: **v1.8** — five new enforcement hooks for the orchestrator itself: `bash-mare.sh` and `write-mare.sh` catch main doing big reads/writes through the wrong tool, `commit-gate.sh` asks before a `git commit` on code without a fresh audit marker, `agenti-vii.sh` caps live agents at 4 (`ask`, not deny) via a per-session state file, and `context-agent.sh` now also runs scoped to main (`--scope main`) with opt-in per-type thresholds (`--praguri-tip`). Measured experiments: `docs/experiments.md`. Narration avoidable is defined as a text-only call with no live agent and no question to the user, with a `residual_poll` subtype for the harness re-notifying an already-notified agent. v1.6
-is tuned for Fable 5.1 as orchestrator (see `docs/postmortem-2026-09-01-fable-5-1.md`) and
-its hooks were smoke-tested live on 2026-09-02: the deny hooks enforce, the ask hooks (commit
-gate, live-agent cap) are advisory under auto permission mode by design.
+Current version: **v1.8** (final) — phase-based effort is back (plan medium /
+implementation low, `/effort` given by hand by Vali, Claude Code 2.1.260), the advisor is
+now mandatory on a wide set of triggers (a-f) and re-reads the plan in round 2,
+`bash-mare.sh` nudges main on the 3rd consecutive small Bash call, Fable 5.1 pricing and
+5m/1h cache billing are corrected in the analyzer, the `/refine` skill (agents `refiner` /
+`refiner-complex`, both Fable 5.1) ships for single-page changes, and
+`orchestrare.md` is kept under 10 KB. Metrics from 2026-09-05T14:50 (local time) onward are
+the ones that count for v1.8.
 
 ## The problem
 
@@ -118,6 +122,12 @@ writes 1h cache). The Fable-only floor now runs on `claude-fable-5-1` too (cache
 0.1x): floor $89.44 (1.5x), realistic $556.44 — read orchestration savings on `realistic`,
 not floor. Narration was left without a hook: 27 of 88 main calls on that blueprint,
 ~$0.73, about 1.5% of the session.
+
+New skill `/refine`: like `/polish` but scoped to one page or section, routed to `refiner`
+or `refiner-complex` (both Fable 5.1) — see the entry below for the shape. Separately,
+`~/.claude/orchestrare.md` and `templates/orchestrare.md` are capped at 10 KB, since the
+harness truncates the injected SessionStart block to 2 KB past that size; on 2026-09-05 the
+margin was under 5 bytes, so any new line there needs a compensating cut.
 
 ## v1.7.5 (stable, 2026-09-03)
 
@@ -285,7 +295,7 @@ reviews the plan against DECISIONS/budget and does the steering by text, not the
 History: v1.1 (2026-08-28) added the router and the long route; v1.2 (2026-08-29) moved
 the expert to Opus 5 xhigh and split it into the two phases above.
 
-**/refine (v1.8.1)**: same shape as `/polish` but scoped to one page or section, not a
+**/refine (v1.8)**: same shape as `/polish` but scoped to one page or section, not a
 redesign. A router picks `refiner` or `refiner-complex`; an explorer writes a dossier and a
 scripter writes/runs the measurement script plus ≤3 screenshots in parallel; the refiner
 writes the plan to `docs/refine/<slug>.md`, the orchestrator reviews it adversarially (one
