@@ -285,6 +285,13 @@ reviews the plan against DECISIONS/budget and does the steering by text, not the
 History: v1.1 (2026-08-28) added the router and the long route; v1.2 (2026-08-29) moved
 the expert to Opus 5 xhigh and split it into the two phases above.
 
+**/refine (v1.8.1)**: same shape as `/polish` but scoped to one page or section, not a
+redesign. A router picks `refiner` or `refiner-complex`; an explorer writes a dossier and a
+scripter writes/runs the measurement script plus ≤3 screenshots in parallel; the refiner
+writes the plan to `docs/refine/<slug>.md`, the orchestrator reviews it adversarially (one
+round, against DECISIONS and the target's spec sections) before Vali picks items to
+implement. `docs/refine/` is never committed.
+
 **Scripter before repetitive work (v1.4b)**: when a brief has the same edit repeated across
 many files, or a check that will run more than once, the first brief goes to `scripter`
 (cheap model, high effort) instead of straight to `implementer`. It writes a script under
@@ -443,8 +450,9 @@ session data never leaves the machine.
 ```
 agents/     the agent definitions (explorer, implementer, implementer-complex, implementer-max,
             implementer-sonnet, scripter, scripter-complex, scribe, auditor, design-lead,
-            design-lead-expert) — model, effort, maxTurns, allowed tools, fixed report format
-commands/   slash commands (polish, rate) — mirrors ~/.claude/commands/
+            design-lead-expert, refiner, refiner-complex) — model, effort, maxTurns, allowed
+            tools, fixed report format
+commands/   slash commands (polish, refine, rate) — mirrors ~/.claude/commands/
 hooks/      the eleven enforcement hooks + settings.example.json
 templates/  CLAUDE.global.md (orchestration policy), CLAUDE.project.md
             (the sources-of-truth pattern for a project), and SCRIPTS.md (the

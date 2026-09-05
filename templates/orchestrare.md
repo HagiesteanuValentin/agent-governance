@@ -10,27 +10,25 @@ session only.
   change scope silently.
 
 ## Agents
-- explorer, explorer-max, implementer, implementer-complex, implementer-max, implementer-sonnet, scripter,
-  scripter-complex, scribe, auditor, design-lead and design-lead-expert (both only through
-  `/polish`) — nothing else without my OK.
+- explorer(-max), implementer(-complex/-max/-sonnet), scripter(-complex), scribe, auditor,
+  design-lead(-expert) only through /polish, refiner(-complex) only through /refine — nothing
+  else without my OK.
 - Models: explorer* Sonnet 5 medium, read-only (max: report ≤6k, table-shaped answers) ·
   auditor Opus 5 high · implementer Opus 5 low, DEFAULT for any brief, including logic ·
   implementer-complex Opus 5 medium, chosen AT PLAN for multi-file logic, non-trivial verifier
   or declared debugging · implementer-max Opus 5 high · implementer-sonnet Sonnet 5 high ·
   scripter Sonnet 5 high · scripter-complex Opus 5 medium.
 - maxTurns: implementer* 100 (max 120), scripter* 80-100, explorer-max 60.
-- implementer-sonnet ONLY with a cheap verifier (script, build, test, grep), no debugging and
-  no JS/TS logic across multiple files: CSS, markup, config, docs, mechanical items. AT PLAN
-  TIME. Logic deviations at audit → implementer-max; SendMessage to Sonnet only for mechanical
-  deviations (text/CSS/config).
+- implementer-sonnet ONLY with a cheap verifier (script, build, test, grep), no debugging, no
+  cross-file JS/TS logic: CSS, markup, config, docs, mechanical items. AT PLAN TIME. Logic
+  deviations at audit → implementer-max; SendMessage to Sonnet only for mechanical ones.
 - Light tasks (docs, HANDOFF, renames, one-line fixes) → scribe, given the target SECTIONS
   (heading, range), not whole files.
 
 ## Reading in main
 - Main reads only `git diff --stat`, agent reports, and at most one dossier.
-- A command or Read producing over ~3k characters of FACTS → explorer. A table or list that
-  doesn't fit in 1.5k → explorer-max, or an explorer that writes a dossier into `docs/dossier/`.
-  Not fitting the report is no reason to read directly.
+- Over ~3k chars of FACTS → explorer. A table/list over 1.5k → explorer-max, or a dossier in
+  `docs/dossier/`. Not fitting the report is no reason to read directly.
 - Bash: first list what you need, then ALL independent commands in a single call (`;`/`&&`)
   or the same message — never one per turn; the analyzer flags `batchable_bash`, the bash-mare
   hook flags the 3rd.
@@ -64,11 +62,10 @@ session only.
 - The verifier runs once at the end and once after fixes, not after every edit (the hook
   flags the 3rd run).
 - Agent turns are not something to save; a run that leaves verifications unrun is a loss.
-- The BRIEF is self-contained (the agent doesn't see the conversation, has no skills, can't
-  delegate). It must contain: the goal in one sentence · the steps · the exact files with
-  paths · the definition of done · how it's verified · what it's NOT allowed to do
-  (commit/push/seed/real services). Rules spelled out, not "load /handoff". No brief, no
-  delegation.
+- The BRIEF is self-contained (no conversation context, no skills, no delegating). It must
+  contain: the goal in one sentence · the steps · the exact files with paths · the definition
+  of done · how it's verified · what it's NOT allowed to do (commit/push/seed/real services).
+  Rules spelled out, not "load /handoff". No brief, no delegation.
 - Give paths and criteria, not pasted code: you don't read files to write the brief; the
   implementer reads its own code from those paths. Copy doc prohibitions verbatim, plus:
   "Do not read DECISIONS or RECIPES in full; only the sections named here".
@@ -105,7 +102,7 @@ session only.
   (c) auditor on Brief N while the implementer runs Brief N+1, ONLY if N+1 doesn't touch N's
   files and doesn't depend on its verdict — declared at plan time;
   (d) an explorer while an implementer runs, only on areas the brief doesn't touch.
-- HARD CAP: at most 6 live agents at once, any type — the analyzer flags `parallel_over_cap`.
+- HARD CAP: ≤6 live agents at once, any type — the analyzer flags `parallel_over_cap`.
 - I want to see only the plan and the conclusion, not the execution. Audit after parallel
   runs: brief by brief.
 - Worktree (`isolation: worktree`) only when declared at plan time, when the lists can't be
@@ -113,10 +110,10 @@ session only.
   the dependency between briefs.
 
 ## Caps
-- At most 2 re-sends to implementer per task (3 runs total); one implementer-sonnet,
+- ≤2 re-sends to implementer per task (3 runs total); one implementer-sonnet,
   implementer-complex or scripter run counts toward them.
 - SendMessage to a live agent is not a re-send; it's the first option for small deviations.
-- At most 3 explorer runs per task, can run parallel.
+- ≤3 explorer runs per task, can run parallel.
 - An agent stopped by `maxTurns` = partial output; continue it ONCE via SendMessage (sub-agents
   docs: "message the subagent to continue from where it stopped"), then split the brief,
   don't relaunch it as is.
@@ -133,8 +130,8 @@ session only.
   deviations in ≤1.5k; you read `git diff --stat` + the report + the flagged files.
 - The auditor dies with the delivery; on a re-audit for the same task, continue the same
   agent.
-- After launching an agent: zero text until the result notification; at the notification, the
-  next-action line AND its tool call come in the same message. No "waiting for the report".
+- After launching an agent: zero text until the result notification; then the next-action line
+  AND its tool call come in the same message. No "waiting for the report".
 
 ## Commit
 - At the end of a task, without asking me, ONLY when: the audit is COMPLIANT, the definition

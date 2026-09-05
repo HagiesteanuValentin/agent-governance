@@ -25,6 +25,8 @@ project has its own HANDOFF / PATTERNS / DECISIONS.
   | `auditor` | expensive | high | 60 | diffs over 150 lines / 3 files / new JS logic; reads, plus mechanical fixes via Edit (v1.4.1: tested against medium, medium misses silent deletions — stays high) |
   | `design-lead` | expensive | high | 60 | read-only + one plan file; gets paths and section headings, does not delegate; only via /polish |
   | `design-lead-expert` | expensive (opus) | xhigh | 50 | read-only + one plan file; two phases: concepts without data, then synthesis with measurements; gets a dossier (paths + line ranges) from an explorer and measurements from an implementer; reads fragments only; chosen by the router in /polish |
+  | `refiner` | expensive (fable) | medium | 40 | read-only + one plan file; writes `docs/refine/<slug>.md` from a dossier, measurements and 3 screenshots; only via /refine |
+  | `refiner-complex` | expensive (fable) | high | 50 | same as `refiner`, chosen by the router for targets needing more structural judgment; only via /refine |
 
 - The auditor dies with the delivery and is respawned for the next one. The exception: a
   re-audit after repairs on the SAME task continues the same agent, which already has the
@@ -34,6 +36,13 @@ project has its own HANDOFF / PATTERNS / DECISIONS.
 range against DECISIONS + definition of done), `/handoff` (rewrite HANDOFF.md as a snapshot),
 `/polish` (design-lead writes an exhaustive polish plan to a file, the orchestrator reviews
 it adversarially, then the normal implement → audit loop).
+
+**/refine**: narrower than `/polish` — one page or section, not a whole redesign. An explorer
+writes a dossier (structure, reusable site inventory, tokens) while a scripter writes/runs a
+measurement script and takes ≤3 screenshots (≤1568px long side); `refiner` or `refiner-complex`
+(router picks by target) turns those into a plan at `docs/refine/<slug>.md`, reviewed
+adversarially in main (one round) before Vali picks items. `docs/refine/` is never committed,
+same as `docs/dosar/`.
 
 Why it saves money: the orchestrator's context is the expensive resource, because every
 token in it is re-paid (as cache reads) on every subsequent message. Agents have their own
