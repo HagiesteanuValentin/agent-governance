@@ -402,6 +402,16 @@ Comments shaped `🔴 … — DECIZII/PATTERNS «…»` are pointers to internal
 not included in this repo. The regexes with Romanian diacritics target the Romanian
 wording of agent reports from the author's own system.
 
+**Quick install**
+
+```sh
+git clone <this-repo> ~/agent-governance
+bash ~/agent-governance/easy_install.sh
+```
+
+Backs up your current `~/.claude` first and asks for confirmation. See `HOW_TO_USE.md`
+for what it changes, what `--dry-run`/`--restore` do, and settings that break the engine.
+
 **Install the agents and hooks**
 
 ```sh

@@ -144,4 +144,12 @@ elsewhere in the file, not just an addition.
 Windows) stdout comes out ascii and the print crashes with `UnicodeEncodeError`. That's why
 `main()` forces `reconfigure(encoding="utf-8", errors="replace")` on stdout and stderr,
 before any print.
+
+## easy_install.sh
+The installer replaces four folders under `$HOME/.claude` with `rm -rf`, so every delete goes
+through `safe_rm`: it refuses when `$HOME` is empty or not a directory, and refuses any path
+outside `$HOME/.claude`. Line 5 of `hooks/session-metrics.sh` hardcodes
+`$HOME/agent-governance`; the installer rewrites that line in the *installed copy* with the
+absolute path of the clone, otherwise SessionEnd exits silently and TRENDS.md never appears.
+The repo copy stays unchanged, so "settings == example" style comparisons still hold.
 </content>
