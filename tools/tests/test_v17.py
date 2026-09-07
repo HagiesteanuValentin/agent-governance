@@ -56,8 +56,8 @@ def test_cost_per_turn_is_filled_only_in_trends():
 
 
 def test_task_class_from_slug_and_from_an_old_record():
-    assert sm.task_class("-home-vali-workflow-proiecte-agent-governance") == "governance-rd"
-    assert sm.task_class("-home-vali-proiecte-site_ac") == "product"
+    assert sm.task_class("-home-user-workflow-proiecte-agent-governance") == "governance-rd"
+    assert sm.task_class("-home-user-proiecte-site_ac") == "product"
     assert sm.task_class({"project": "-home-x-agent-governance"}) == "governance-rd"
     assert sm.task_class({"project": "-home-x-shop", "task_class": "governance-rd"}) \
         == "governance-rd"

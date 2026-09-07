@@ -152,4 +152,11 @@ outside `$HOME/.claude`. Line 5 of `hooks/session-metrics.sh` hardcodes
 `$HOME/agent-governance`; the installer rewrites that line in the *installed copy* with the
 absolute path of the clone, otherwise SessionEnd exits silently and TRENDS.md never appears.
 The repo copy stays unchanged, so "settings == example" style comparisons still hold.
+
+## context-agent reads the sub-agent's own transcript
+Inside a sub-agent, the `transcript_path` a hook receives is MAIN's transcript, not the
+agent's; measuring it counts main's tokens against the agent's budget (blueprint postmortem:
+main at 163k-187k while two implementers passed 217k/182k undetected). So `context-agent.sh`
+rebuilds `<dir(transcript_path)>/<session_id>/subagents/agent-<agent_id>.jsonl` and returns
+without measuring when that file is missing — it never falls back to main's transcript.
 </content>

@@ -69,7 +69,7 @@ CLAUDE.md loads, PATTERNS/DECIZII are the target, `scripts/SCRIPTS.md` belongs t
 the hook and the analyzer log on cwd.
 
 ## Cell experiment — evaluating a batch
-S = `~/.claude/projects/-home-vali-workflow-proiecte-agent-governance/<session>/subagents`
+S = `~/.claude/projects/-home-user-projects-my-app/<session>/subagents`
 (batch 1 = `eb3b7cff-2e84-44ec-b9de-fe02fa88366c`; batches 2–4 =
 `1582af01-4db0-4d07-8298-10b83d183134`; each new batch adds its session's `--subagents-dir`).
 R = `metrics-local/experiments/simplu/r<k>`. Steps:
@@ -97,7 +97,7 @@ Smoke, a NEW session, in this order:
 3) Staging in a SEPARATE command: `touch smoke.mjs && git add smoke.mjs`, then
    `git commit -m smoke` alone; in auto mode NO prompt appears — the verdict is read from the
    transcript: `grep -c '"permissionDecision\": \"ask'
-   ~/.claude/projects/-home-vali-workflow-proiecte-agent-governance/<session-id>.jsonl`
+   ~/.claude/projects/-home-user-projects-my-app/<session-id>.jsonl`
    (session-id = the file `/tmp/claude-hooks/live-<sid>`); then
    `git reset --soft HEAD~1 && git reset smoke.mjs && rm smoke.mjs`.
 4) 4 explorers run `python3 -c "import time; time.sleep(180)"` then answer "ok"; check

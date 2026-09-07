@@ -1,5 +1,5 @@
 #!/bin/bash
-# 🔴 must read the sub-agent's own transcript, not main's — docs/workflow.md «Active hooks»
+# 🔴 must read the sub-agent's own transcript, not main's — PATTERNS «context-agent reads the sub-agent's own transcript»
 MARKER_DIR=/tmp/claude-hooks
 input=$(cat)
 python3 - "$input" "$MARKER_DIR" "$@" <<'PY'
@@ -13,7 +13,7 @@ WARN_AT, BLOCK_AT = 150000, 220000
 SCOPE = "agent"
 ANY_TYPE = False
 PER_TYPE = False
-# 🔴 per-type thresholds only with --praguri-tip, default stays 150k/220k — docs/DECIZII.md «context-agent — scope main și praguri per tip»
+# 🔴 per-type thresholds only with --praguri-tip, default stays 150k/220k — docs/DECIZII.md «context-agent — scope main and per-type thresholds»
 TYPE_LIMITS = {"implementer-sonnet": (100000, 150000),
                "scripter": (100000, 150000)}
 AGENT_PREFIXES = ("implementer", "scripter")

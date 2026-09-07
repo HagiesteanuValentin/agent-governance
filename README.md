@@ -7,13 +7,13 @@ stop verbose agents from flooding the orchestrator's context.
 Current version: **v1.8** (frozen) — the rules aren't changing anymore, it's now being
 tested on product sessions (≥3 from 2026-09-05T14:45 onward, until a verdict is reached).
 Phase-based effort is back (plan medium / implementation low, `/effort` given by hand by
-Vali, Claude Code 2.1.260), the advisor is now mandatory on a wide set of triggers (a-f) and
+claude_code_king, Claude Code 2.1.260), the advisor is now mandatory on a wide set of triggers (a-f) and
 re-reads the plan in round 2, `bash-mare.sh` nudges main on the 3rd consecutive small Bash
 call, Fable 5.1 pricing and 5m/1h cache billing are corrected in the analyzer, the `/refine`
 skill (agents `refiner` / `refiner-complex`, both Fable 5.1) ships for single-page changes,
 and `orchestrare.md` is kept under 10 KB. Phase-based effort now also runs inside `/polish`
 and `/refine` (both commands run the `effort-phase.sh` hook), and the `/refine` scripter
-brief asks for line ranges plus `scripts/masoara-*.mjs`. Metrics from
+brief asks for line ranges plus per-project measurement scripts. Metrics from
 2026-09-05T14:45 (local time) onward are the ones that count for v1.8.
 
 ## The problem
@@ -95,8 +95,8 @@ avoidable" in `tools/session_metrics.py` as a text-only call with no live agent 
 question to the user, adding a `residual_poll` subtype; across 12 sessions this cut avoidable
 turns from 62 to 11 (5 of them residual). v1.6 (2026-09-02) added `bash-mare.sh`,
 `write-mare.sh`, `commit-gate.sh`, and `agenti-vii.sh`, and gave `context-agent.sh` a
-`--scope main` mode plus opt-in per-type thresholds (`--praguri-tip`) — see `docs/DECIZII.md`
-«v1.6 — hook-uri pentru orchestrator (02.09.2026)». Smoke-tested live 2026-09-02: deny hooks
+`--scope main` mode plus opt-in per-type thresholds (`--praguri-tip`) — see internal decision
+notes, not published. Smoke-tested live 2026-09-02: deny hooks
 enforce, ask hooks (commit gate, live-agent cap) are advisory under auto permission mode by
 design; v1.6 is tuned for Fable 5.1 as orchestrator. v1.6.1 (2026-09-02) moved the default
 implementer to Opus 5 low effort after the "simplu" experiment — see `docs/experiments.md`
@@ -107,17 +107,17 @@ lot, vs opus-medium 4/4/3, eval 9–10/11, $2.52 (confounds listed in the same s
 ## v1.8 (2026-09-05)
 
 Phase-based effort is back: the `~/.claude/v17-effort-auto` flag is set again, since
-changelog 2.1.260 states `/effort` no longer rewrites the prompt cache. Vali still runs
+changelog 2.1.260 states `/effort` no longer rewrites the prompt cache. claude_code_king still runs
 `/effort` by hand; the hook only warns. Check the first main call after a switch — if
 `cache_read` drops to ~17k and `cache_creation` jumps, remove the flag and go back to
 medium constant. The advisor is now mandatory on triggers a-f (2+ JS/TS briefs, hooks or
-live config or data migration, Vali's own word, any complex/max brief, 3+ briefs, parallel
+live config or data migration, claude_code_king's own word, any complex/max brief, 3+ briefs, parallel
 implementers or a worktree), and it re-reads the updated plan in round 2. `bash-mare.sh`
 adds a main-side nudge on the 3rd consecutive small Bash call.
 
 `subagentPromptCacheTtl` is deliberately left unset: measured on the 2026-09-03 blueprint,
 agents already write 100% at 5m (2.21M tokens) and main 100% at 1h (293k). Fable 5.1
-pricing is corrected across the analyzer ($10/$50, cache read $1 at 0.1x for calc — Vali is
+pricing is corrected across the analyzer ($10/$50, cache read $1 at 0.1x for calc — claude_code_king is
 on subscription; $0.25 is only the informative API price, write 5m $12.50 / 1h $20;
 `scripts/pricing-cache-5m.py`): the same blueprint goes $65.87 to $57.72 in total (the drop
 comes only from agent 5m writes billed at 1.25x instead of 2x), main stays $19.34 (main
@@ -134,7 +134,7 @@ margin was under 5 bytes, so any new line there needs a compensating cut.
 
 Phase-based effort now also runs inside `/polish` and `/refine`: both commands call the
 `effort-phase.sh` hook, at step 0/1 and again at step 5 after plan approval. The `/refine`
-scripter brief (step 2b) asks for line ranges plus `scripts/masoara-*.mjs`. Metrics from
+scripter brief (step 2b) asks for line ranges plus per-project measurement scripts. Metrics from
 14:45 (local time) onward are the ones that count for the v1.8 verdict.
 
 ## v1.7.5 (stable, 2026-09-03)
@@ -209,7 +209,7 @@ effort disagree. Live-agent cap raised 4 → 6. Metrics: section «T-v17» in
 (`governance-rd`/`product`), cost is read as `v17.cost_per_turn` (not counterfactual),
 and `plan.echo` and `Summary` show up in the per-session report under `metrics-local/`.
 
-**What we're testing**: Vali's theory is that heavy reasoning earns its cost at plan time;
+**What we're testing**: claude_code_king's theory is that heavy reasoning earns its cost at plan time;
 at implementation time governance (briefs, audit, hooks) already does the reasoning's job,
 so the expensive second opinion (the advisor) is only worth it when the plan is risky.
 Judged over ≥3 real sessions with `/rate`, $ spent by main per phase, and the flags from
@@ -307,7 +307,7 @@ the expert to Opus 5 xhigh and split it into the two phases above.
 redesign. A router picks `refiner` or `refiner-complex`; an explorer writes a dossier and a
 scripter writes/runs the measurement script plus ≤3 screenshots in parallel; the refiner
 writes the plan to `docs/refine/<slug>.md`, the orchestrator reviews it adversarially (one
-round, against DECISIONS and the target's spec sections) before Vali picks items to
+round, against DECISIONS and the target's spec sections) before claude_code_king picks items to
 implement. `docs/refine/` is never committed.
 
 **Scripter before repetitive work (v1.4b)**: when a brief has the same edit repeated across
@@ -513,8 +513,9 @@ tools/      session_metrics.py, the offline transcript analyzer, pricing.json (p
             versions.json (workflow versions: name + start day or local minute; TRENDS.md groups
             sessions by version so you can compare before/after a workflow change;
             sessions before the first version are `older`)
-docs/       workflow.md — architecture, thresholds, what is measured, how; experiments.md —
-            model/effort A-B tests for read-heavy agents (explorer, auditor)
+docs/       PATTERNS.md — recurring technical traps; RECIPES.md — step-by-step procedures;
+            experiments.md — model/effort A-B tests for read-heavy agents (explorer, auditor);
+            postmortem — incident writeups
 metrics/    baseline-2026-08.md — the numbers above, with method and caveats
             (metrics-local/TRENDS.md holds the cross-session Fable-only counterfactual,
             and per-session reports include a calls/limit column per worker)
