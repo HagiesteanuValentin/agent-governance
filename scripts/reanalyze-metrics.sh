@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Re-analizează recordurile din metrics-local/ pe transcriptul sesiunii lor.
+# Re-analyze the records in metrics-local/ against their session transcript.
 set -uo pipefail
 
 DRY_RUN=0
@@ -54,7 +54,7 @@ print(row.get('session', ''))
 " "$record" 2>/dev/null)"
 
   if [ -z "$session" ]; then
-    echo "FĂRĂ SESSION: $base"
+    echo "NO SESSION: $base"
     no_transcript=$((no_transcript + 1))
     continue
   fi
@@ -62,7 +62,7 @@ print(row.get('session', ''))
   jsonl="$(find "$PROJECTS_DIR" -maxdepth 2 -name "${session}.jsonl" -print -quit 2>/dev/null)"
 
   if [ -z "$jsonl" ]; then
-    echo "FĂRĂ TRANSCRIPT: $base (session=$session)"
+    echo "NO TRANSCRIPT: $base (session=$session)"
     no_transcript=$((no_transcript + 1))
     continue
   fi
@@ -78,17 +78,17 @@ print(row.get('session', ''))
     reanalyzed=$((reanalyzed + 1))
   else
     errors=$((errors + 1))
-    echo "EROARE: $base (session=$session)"
+    echo "ERROR: $base (session=$session)"
     tail -n 5 /tmp/reanalyze-metrics.$$.log
   fi
   rm -f /tmp/reanalyze-metrics.$$.log
 done
 
 echo "---"
-echo "recorduri: $total"
-echo "re-analizate: $reanalyzed"
-echo "fără transcript: $no_transcript"
-echo "erori: $errors"
+echo "records: $total"
+echo "re-analyzed: $reanalyzed"
+echo "no transcript: $no_transcript"
+echo "errors: $errors"
 
 if [ "$errors" -gt 0 ]; then
   exit 1

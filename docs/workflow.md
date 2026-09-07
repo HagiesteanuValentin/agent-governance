@@ -153,6 +153,9 @@ see DECIZII «v1.4.1») and added `tool_results_read`, `late_first_edit`, an int
 - `main_read_files`: Bash calls in main that read files (`cat`, `sed -n`, `head`, `tail`,
   `less`, long heredocs, `grep`/`wc`) instead of delegating the read — counted only when the
   result comes back over 2,000 characters, so a targeted lookup is not a flag.
+- `main_read_report`: Bash calls in main that read a report under `docs/refine/` or
+  `docs/polish/` — informative only, 0 tokens taxed, since reading a subagent's own report
+  back is the feedback loop, not a delegation miss.
 - `narration_turns`: API calls in main with no tool use and short text. A short answer to
   the user is not counted at all. The rest are split by what the turn could have done
   instead: `structural` (an async agent was still live, the note came right after a launch,

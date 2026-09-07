@@ -25,6 +25,14 @@ READ_CMD_RE = re.compile(r"(?:^|[|;&(\n]\s*)(cat|bat|head|tail|less|sed\s+-n)\b"
 GREP_WC_RE = re.compile(r"(?:^|[|;&(\n]\s*)(grep\s+-[A-Za-z]*n|wc)\b")
 HEREDOC_RE = re.compile(r"python3?\s+-\s*<<")
 GIT_LS_RE = re.compile(r"^(git|ls)\b")
+FILE_TOKEN_RE = re.compile(r"[\w./~$-]+\.[A-Za-z0-9]+")
+REPORT_DIR_RE = re.compile(r"docs/(?:refine|polish)/")
+
+
+def only_report_paths(cmd):
+    """A Bash read whose every file argument is a refine/polish report main asked for."""
+    paths = FILE_TOKEN_RE.findall(cmd)
+    return bool(paths) and all(REPORT_DIR_RE.search(p) for p in paths)
 # harness tag on the user message that carries an async agent's result back into main
 TASK_NOTIFICATION_RE = re.compile(r"<task-notification>")
 
@@ -115,6 +123,7 @@ FLAG_TEXT = {
     "agent_no_report": "worker ended without a final report",
     "agent_reread_own_write": "worker re-read a file it had just written",
     "main_read_files": "main read files through Bash instead of delegating",
+    "main_read_report": "main read a refine/polish report it had asked for; visible, not taxed",
     "narration_turns": "main ended a turn on a note with nothing running and nothing asked; "
                        "wasted = cache_read / 10 (input-equivalent, the cached context "
                        "re-sent for nothing); a note while an async agent is live, right "
@@ -195,6 +204,7 @@ RECOMMENDATION = {
     "agent_reread_own_write": "{detail} - the write already succeeded; do not read it back.",
     "main_read_files": "{detail} - delegate the reading; an audit is `git diff --stat` "
                        "plus a targeted grep.",
+    "main_read_report": "{detail} - legitimate: main reads the report it asked for; 0 tokens.",
     "narration_turns": "{detail} - text-only calls with no live agent; residual_poll = the harness "
                        "re-sent a notification for an already-notified agent, not a rule miss.",
     "batchable_bash": "{detail} - one Bash call chained with `;` / `&&`.",
@@ -1332,7 +1342,7 @@ def main_call_flags(scope, doc, rows):
             chars_by_id[tid] = r["chars"]
             input_by_id[tid] = r["input"] or {}
 
-    reads = []
+    reads, reports = [], []
     for r in rows:
         if r["tool"] != "Bash":
             continue
@@ -1348,11 +1358,17 @@ def main_call_flags(scope, doc, rows):
         if hit and r["chars"] <= THRESHOLDS["main_read_chars"]:
             hit = False
         if hit:
-            reads.append({"cmd": " ".join(cmd.split())[:60], "chars": r["chars"]})
+            item = {"cmd": " ".join(cmd.split())[:60], "chars": r["chars"]}
+            # 🔴 advisor/rapoarte refine citite legitim, 0 tokens — DECIZII «waste: citiri legitime exceptate»
+            (reports if only_report_paths(cmd) else reads).append(item)
     reads.sort(key=lambda r: -r["chars"])
+    reports.sort(key=lambda r: -r["chars"])
     emit_many(flags, "main_read_files", scope, reads,
               lambda r: "`%s` returned %s chars" % (r["cmd"], fmt(r["chars"])),
               lambda r: r["chars"] / 4.0)
+    emit_many(flags, "main_read_report", scope, reports,
+              lambda r: "`%s` returned %s chars" % (r["cmd"], fmt(r["chars"])),
+              lambda r: 0)
 
     launch_ts = [l["at"] for l in doc["agent_launches"] if isinstance(l.get("at"), str)]
     first_launch = min(launch_ts) if launch_ts else "9"  # 🔴 no Agent at all = every read counts — DECIZII «v1.5 — 30.08.2026»
@@ -1529,7 +1545,8 @@ def scope_flags(scope, doc, rows, is_main):
                   lambda r: "%s re-read after writing it" % os.path.basename(r["path"]),
                   lambda r: 0)
         plans = []
-        for r in rows:
+        # 🔴 advisor/rapoarte refine citite legitim, 0 tokens — DECIZII «waste: citiri legitime exceptate»
+        for r in rows if scope.split("#")[0] != "advisor" else []:
             inp = r["input"] or {}
             fp = inp.get("file_path") or ""
             if (r["tool"] == "Read" and PLANS_DIR in fp and fp.endswith(".md")
@@ -1790,7 +1807,7 @@ def load_effort_baseline(path):
 def build_effort_baseline(directory, out_path, model=BASELINE_MODEL, effort="high"):
     """Median output/thinking over the level-1 transcripts' main turns run at one effort."""
     if not os.path.isdir(directory):
-        print("nu e director: %s" % directory, file=sys.stderr)
+        print("not a directory: %s" % directory, file=sys.stderr)
         return 2
     outs, thinks, line_outs = [], [], []
     # 🔴 o sesiune reluată copiază turele părintelui: dedupe peste tot corpusul, nu per fișier — PATTERNS «Sesiuni reluate»
@@ -2722,11 +2739,11 @@ def summary_ok_list(s):
     if runs.get("explorer", 0) <= THRESHOLDS["max_explorer_runs"]:
         ok.append("explorer %d ≤ %d" % (runs.get("explorer", 0), THRESHOLDS["max_explorer_runs"]))
     if live <= THRESHOLDS["max_live_agents"]:
-        ok.append("agenți vii %d ≤ %d" % (live, THRESHOLDS["max_live_agents"]))
+        ok.append("live agents %d <= %d" % (live, THRESHOLDS["max_live_agents"]))
     if lp.get("audit_ok") and not lp.get("audit_abateri_total"):
         ok.append("audit OK")
     if not any(w.get("type", "").endswith("-max") for w in s.get("workers") or []):
-        ok.append("fără escaladare max")
+        ok.append("no max escalation")
     return ok
 
 
@@ -2739,24 +2756,24 @@ def summary_lines(s):
     p, a = v.get("plan") or {}, v.get("advisor") or {}
     lp, cpt = v.get("low_phase") or {}, v.get("cost_per_turn") or {}
     out = ["## Summary", ""]
-    out.append("%s · %s · effort %s · $%.2f total (main $%s · agenți $%s) · quality %s"
+    out.append("%s · %s · effort %s · $%.2f total (main $%s · agents $%s) · quality %s"
                % (task_class(s), s.get("version") or VERSION_OLDER, m.get("effort") or "—",
                   t.get("cost_usd", 0.0),
                   "—" if m.get("cost_usd") is None else "%.2f" % m["cost_usd"],
                   "—" if t.get("agents_cost_usd") is None else "%.2f" % t["agents_cost_usd"],
                   quality_score(s) or "—"))
     lag = ", ".join("—" if l is None else str(l) for l in (p.get("lag_turns_to_low") or [])) or "—"
-    out.append("Ture: plan %d medium ($%.2f) / impl %d low ($%.2f) · high %d · lag %s ture "
-               "· $/tură %s"
+    out.append("Turns: plan %d medium ($%.2f) / impl %d low ($%.2f) · high %d · lag %s turns "
+               "· $/turn %s"
                % (et.get("medium", 0), ec.get("medium", 0.0), et.get("low", 0),
                   ec.get("low", 0.0), et.get("high", 0), lag,
                   num_or_dash(cpt.get("main_usd_per_turn") or main_usd_per_turn(s))))
-    out.append("Advisor: %s · schimbări %d itemi · audit ABATERI %d (OK %d)"
-               % (a.get("verdict") or "necerut", a.get("n_schimbari", 0),
+    out.append("Advisor: %s · changes %d items · audit ABATERI %d (OK %d)"
+               % (a.get("verdict") or "not requested", a.get("n_schimbari", 0),
                   lp.get("audit_abateri_total", 0), lp.get("audit_ok", 0)))
     echo = p.get("echo")
     out.append("Plan echo: %s"
-               % ("—" if not echo else "$%.4f (%s chars re-trimiși pe %d ture)"
+               % ("—" if not echo else "$%.4f (%s chars resent over %d turns)"
                   % (echo.get("cost_est_usd", 0.0), fmt(echo.get("chars", 0)),
                      echo.get("turns_after", 0))))
     flags = s.get("flags") or []
@@ -2926,8 +2943,8 @@ def session_report(s):
     return out
 
 
-V17_BENCH_NOTE = ("Benchmark, nu criteriu de fail: cifrele de cost compară configurații, "
-                  "nu promovează/pică o sesiune.")
+V17_BENCH_NOTE = ("Benchmark, not a pass/fail criterion: the cost figures compare configurations, "
+                  "they do not pass or fail a session.")
 
 
 def v17_lines(s):
@@ -2941,7 +2958,7 @@ def v17_lines(s):
     head = "## v1.7 — effort phases & advisor"
     inh = v.get("inherited_turns") or 0
     if inh:
-        head += " (%d ture moștenite, facturate la părinte, în afara cifrelor)" % inh
+        head += " (%d inherited turns, billed to the parent, outside these figures)" % inh
     out = [head, "", V17_BENCH_NOTE, "",
            "| effort | turns | tool calls | output tok | thinking tok | $ |",
            "|---|---:|---:|---:|---:|---:|"]
@@ -3253,6 +3270,7 @@ def code_rows(sessions):
 # waste codes grouped into families; a code missing here lands in "other"
 WASTE_FAMILIES = {
     "main_read_files": "reads",
+    "main_read_report": "reads",
     "reread": "reads",
     "full_read_big_file": "reads",
     "big_tool_result_main": "reads",
@@ -3873,14 +3891,14 @@ def refresh_versions(directory, versions):
 
 def write_trends(directory, versions, threshold):
     if not os.path.isdir(directory):
-        print("nu e director: %s" % directory, file=sys.stderr)
+        print("not a directory: %s" % directory, file=sys.stderr)
         return 2
     refreshed = refresh_versions(directory, versions)
     if refreshed:
-        print("versiune actualizata in %d sesiuni" % refreshed, file=sys.stderr)
+        print("version refreshed in %d sessions" % refreshed, file=sys.stderr)
     sessions, skipped = load_session_dir(directory)
     if not sessions:
-        print("niciun raport de sesiune in %s" % directory, file=sys.stderr)
+        print("no session report in %s" % directory, file=sys.stderr)
         return 1
     apply_cost_per_turn(sessions)
     text = trends_md(sessions, skipped, versions, threshold) + "\n"
@@ -3904,7 +3922,7 @@ def rate_session(out_dir, name, score, note, versions, threshold):
     path = os.path.join(out_dir, name + ".json")
     rec = read_record(path)
     if rec is None:
-        print("nu gasesc sesiunea: %s" % path, file=sys.stderr)
+        print("session not found: %s" % path, file=sys.stderr)
         return 1
     old_q = rec.get("quality") or {}
     rec["quality"] = {"score": score, "note": note,
@@ -3962,7 +3980,7 @@ OLD_NAME_RE = re.compile(r"^(\d{4}-\d{2}-\d{2})-s\d+-(.+)$")
 def _new_name(rec, stem, fmt_="%H%M"):
     """(new stem, reason-if-impossible) for one saved record; fmt_ %H%M%S resolves a clash."""
     if not rec or not rec.get("session"):
-        return None, "fara session id"
+        return None, "no session id"
     ts = rec.get("started")
     m = SESSION_NAME_RE.match(rec.get("name") or stem)
     proj = m.group(1) if m else ""
@@ -3973,17 +3991,17 @@ def _new_name(rec, stem, fmt_="%H%M"):
             ts = ts or ts2
             proj = proj or project_of(cwd, path)
     if not ts or not proj:
-        return None, "fara started sau proiect"
+        return None, "no started or project"
     day = local_day(ts)
     if day == "?":
-        return None, "started nedecodabil"
+        return None, "undecodable started"
     return "%s-%s-%s" % (day, local_str(ts, fmt_), proj), None
 
 
 def migrate_names(directory, apply_=False, versions=(), threshold=0.5):
     """--migrate-names: <day>-sN-<project> -> <day>-HHMM-<project>, renaming only (no re-analysis)."""
     if not os.path.isdir(directory):
-        print("nu e director: %s" % directory, file=sys.stderr)
+        print("not a directory: %s" % directory, file=sys.stderr)
         return 2
     entries = [e for e in sorted(os.listdir(directory))
                if e.endswith(".json") and OLD_NAME_RE.match(e[:-len(".json")])]
@@ -4000,7 +4018,7 @@ def migrate_names(directory, apply_=False, versions=(), threshold=0.5):
         if new in taken:
             alt, _why = _new_name(rec, stem, "%H%M%S")
             if alt is None or alt in taken:
-                print("SKIP %s coliziune pe %s" % (entry, new))
+                print("SKIP %s name collision on %s" % (entry, new))
                 skipped += 1
                 continue
             new = alt
@@ -4010,7 +4028,7 @@ def migrate_names(directory, apply_=False, versions=(), threshold=0.5):
     plan.sort(key=lambda p: p[1])
     for stem, new, _ in plan:
         print("%s -> %s" % (stem, new))
-    print("%d de redenumit, %d SKIP%s" % (len(plan), skipped, "" if apply_ else " (dry-run)"),
+    print("%d to rename, %d SKIP%s" % (len(plan), skipped, "" if apply_ else " (dry-run)"),
           file=sys.stderr)
     if apply_:
         for stem, new, rec in plan:
@@ -4026,6 +4044,10 @@ def migrate_names(directory, apply_=False, versions=(), threshold=0.5):
 
 
 def main(argv=None):
+    # 🔴 stdout UTF-8 forțat pentru LANG=C — PATTERNS «analizor: locale»
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8", errors="replace")
     here = os.path.dirname(os.path.abspath(__file__))
     out_dir_default = os.path.normpath(os.path.join(here, os.pardir, "metrics-local"))
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
@@ -4074,8 +4096,8 @@ def main(argv=None):
                          "write the medians to --effort-baseline, then exit" % BASELINE_MODEL)
     ap.add_argument("--effort-baseline", dest="effort_baseline",
                     default=EFFORT_BASELINE_DEFAULT,
-                    help="ignorat din v1.7.2, vezi DECIZII «Counterfactual înlocuit»; "
-                         "ramane doar tinta lui --build-effort-baseline (default %s)"
+                    help="ignored since v1.7.2 (see DECIZII «Counterfactual inlocuit»); "
+                         "only the target of --build-effort-baseline (default %s)"
                          % EFFORT_BASELINE_DEFAULT)
     ap.add_argument("--pricing", default=os.path.join(here, "pricing.json"))
     ap.add_argument("--versions", default=os.path.join(here, "versions.json"),
@@ -4091,7 +4113,7 @@ def main(argv=None):
 
     if args.rename:
         if not os.path.isdir(args.rename):
-            print("nu e director: %s" % args.rename, file=sys.stderr)
+            print("not a directory: %s" % args.rename, file=sys.stderr)
             return 2
         rename_dir(args.rename, args.force)
         return 0
@@ -4110,25 +4132,26 @@ def main(argv=None):
         name, raw = args.rate
         score = clean_score(raw)
         if score is None:
-            print("scor invalid: %s (se cere un intreg 1-5)" % raw, file=sys.stderr)
+            print("invalid score: %s (an integer 1-5 is required)" % raw, file=sys.stderr)
             return 1
         return rate_session(args.out_dir or out_dir_default, name, score,
                             args.note.strip(), versions, args.browser_threshold)
 
     if not args.paths:
-        ap.error("dai cel putin un .jsonl / director, sau --rename DIR")
+        ap.error("give at least one .jsonl / directory, or --rename DIR")
     if not args.json and not args.md:
         args.md = True
 
     try:
         pricing = load_pricing(args.pricing)
     except (OSError, ValueError) as exc:
-        print("pricing ilizibil (%s): %s" % (args.pricing, exc), file=sys.stderr)
-        return 2
+        pricing = {}
+        print("WARN: no usable pricing (%s): %s — all costs reported as 0.0"
+              % (args.pricing, exc), file=sys.stderr)
 
     targets = collect_targets(args.paths)
     if not targets:
-        print("niciun .jsonl gasit", file=sys.stderr)
+        print("no .jsonl found", file=sys.stderr)
         return 1
     # 🔴 fork și origine dau un singur record — PATTERNS «Sesiuni reluate»
     origins = []

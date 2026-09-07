@@ -395,7 +395,8 @@ threshold is the operator's, not Anthropic's.
 
 ## Reproduce it
 
-Requirements: Claude Code, Python 3.9+. No dependencies.
+Requirements: Claude Code, Python 3.6+ (no f-strings, no walrus, no `match`; 3.7+
+recommended). No dependencies, no config file needed.
 
 **Install the agents and hooks**
 
@@ -446,7 +447,22 @@ threshold for the `high_context_end` flag (default 150000). Files are named
 `YYYY-MM-DD-HHMM-<project>.json`/`.md` (local start date and time, `HHMMSS` if another
 session started the same minute, `<project>` = basename of the working directory);
 `--migrate-names DIR` renames files left over from the old `-sN-` scheme (dry-run without
-`--yes`). The `.md` report includes
+`--yes`).
+
+Run it on a single transcript and check the tests:
+
+```sh
+python3 tools/session_metrics.py --md ~/.claude/projects/<project-dir>/<session>.jsonl
+python3 tools/tests/test_v17.py     # expected: 0 failed
+```
+
+`tools/pricing.json` is optional: without it every cost is reported as `0.0`, one WARN line
+goes to stderr, and all other metrics are unaffected. On a session with no subagents and no
+governance hooks the `## v1.7` block (effort phases, advisor, low phase) is empty, while the
+generic metrics — turns, tool calls, context, reads, inefficiencies, postmortem — are all
+filled in.
+
+The `.md` report includes
 the summary plus the "Inefficiencies" list, an automatic "Postmortem" section with severity
 and recommendations, and a Fable-only cost estimate. `--trends DIR` regenerates
 `DIR/TRENDS.md`, a cross-session view of recurring inefficiencies. It opens with an

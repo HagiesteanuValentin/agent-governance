@@ -196,7 +196,7 @@ def test_inherited_turns_are_outside_the_figures():
     # the parent's ExitPlanMode must not become this session's approval
     assert v["plan"]["exit_plan_count"] == 0 and v["plan"]["mismatch_turns"] is None
     assert v["effort_cost_usd"]["high"] == 0.0
-    assert any("moștenite" in l for l in sm.v17_lines(s))
+    assert any("inherited turns" in l for l in sm.v17_lines(s))
 
 
 def test_v17_md_survives_a_record_without_the_block():
@@ -329,6 +329,37 @@ def test_inherited_needs_the_uuid_copied_from_the_parent():
     s = analyzed(BASELINE, os.path.join(HERE, "fixtures", "v17-sessionid.jsonl"))
     assert s["v17"]["inherited_turns"] == 1
     assert s["totals"]["main_cost_usd"] > 0
+
+
+WASTE_LEGIT = os.path.join(HERE, "fixtures", "v18-waste-legit.jsonl")
+
+
+def waste_flags():
+    return analyzed(fixture=WASTE_LEGIT)["flags"]
+
+
+def test_advisor_reading_the_whole_plan_is_not_waste():
+    codes = [(f["code"], f["scope"]) for f in waste_flags()]
+    assert ("agent_read_plan_whole", "advisor#1") not in codes, codes
+    assert ("agent_read_plan_whole", "implementer#1") in codes, codes
+
+
+def test_main_reading_a_refine_report_is_a_zero_token_flag():
+    flags = waste_flags()
+    rep = [f for f in flags if f["code"] == "main_read_report"]
+    assert len(rep) == 1 and "docs/refine/pret.md" in rep[0]["detail"], flags
+    assert rep[0].get("est_wasted_tokens", 0) == 0 and rep[0]["severity"] == "low"
+    cmds = [f["detail"] for f in flags if f["code"] == "main_read_files"]
+    assert any("src/a.ts" in c for c in cmds), cmds        # mixed stays taxed
+    assert any("src/index.astro" in c for c in cmds), cmds
+    assert len(cmds) == 2, cmds
+
+
+def test_wasted_total_still_equals_the_sum_of_the_families():
+    a = analyzed(fixture=WASTE_LEGIT)
+    total = a["postmortem"]["wasted_total"]
+    assert total == sum(f.get("est_wasted_tokens", 0) for f in a["flags"]), total
+    assert sm.WASTE_FAMILIES["main_read_report"] == "reads"
 
 
 if __name__ == "__main__":

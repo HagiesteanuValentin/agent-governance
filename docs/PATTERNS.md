@@ -129,3 +129,8 @@ scris): sub 3 s de la ultimul apel mic = același mesaj — nu incrementează, n
 peste, harness-ul trunchiază blocul SessionStart la 2 KB și sesiunea pierde reguli. Pe
 05.09 marja era sub 5 bytes (9.996/9.997) — orice rând nou cere o scurtare compensatorie în
 altă parte a fișierului, nu doar adăugare.
+
+## analizor: locale
+`session_metrics.py` scrie `·`, `≤`, `—` în raport. Sub `LANG=C`/`LC_ALL=C` (sau pe Windows)
+stdout ajunge ascii și printul crapă cu `UnicodeEncodeError`. De aceea `main()` forțează
+`reconfigure(encoding="utf-8", errors="replace")` pe stdout și stderr, înainte de orice print.
