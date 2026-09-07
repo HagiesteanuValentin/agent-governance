@@ -1,9 +1,9 @@
 #!/bin/bash
-# 🔴 offline, synthetic transcripts, no network/Claude — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
+# 🔴 offline, synthetic transcripts, no network/Claude — docs/RECIPES.md «State from the transcript, not from a file (read-mare, test-hooks)»
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
-# 🔴 fixture-urile nu depind de modelul din settings — PATTERNS «Modelul în hook-uri»
+# 🔴 fixtures don't depend on the model from settings — PATTERNS «The model inside hooks»
 export GOV_MODEL=claude-fable-5-1
 python3 - <<'PY'
 import json, os, shutil, subprocess, sys, tempfile, time
@@ -167,11 +167,11 @@ sub_payload["agent_id"] = "a-%s-x" % RUN
 sub_payload["agent_type"] = "implementer"
 case("sub-agent not affected by read-mare", READ_HOOK, sub_payload, "allow")
 tr = write("tool-results/x.txt", ["line %d" % i for i in range(10)])
-case("tool-results from main -> deny", READ_HOOK, read_in(tr), "deny", "interval mai mic")
+case("tool-results from main -> deny", READ_HOOK, read_in(tr), "deny", "smaller range")
 tr_sub = read_in(tr)
 tr_sub["agent_id"] = "a-%s-tr" % RUN
 tr_sub["agent_type"] = "implementer"
-case("tool-results from sub-agent -> deny", READ_HOOK, tr_sub, "deny", "nu-l citi")
+case("tool-results from sub-agent -> deny", READ_HOOK, tr_sub, "deny", "don't read it")
 
 # ---------------------------------------------------------------- context-agent
 sub_fixture("a-%s-main" % RUN, 100000)
@@ -203,7 +203,7 @@ case("agent transcript missing -> allow", CTX_HOOK,
 VER1 = ["npm run build", "node scripts/verifica-galerie.mjs"]
 ctx_case("2nd verification -> allow", "v2", 90000, "allow", tool_name="Bash",
          command="npm run build", bash_cmds=VER1[:1])
-ctx_case("3rd verification -> context", "v3", 90000, "context", "A 3-a verificare",
+ctx_case("3rd verification -> context", "v3", 90000, "context", "3rd verification run",
          tool_name="Bash", command="node scripts/verifica-x.mjs", bash_cmds=VER1)
 ctx_case("4th verification -> allow (once)", "v3", 90000, "allow", tool_name="Bash",
          command="npx vitest run", reuse=True)

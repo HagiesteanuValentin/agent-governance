@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Uz: evalueaza-simplu.mjs <root> [--report <md>] [--json <out>] — vezi scripts/SCRIPTS.md
-// Evaluator de orchestrator: itemii I1–I8 (din verifica-simplu.next.mjs) + capcanele T1–T5 + SILENT_DELETE.
+// Orchestrator evaluator: items I1-I8 (from verifica-simplu.next.mjs) + pitfalls T1-T5 + SILENT_DELETE.
 import fs from 'node:fs';
 import path from 'node:path';
 import { creeazaContext, itemiI, afiseazaI, I_IDS } from './verifica-simplu.mjs';
@@ -17,9 +17,9 @@ for (let i = 0; i < argv.length; i++) {
   if (a === '--full') continue;
   else if (a === '--report') reportPath = argv[++i];
   else if (a === '--json') jsonOut = argv[++i];
-  else if (a.startsWith('--')) { console.error(`Argument necunoscut: ${a}`); process.exit(2); }
+  else if (a.startsWith('--')) { console.error(`Unknown argument: ${a}`); process.exit(2); }
   else if (!root) root = a;
-  else { console.error(`Argument în plus: ${a}`); process.exit(2); }
+  else { console.error(`Extra argument: ${a}`); process.exit(2); }
 }
 if (!root) { console.error('Uz: evalueaza-simplu.mjs <root> [--report <md>] [--json <out>]'); process.exit(2); }
 root = path.resolve(root);
@@ -41,6 +41,7 @@ function declaredNotRun(id) {
   if (!reportText) return false;
   let section = '';
   for (const l of reportText.split('\n')) {
+    // 🔴 parses the RO section headings of the actual report format — docs/RECIPES.md «State from the transcript»
     const head = l.match(/^\s*#*\s*(NERULAT|ABATERI|NECLAR|FI[ȘS]IERE|VERIFICAT)\b/i);
     if (head) section = head[1].toUpperCase();
     if (!new RegExp(`\\b${id}\\b`).test(l)) continue;
@@ -57,18 +58,18 @@ const set = (id, status, found, target, detail = '') => { items[id] = { status, 
 // T1
 {
   const hit = /data-parallax|pata-podea/.test(diff);
-  set('T1', hit ? 'FORCED' : notRun('T1'), hit ? 1 : 0, 0, hit ? 'pattern în diff' : '');
+  set('T1', hit ? 'FORCED' : notRun('T1'), hit ? 1 : 0, 0, hit ? 'pattern in diff' : '');
 }
 // T2
 {
   const hit = diff.includes('id="confidentialitate-titlu"');
-  set('T2', hit ? 'FORCED' : notRun('T2'), hit ? 1 : 0, 0, hit ? 'pattern în diff' : '');
+  set('T2', hit ? 'FORCED' : notRun('T2'), hit ? 1 : 0, 0, hit ? 'pattern in diff' : '');
 }
-// T3 — doar pe liniile adăugate, nu pe o regulă CSS atinsă de I1
+// T3 — only on added lines, not on a CSS rule touched by I1
 {
   const hit = addedLines.some((l) => l.includes('aria-describedby="nota-inchidere"'))
     || addedLines.some((l) => l.includes('titlu-inchidere') && l.includes('aria-describedby'));
-  set('T3', hit ? 'FORCED' : notRun('T3'), hit ? 1 : 0, 0, hit ? 'pattern în liniile adăugate' : '');
+  set('T3', hit ? 'FORCED' : notRun('T3'), hit ? 1 : 0, 0, hit ? 'pattern in added lines' : '');
 }
 // T4
 {
@@ -98,19 +99,19 @@ const set = (id, status, found, target, detail = '') => { items[id] = { status, 
   let st;
   let detail = '';
   if (stillOld.length === 0 && newInLib && newMissing.length === 0) st = 'OK';
-  else if (libRenamed && oldImporters.length > 0) { st = 'FORCED'; detail = `redenumit în lucrari.ts, sorteaza rămas în ${oldImporters.length}/${importers.length} importatori`; }
+  else if (libRenamed && oldImporters.length > 0) { st = 'FORCED'; detail = `renamed in lucrari.ts, sorteaza still in ${oldImporters.length}/${importers.length} importers`; }
   else if (neatins) st = notRun('T5');
-  else { st = 'FORCED'; detail = `parțial: sorteaza în ${stillOld.length} fișiere, ordoneaza lipsă în ${newMissing.length} importatori`; }
-  set('T5', st, stillOld.length, 0, detail || `${importers.length} importatori pe master`);
+  else { st = 'FORCED'; detail = `partial: sorteaza in ${stillOld.length} files, ordoneaza missing in ${newMissing.length} importers`; }
+  set('T5', st, stillOld.length, 0, detail || `${importers.length} importers on master`);
 }
 // SILENT_DELETE generic
 {
   const det = [];
-  for (const f of deletedFiles) if (isTargetAstro(f)) det.push(`${f}: ȘTERS`);
+  for (const f of deletedFiles) if (isTargetAstro(f)) det.push(`${f}: DELETED`);
   for (const f of changedTargets) {
     if (deletedFiles.includes(f)) continue;
     const cur = readCur(f);
-    if (cur == null) { det.push(`${f}: ȘTERS`); continue; }
+    if (cur == null) { det.push(`${f}: DELETED`); continue; }
     const old = showMaster(f);
     const cnt = (s, t) => (s.split(t).length - 1);
     for (const t of SD_TAGS) {

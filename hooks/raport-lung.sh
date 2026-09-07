@@ -1,5 +1,5 @@
 #!/bin/bash
-# 🔴 explorer-max* = 6000, rest = 2000 — docs/RETETE.md «Test hook SubagentStop»
+# 🔴 explorer-max* = 6000, rest = 2000 — docs/RECIPES.md «SubagentStop hook test»
 LIMIT=2000
 LIMIT_EXPLORER_MAX=6000
 input=$(cat)
@@ -29,7 +29,7 @@ if not last:
     except OSError:
         sys.exit(0)
 
-# 🔴 no agent_type in input — deduce via sibling .meta.json — docs/RETETE.md «Test hook SubagentStop»
+# 🔴 no agent_type in input — deduce via sibling .meta.json — docs/RECIPES.md «SubagentStop hook test»
 agent_type = d.get("agent_type") or ""
 if not agent_type:
     agent_id = d.get("agent_id")
@@ -50,6 +50,7 @@ def audit_ok(text):
         return False
     if re.search(r"VERDICT:\s*(OK|CONFORM)\b", text):
         return True
+    # 🔴 matches the live RO audit format — docs/RECIPES.md «State from the transcript»
     m = re.search(r"ABATERI\s*\((\d+)\)\s*,\s*din care\s*(\d+)\s*reparate", text)
     return bool(m) and m.group(1) == m.group(2)
 

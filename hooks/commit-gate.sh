@@ -1,5 +1,5 @@
 #!/bin/bash
-# 🔴 markerul audit-ok îl scrie raport-lung.sh la CONFORM — docs/DECIZII.md «Autoritate hook + commit gate (31.08.2026)»
+# 🔴 the audit-ok marker is written by raport-lung.sh on CONFORM — docs/DECIZII.md «Autoritate hook + commit gate (31.08.2026)»
 MARKER_DIR=${CLAUDE_HOOKS_DIR:-/tmp/claude-hooks}
 input=$(cat)
 GOV_HOOKS_DIR=$(dirname "$0")
@@ -14,11 +14,11 @@ ARGV = sys.argv[3:]
 
 EXTS = ["ts", "tsx", "js", "jsx", "mjs", "astro"]
 GIT = os.environ.get("COMMIT_GATE_GIT", "git")
-# 🔴 prinde si `git -C x commit` / `git --git-dir=... commit` — docs/DECIZII.md «Autoritate hook + commit gate (31.08.2026)»
+# 🔴 also catches `git -C x commit` / `git --git-dir=... commit` — docs/DECIZII.md «Autoritate hook + commit gate (31.08.2026)»
 GIT_COMMIT = re.compile(r"\bgit\b(\s+-\S+(\s+\S+)?)*\s+commit\b")
 EDIT_TOOLS = ("Edit", "Write", "MultiEdit", "NotebookEdit")
-REASON = ("commit fără audit CONFORM: rulează /audit pe commit-range și cere confirmarea "
-          "orchestratorului înainte de `git commit`.")
+REASON = ("commit without a CONFORM audit: run /audit on the commit range and get the "
+          "orchestrator's confirmation before `git commit`.")
 
 
 def parse_args(argv):
@@ -110,10 +110,10 @@ def session_last_edit(tp, session_id):
 def run():
     parse_args(ARGV)
     d = json.loads(RAW)
-    # 🔴 main only, aceeasi conventie ca read-mare.sh — docs/DECIZII.md «Autoritate hook + commit gate (31.08.2026)»
+    # 🔴 main only, same convention as read-mare.sh — docs/DECIZII.md «Autoritate hook + commit gate (31.08.2026)»
     if d.get("agent_id") or "subagent" in (d.get("transcript_path") or ""):
         return
-    # 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+    # 🔴 model guard, main only — PATTERNS «The model inside hooks»
     _m = subprocess.run(["bash", os.path.join(os.environ.get("GOV_HOOKS_DIR", "."),
                                               "main-model.sh"),
                          d.get("transcript_path") or ""],

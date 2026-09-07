@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Testul fixture pentru scripts/pricing-cache-5m.py: dry-run, aplicare, diff cu dupa/, a doua rulare = 0.
+# Fixture test for scripts/pricing-cache-5m.py: dry-run, apply, diff against dupa/, second run = 0.
 set -uo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 repo="$(cd "$here/../../.." && pwd)"
@@ -19,12 +19,12 @@ run() { python3 "$repo/scripts/pricing-cache-5m.py" --pricing "$tmp/pricing.json
 
 rc=0
 run --dry-run >/dev/null || rc=1
-diff -q "$here/inainte/fragment_metrics.py" "$tmp/fragment_metrics.py" >/dev/null || { echo "FAIL: dry-run a scris"; rc=1; }
+diff -q "$here/inainte/fragment_metrics.py" "$tmp/fragment_metrics.py" >/dev/null || { echo "FAIL: dry-run wrote"; rc=1; }
 run >/dev/null || rc=1
 diff -u "$here/dupa/fragment_metrics.py" "$tmp/fragment_metrics.py" || { echo "FAIL: fragment != dupa/"; rc=1; }
 python3 -c "import json,sys; a=json.load(open(sys.argv[1])); b=json.load(open(sys.argv[2])); sys.exit(0 if a==b else 1)" \
   "$here/dupa/pricing.json" "$tmp/pricing.json" || { echo "FAIL: pricing != dupa/"; rc=1; }
 out="$(run)"
-echo "$out" | grep -q "0 aplicate, 12 deja prezente" || { echo "FAIL: a doua rulare nu e idempotenta"; echo "$out"; rc=1; }
-[ $rc -eq 0 ] && echo "OK: fixture pricing-cache-5m (12 reguli, dry-run curat, idempotent)"
+echo "$out" | grep -q "0 applied, 12 already present" || { echo "FAIL: second run is not idempotent"; echo "$out"; rc=1; }
+[ $rc -eq 0 ] && echo "OK: fixture pricing-cache-5m (12 rules, clean dry-run, idempotent)"
 exit $rc

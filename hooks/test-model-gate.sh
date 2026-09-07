@@ -1,9 +1,9 @@
 #!/bin/bash
-# 🔴 offline, transcripturi sintetice, fără rețea/Claude — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
+# 🔴 offline, synthetic transcripts, no network/Claude — docs/RECIPES.md «State from the transcript, not from a file (read-mare, test-hooks)»
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
-# 🔴 suita testează sursa modelului; GOV_MODEL moștenit din test-hooks ar ascunde-o — PATTERNS «Modelul în hook-uri»
+# 🔴 the suite tests the model source; GOV_MODEL inherited from test-hooks would hide it — PATTERNS «The model inside hooks»
 unset GOV_MODEL
 python3 - <<'PY'
 import json, os, shutil, subprocess, sys, tempfile
@@ -58,7 +58,7 @@ def decision(out):
 OPUS = write("proj/opus.jsonl", [user_line("log: claude-opus-5 mentioned"),
                                  line("claude-opus-5")])
 FABLE = write("proj/fable.jsonl", [line("claude-fable-5-1")])
-# tool_result cu textul claude-opus DUPĂ ultima linie de assistant pe Fable
+# tool_result with claude-opus text AFTER the last assistant line on Fable
 TRICK = write("proj/trick.jsonl", [line("claude-fable-5-1"),
                                    user_line("output contains claude-opus-5 text")])
 SYNTH = write("proj/synth.jsonl", [line("claude-fable-5-1"),
@@ -82,10 +82,10 @@ check("helper: tool_result cu 'claude-opus' ignorat -> fable",
 rc, m = model_of(SYNTH)
 check("helper: <synthetic> ignorat -> fable", rc == 0 and m == "claude-fable-5-1", m)
 rc, m = model_of("/nonexistent/x.jsonl")
-check("helper: fara transcript -> settings (fable, fara [1m])",
+check("helper: no transcript -> settings (fable, no [1m])",
       rc == 0 and "fable" in m and "[1m]" not in m, m)
 rc, m = model_of(FABLE, env={"GOV_MODEL": "claude-opus-5"})
-check("helper: GOV_MODEL are prioritate", rc == 0 and m == "claude-opus-5", m)
+check("helper: GOV_MODEL takes priority", rc == 0 and m == "claude-opus-5", m)
 
 # ------------------------------------------------------------------ write-mare
 def write_in(tp, agent_id=None):
@@ -97,16 +97,16 @@ def write_in(tp, agent_id=None):
     return d
 
 rc, out, err = call(WRITE_HOOK, write_in(OPUS))
-check("write-mare: main pe Opus, 50 de linii -> allow",
+check("write-mare: main on Opus, 50 lines -> allow",
       rc == 0 and not err and decision(out) == "allow", "%s (rc=%d)" % (decision(out), rc))
 rc, out, err = call(WRITE_HOOK, write_in(FABLE))
-check("write-mare: main pe Fable, 50 de linii -> deny",
+check("write-mare: main on Fable, 50 lines -> deny",
       rc == 0 and not err and decision(out) == "deny", "%s (rc=%d)" % (decision(out), rc))
 rc, out, err = call(WRITE_HOOK, write_in(FABLE), env={"GOV_MODEL": "claude-opus-5"})
 check("write-mare: GOV_MODEL=opus -> allow",
       rc == 0 and decision(out) == "allow", "%s (rc=%d)" % (decision(out), rc))
 rc, out, err = call(WRITE_HOOK, write_in("/nonexistent/x.jsonl"))
-check("write-mare: transcript inexistent -> exit 0", rc == 0 and not err, "rc=%d" % rc)
+check("write-mare: nonexistent transcript -> exit 0", rc == 0 and not err, "rc=%d" % rc)
 
 # ------------------------------------------------------------------ brief-mare
 def brief_in(tp):
@@ -114,10 +114,10 @@ def brief_in(tp):
             "tool_use_id": "cur", "tool_input": {"prompt": "x" * 8000}}
 
 rc, out, err = call(BRIEF_HOOK, brief_in(OPUS))
-check("brief-mare: main pe Opus, 8000 de caractere -> tacere",
+check("brief-mare: main on Opus, 8000 characters -> silence",
       rc == 0 and not out, "out=%r (rc=%d)" % (out[:40], rc))
 rc, out, err = call(BRIEF_HOOK, brief_in(FABLE))
-check("brief-mare: main pe Fable -> additionalContext",
+check("brief-mare: main on Fable -> additionalContext",
       rc == 0 and decision(out) == "context", "%s (rc=%d)" % (decision(out), rc))
 
 # ------------------------------------------------------------------ session-start
@@ -126,22 +126,22 @@ start_payload = {"session_id": "s1", "transcript_path": OPUS, "source": "startup
 env_opus = {"GOV_MODEL": "claude-opus-5", "CLAUDE_PROJECT_DIR": TMP}
 env_fable = {"GOV_MODEL": "claude-fable-5-1", "CLAUDE_PROJECT_DIR": TMP}
 rc, out, err = call(START_HOOK, start_payload, env=env_opus, args=("rules",))
-check("session-start rules pe Opus: fara ORCHESTRATION, cu rand de efort",
+check("session-start rules on Opus: no ORCHESTRATION, with effort line",
       rc == 0 and "=== ORCHESTRATION" not in out and "effort main" in out,
       "rc=%d len=%d" % (rc, len(out)))
 rc, out, err = call(START_HOOK, start_payload, env=env_opus, args=("v17",))
-check("session-start v17 pe Opus: fara ORCHESTRATION v1.7",
+check("session-start v17 on Opus: no ORCHESTRATION v1.7",
       rc == 0 and "=== ORCHESTRATION" not in out and "effort main" in out,
       "rc=%d len=%d" % (rc, len(out)))
 rc_f, out_f, err_f = call(START_HOOK, start_payload, env=env_fable, args=("rules",))
 has_rules = os.path.isfile(os.path.expanduser("~/.claude/orchestrare.md"))
-check("session-start rules pe Fable: ORCHESTRATION injectat (daca exista fisierul)",
+check("session-start rules on Fable: ORCHESTRATION injected (if the file exists)",
       rc_f == 0 and (("=== ORCHESTRATION" in out_f) if has_rules else True),
       "rc=%d orchestrare.md=%s" % (rc_f, has_rules))
-# HANDOFF rămâne pe orice model
+# HANDOFF stays regardless of model
 write("HANDOFF.md", ["stare curenta"])
 rc, out, err = call(START_HOOK, start_payload, env=env_opus, args=("handoff",))
-check("session-start handoff pe Opus: HANDOFF injectat",
+check("session-start handoff on Opus: HANDOFF injected",
       rc == 0 and "HANDOFF.md" in out and "stare curenta" in out, "rc=%d" % rc)
 
 # ------------------------------------------------------------------ read-mare (main)
@@ -160,10 +160,10 @@ def read_in(tp):
 
 RM_HOOK = os.path.join(HOOKS, "read-mare.sh")
 rc, out, err = call(RM_HOOK, read_in(read_tp("rm-fable", "claude-fable-5-1")))
-check("read-mare: main pe Fable, re-citire -> deny",
+check("read-mare: main on Fable, re-read -> deny",
       rc == 0 and decision(out) == "deny", "%s (rc=%d)" % (decision(out), rc))
 rc, out, err = call(RM_HOOK, read_in(read_tp("rm-opus", "claude-opus-5")))
-check("read-mare: main pe Opus, re-citire -> allow",
+check("read-mare: main on Opus, re-read -> allow",
       rc == 0 and decision(out) == "allow", "%s (rc=%d)" % (decision(out), rc))
 
 # ------------------------------------------------------------------ bash-mare (main)
@@ -175,10 +175,10 @@ def bash_in(tp):
             "tool_use_id": "cur", "tool_input": {"command": "cat %s" % BIG}}
 
 rc, out, err = call(BM_HOOK, bash_in(FABLE))
-check("bash-mare: main pe Fable, cat pe 400 de linii -> deny",
+check("bash-mare: main on Fable, cat on 400 lines -> deny",
       rc == 0 and decision(out) == "deny", "%s (rc=%d)" % (decision(out), rc))
 rc, out, err = call(BM_HOOK, bash_in(OPUS))
-check("bash-mare: main pe Opus -> allow",
+check("bash-mare: main on Opus -> allow",
       rc == 0 and decision(out) == "allow", "%s (rc=%d)" % (decision(out), rc))
 
 # ------------------------------------------------------------------ agenti-vii (main)
@@ -197,10 +197,10 @@ def av_in(tp, agent_id=None):
 
 call(AV_HOOK, av_in(FABLE, agent_id="av1-%s" % RUN), env=AV_ENV, args=("start",))
 rc, out, err = call(AV_HOOK, av_in(FABLE), env=AV_ENV, args=("check",))
-check("agenti-vii: main pe Fable, peste cap -> ask",
+check("agenti-vii: main on Fable, over cap -> ask",
       rc == 0 and decision(out) == "ask", "%s (rc=%d)" % (decision(out), rc))
 rc, out, err = call(AV_HOOK, av_in(OPUS), env=AV_ENV, args=("check",))
-check("agenti-vii: main pe Opus -> allow",
+check("agenti-vii: main on Opus -> allow",
       rc == 0 and decision(out) == "allow", "%s (rc=%d)" % (decision(out), rc))
 
 # ------------------------------------------------------------------ commit-gate (main)
@@ -228,24 +228,24 @@ def cg_in(tp):
             "tool_name": "Bash", "tool_input": {"command": "git commit -m x"}}
 
 rc, out, err = call(CG_HOOK, cg_in(FABLE), env={"CLAUDE_HOOKS_DIR": CG_MARKERS})
-check("commit-gate: main pe Fable, diff .ts fara marker -> ask",
+check("commit-gate: main on Fable, .ts diff without marker -> ask",
       rc == 0 and decision(out) == "ask", "%s (rc=%d)" % (decision(out), rc))
 rc, out, err = call(CG_HOOK, cg_in(OPUS), env={"CLAUDE_HOOKS_DIR": CG_MARKERS})
-check("commit-gate: main pe Opus -> allow",
+check("commit-gate: main on Opus -> allow",
       rc == 0 and decision(out) == "allow", "%s (rc=%d)" % (decision(out), rc))
 
-# ------------------------------------------------------------------ agent pe Opus
-BLOCK3 = "// prima\n// a doua\n// a treia\nconst a = 1;"
+# ------------------------------------------------------------------ agent on Opus
+BLOCK3 = "// first\n// second\n// third\nconst a = 1;"
 cmt = {"session_id": CMT_SESSION, "cwd": TMP, "tool_name": "Edit", "tool_use_id": "cur",
        "transcript_path": SUBTP, "agent_id": "a-%s" % RUN, "agent_type": "implementer",
        "tool_input": {"file_path": os.path.join(TMP, "src.js"),
                       "old_string": "const a = 1;", "new_string": BLOCK3}}
 rc, out, err = call(CMT_HOOK, cmt, env={"GOV_MODEL": "claude-opus-5"})
-check("agent pe Opus: garda de comentarii ramane activa",
+check("agent on Opus: comment guard stays active",
       rc == 0 and decision(out) in ("context", "deny"), "%s (rc=%d)" % (decision(out), rc))
 rc, out, err = call(WRITE_HOOK, write_in(SUBTP, agent_id="a-%s" % RUN),
                     env={"GOV_MODEL": "claude-fable-5-1"})
-check("agent: write-mare tace si pe Fable (ramura de agent neschimbata)",
+check("agent: write-mare stays silent on Fable too (agent branch unchanged)",
       rc == 0 and decision(out) == "allow", "%s (rc=%d)" % (decision(out), rc))
 
 # ------------------------------------------------------------------ cleanup

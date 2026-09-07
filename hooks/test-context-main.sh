@@ -1,5 +1,5 @@
 #!/bin/bash
-# 🔴 offline, synthetic transcripts, no network/Claude — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
+# 🔴 offline, synthetic transcripts, no network/Claude — docs/RECIPES.md «State from the transcript, not from a file (read-mare, test-hooks)»
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR

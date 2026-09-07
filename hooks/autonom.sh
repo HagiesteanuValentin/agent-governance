@@ -1,5 +1,5 @@
 #!/bin/bash
-# 🔴 marker autonom-<sid> per session, fail-open — docs/DECIZII.md «Mod autonom (04.09.2026)»
+# 🔴 autonom-<sid> marker per session, fail-open — docs/DECIZII.md «Mod autonom (04.09.2026)»
 MODE=${1:-prompt}
 MARKER_DIR=${CLAUDE_HOOKS_DIR:-/tmp/claude-hooks}
 input=$(cat)
@@ -13,19 +13,19 @@ except ValueError:
 MODE, MARKER_DIR = sys.argv[2], sys.argv[3]
 
 REGULI = (
-    "MOD AUTONOM pornit (orice mesaj nou îl oprește).\n"
-    "Vali pleacă de la PC. MODUL AUTONOM PREVALEAZĂ asupra ORCHESTRATION «Flux» "
-    "(plan aprobat de Vali) și «Peste plafon» (AskUserQuestion).\n"
-    "Nicio întrebare, niciun plan mode; tool-ul refuzat nu se reîncearcă.\n"
-    "Peste plafoane alegi varianta conservatoare și o notezi în raportul de final.\n"
-    "Dacă ești în plan mode acum: ExitPlanMode imediat, cât Vali e încă aici.\n"
-    "La capăt faci ce s-a cerut (handoff/commit/push, dacă au fost cerute) și închei "
-    "tura fără să aștepți.\n"
-    "Push respins: raportezi, nu insiști."
+    "AUTONOMOUS MODE started (any new message stops it).\n"
+    "The user is stepping away. AUTONOMOUS MODE OVERRIDES ORCHESTRATION «Flow» "
+    "(plan approved by the user) and «Over the cap» (AskUserQuestion).\n"
+    "No questions, no plan mode; a denied tool is not retried.\n"
+    "Over any cap, pick the conservative option and note it in the final report.\n"
+    "If you're in plan mode now: ExitPlanMode immediately, while the user is still here.\n"
+    "At the end do what was asked (handoff/commit/push, if requested) and close "
+    "the turn without waiting.\n"
+    "Push rejected: report it, don't insist."
 )
 
-# 🔴 „autonom" lipsește din semnale: s-ar potrivi pe orice prompt despre acest hook — DECIZII «Mod autonom (04.09.2026)»
-SEMNAL = re.compile(r"\b(plec|nesupravegheat)\b", re.IGNORECASE)
+# 🔴 the hook's own name is excluded from signals: it would match any prompt about this hook — DECIZII «Mod autonom (04.09.2026)»
+SEMNAL = re.compile(r"\b(plec|nesupravegheat|leaving|unsupervised)\b", re.IGNORECASE)
 
 session_id = str(d.get("session_id") or "")
 if not session_id:
@@ -44,7 +44,7 @@ if MODE == "prompt":
                 fh.write("1\n")
         except OSError:
             sys.exit(0)
-        # 🔴 stdout de UserPromptSubmit intră în context; exit 2 ar șterge prompt-ul — DECIZII «Mod autonom (04.09.2026)»
+        # 🔴 UserPromptSubmit stdout goes into context; exit 2 would erase the prompt — DECIZII «Mod autonom (04.09.2026)»
         print(REGULI)
         sys.exit(0)
     if os.path.exists(MARKER):
@@ -52,18 +52,18 @@ if MODE == "prompt":
             os.remove(MARKER)
         except OSError:
             pass
-        print("MOD AUTONOM oprit (mesaj uman fără semnal).")
+        print("AUTONOMOUS MODE stopped (human message without a signal).")
     sys.exit(0)
 
 # ---- gate (PreToolUse: AskUserQuestion|EnterPlanMode)
 if not os.path.exists(MARKER):
     sys.exit(0)
-COADA = " Prevalează asupra ORCHESTRATION; nu reîncerca."
+COADA = " Overrides ORCHESTRATION; don't retry."
 if (d.get("tool_name") or "") == "EnterPlanMode":
-    reason = "mod autonom: fără plan mode; scrii planul în fișier și execuți direct."
+    reason = "autonomous mode: no plan mode; write the plan to a file and execute directly."
 else:
-    reason = ("mod autonom (Vali nu e la PC): alegi singur opțiunea "
-              "recomandată/conservatoare, o scrii în raport, continui.")
+    reason = ("autonomous mode (the user is away): pick the recommended/conservative "
+              "option yourself, write it in the report, continue.")
 print(json.dumps({"hookSpecificOutput": {
     "hookEventName": "PreToolUse",
     "permissionDecision": "deny",

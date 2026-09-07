@@ -1,9 +1,9 @@
 #!/bin/bash
-# 🔴 offline, synthetic transcripts, no network/Claude — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
+# 🔴 offline, synthetic transcripts, no network/Claude — docs/RECIPES.md «State from the transcript, not from a file (read-mare, test-hooks)»
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
-# 🔴 fixture-urile nu depind de modelul din settings — PATTERNS «Modelul în hook-uri»
+# 🔴 fixtures don't depend on the model from settings — PATTERNS «The model inside hooks»
 export GOV_MODEL=claude-fable-5-1
 python3 - <<'PY'
 import json, os, shutil, subprocess, sys, tempfile
@@ -174,7 +174,7 @@ case("auditor not filtered", agent_in(big, agent_type="auditor"), "allow")
 case("agent plan file exempt", agent_in(planmd), "allow")
 case("agent image exempt", agent_in(img), "allow")
 case("agent tool-results still denied",
-     agent_in(os.path.join(TMP, "tool-results", "x.txt")), "deny", "reia comanda")
+     agent_in(os.path.join(TMP, "tool-results", "x.txt")), "deny", "rerun the command")
 case("no own transcript, 400 lines -> deny", agent_in(bigmd, agent_id="missing"),
      "deny", "400 lines (>300)")
 case("no own transcript, with offset -> allow",
@@ -183,7 +183,7 @@ case("no own transcript, small file -> allow", agent_in(fresh, agent_id="missing
      "allow")
 
 # ------------------------------------------------- write-then-reread + images
-WROTE = "ai scris wrote.txt"
+WROTE = "you wrote wrote.txt"
 case("agent reads back own Write -> deny", agent_in(wrote, agent_id="aw"), "deny", WROTE)
 case("agent spot-check 50 lines after Write -> allow",
      agent_in(wrote, agent_id="aw", offset=10, limit=50), "allow")
@@ -194,7 +194,7 @@ case("agent already re-read after Write -> old rule",
 case("agent after failed Edit -> allow", agent_in(wrote, agent_id="ae"), "allow")
 case("agent after Bash on the file -> allow", agent_in(wrote, agent_id="ab"), "allow")
 case("agent Write on another file -> allow", agent_in(fresh, agent_id="ao"), "allow")
-case("main image 300 KB -> deny", main_in(bigimg), "deny", "explorer sau design-lead")
+case("main image 300 KB -> deny", main_in(bigimg), "deny", "explorer or design-lead")
 case("main image 50 KB -> reminder only", main_in(smallimg), "context", "downscaled")
 case("agent image 300 KB -> allow", agent_in(bigimg), "allow")
 

@@ -8,7 +8,7 @@ d = json.loads(sys.argv[1])
 tp = d.get("transcript_path", "")
 if "subagent" in tp:
     sys.exit(0)
-# 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+# 🔴 model guard, main only — PATTERNS «The model inside hooks»
 model = subprocess.run(["bash", os.path.join(sys.argv[2], "main-model.sh"), tp],
                        capture_output=True, text=True).stdout.strip().lower()
 if not ("fable" in model or "mythos" in model or model in ("", "unknown")):

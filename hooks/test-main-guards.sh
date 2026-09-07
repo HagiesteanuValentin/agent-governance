@@ -1,9 +1,9 @@
 #!/bin/bash
-# 🔴 offline, synthetic payloads, no network/Claude — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
+# 🔴 offline, synthetic payloads, no network/Claude — docs/RECIPES.md «State from the transcript, not from a file (read-mare, test-hooks)»
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
-# 🔴 fixture-urile nu depind de modelul din settings — PATTERNS «Modelul în hook-uri»
+# 🔴 fixtures don't depend on the model from settings — PATTERNS «The model inside hooks»
 export GOV_MODEL=claude-fable-5-1
 python3 - <<'PY'
 import json, os, shutil, subprocess, sys, tempfile
@@ -38,7 +38,7 @@ def call(hook, payload):
 _SID = [0]
 
 def bash_in(command, agent_id=None):
-    # 🔴 sesiune unică per caz de main, altfel intervine nudge-ul — PATTERNS «Batching Bash»
+    # 🔴 unique session per main test case, otherwise the nudge kicks in — PATTERNS «Bash batching»
     _SID[0] += 1
     d = {"session_id": "s1" if agent_id else "s1-%d" % _SID[0],
          "transcript_path": SUBTP if agent_id else MAIN, "cwd": TMP,

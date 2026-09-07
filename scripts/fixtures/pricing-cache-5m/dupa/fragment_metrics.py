@@ -1,10 +1,10 @@
-# fixture: fragmente din tools/session_metrics.py, cate unul per regula din pricing-cache-5m.py
+# fixture: fragments from tools/session_metrics.py, one per rule in pricing-cache-5m.py
 
 def cost_of(counts, rates):
     total = 0.0
     for ck, rk in COST_KEYS:
         total += counts.get(ck, 0) * float(rates.get(rk, 0.0)) / 1_000_000.0
-    # 🔴 cache_creation e totalul; portia 5m se retaxeaza la cache_write_5m — DECIZII «v1.8 — prețuri Fable 5.1»
+    # 🔴 cache_creation is the total; the 5m portion is re-taxed at cache_write_5m — DECIZII «v1.8 — Fable 5.1 pricing»
     n5m = counts.get("cache_creation_5m", 0)
     if n5m:
         r_1h = float(rates.get("cache_write", 0.0))
@@ -80,7 +80,7 @@ def counterfactual_block(main_doc, worker_docs, pricing, as_model, rot_at, windo
     r_cw5 = float(rates.get("cache_write_5m", r_cw))
 
     def cw_cost(call, tokens):
-        # 🔴 portia 5m se taxeaza la r_cw5, proportional cu apelul — DECIZII «v1.8 — prețuri Fable 5.1»
+        # 🔴 the 5m portion is taxed at r_cw5, proportional to the call — DECIZII «v1.8 — Fable 5.1 pricing»
         total = call.get("cache_creation") or 0
         if not total or not tokens:
             return 0.0
@@ -177,7 +177,7 @@ def counterfactual_block(main_doc, worker_docs, pricing, as_model, rot_at, windo
 
 
 def turn_cost(call, pricing):
-    # 🔴 turele moștenite au fost facturate la sesiunea-părinte — PATTERNS «Sesiuni reluate»
+    # 🔴 inherited turns were billed to the parent session — PATTERNS «Resumed sessions»
     if call.get("inherited"):
         return 0.0
     return cost_of({"input": call["input"], "output": call["output"],

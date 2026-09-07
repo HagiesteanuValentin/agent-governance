@@ -1,9 +1,9 @@
 #!/bin/bash
-# 🔴 offline, synthetic transcripts, no Claude — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
+# 🔴 offline, synthetic transcripts, no Claude — docs/RECIPES.md «State from the transcript, not from a file (read-mare, test-hooks)»
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
-# 🔴 fixture-urile nu depind de modelul din settings — PATTERNS «Modelul în hook-uri»
+# 🔴 fixtures don't depend on the model in settings — PATTERNS «The model inside hooks»
 export GOV_MODEL=claude-fable-5-1
 rm -f /tmp/claude-hooks/bash-batch-* 2>/dev/null
 python3 - <<'PY'
@@ -73,48 +73,48 @@ def agent_call(sid, cmd, events, aid="a1"):
 
 CMD = "npm test -- --run"
 
-# 1) a 2-a rulare identică -> tăcut
+# 1) 2nd identical run -> silent
 got, body = agent_call("s1", CMD, [("bash", CMD)])
-case("2 rulări identice -> tăcut", got == "silent", "%s %s" % (got, body))
+case("2 identical runs -> silent", got == "silent", "%s %s" % (got, body))
 
-# 2) a 3-a rulare identică -> additionalContext
+# 2) 3rd identical run -> additionalContext
 got, body = agent_call("s2", CMD, [("bash", CMD), ("bash", CMD)])
-case("a 3-a rulare -> context", got == "context" and "a 3-a rulare" in body,
+case("3rd run -> context", got == "context" and "3rd identical run" in body,
      "%s %s" % (got, body))
 
-# 3) Edit între rulări -> contor resetat
+# 3) Edit in between runs -> counter reset
 got, body = agent_call("s3", CMD, [("bash", CMD), ("bash", CMD), ("edit", "/x.ts")])
-case("Edit între -> contor resetat", got == "silent", "%s %s" % (got, body))
+case("Edit in between -> counter reset", got == "silent", "%s %s" % (got, body))
 
-# 4) main (fără agent_id) -> tăcut
+# 4) main (no agent_id) -> silent
 agent_tp("s4", "a1", [("bash", CMD), ("bash", CMD)])
 got, body = decide({"session_id": "s4", "transcript_path": tp("s4"),
                     "tool_name": "Bash", "tool_input": {"command": CMD}})
-case("main -> tăcut", got == "silent", "%s %s" % (got, body))
+case("main -> silent", got == "silent", "%s %s" % (got, body))
 
-# 5) normalizare: spații multiple / trim contează la fel
+# 5) normalization: multiple spaces / trim count the same
 got, body = agent_call("s5", "  npm   test -- --run ",
                        [("bash", CMD), ("bash", "npm test  -- --run")])
-case("normalizare spații -> context", got == "context", "%s %s" % (got, body))
+case("space normalization -> context", got == "context", "%s %s" % (got, body))
 
-# 6) comandă diferită -> tăcut
+# 6) different command -> silent
 got, body = agent_call("s6", "npm run build", [("bash", CMD), ("bash", CMD)])
-case("comandă diferită -> tăcut", got == "silent", "%s %s" % (got, body))
+case("different command -> silent", got == "silent", "%s %s" % (got, body))
 
-# 7) transcript de agent lipsă -> tăcut (fail-open)
+# 7) missing agent transcript -> silent (fail-open)
 got, body = decide({"session_id": "s7", "transcript_path": tp("s7"), "agent_id": "zzz",
                     "tool_name": "Bash", "tool_input": {"command": CMD}})
-case("transcript agent lipsă -> tăcut", got == "silent", "%s %s" % (got, body))
+case("missing agent transcript -> silent", got == "silent", "%s %s" % (got, body))
 
-# 8) JSON invalid -> exit 0, fără output
+# 8) invalid JSON -> exit 0, no output
 p = subprocess.run(["bash", HOOK], input="not json", text=True, capture_output=True)
-case("JSON invalid -> exit 0, fără output",
+case("invalid JSON -> exit 0, no output",
      p.returncode == 0 and not p.stdout.strip(),
      "rc=%d out=%r" % (p.returncode, p.stdout.strip()))
 
-# 9-12) nudge de batching în main
+# 9-12) batching nudge in main
 
-# 🔴 gap-ul se simulează prin contorul pre-scris, nu prin sleep — PATTERNS «Batching Bash»
+# 🔴 the gap is simulated via a pre-written counter, not sleep — PATTERNS «Bash batching»
 
 
 def state_path(sid):
@@ -137,7 +137,7 @@ BIG = "echo " + "x" * 220
 
 set_state("b1", 1, 10)
 got, body = main_call("b1", SMALL)
-case("al 2-lea apel mic -> tăcut", got == "silent", "%s %s" % (got, body))
+case("2nd small call -> silent", got == "silent", "%s %s" % (got, body))
 
 set_state("b1", 2, 10)
 got, body = main_call("b1", SMALL)
@@ -148,12 +148,12 @@ set_state("b2", 2, 10)
 main_call("b2", BIG)
 set_state("b2", int(open(state_path("b2")).read().split()[0]), 10)
 got, body = main_call("b2", SMALL)
-case("comandă mare -> contor resetat", got == "silent", "%s %s" % (got, body))
+case("large command -> counter reset", got == "silent", "%s %s" % (got, body))
 
 set_state("b3", 0, 10)
 for _i in range(3):
     got, body = main_call("b3", SMALL)
-case("3 apeluri la <3 s (același mesaj) -> tăcut",
+case("3 calls at <3s (same message) -> silent",
      got == "silent" and open(state_path("b3")).read().split()[0] == "1",
      "%s %s state=%s" % (got, body, open(state_path("b3")).read()))
 

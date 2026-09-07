@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Patch idempotent: preturi Fable 5.1 in pricing.json + taxare separata 5m/1h in session_metrics.py.
+"""Idempotent patch: Fable 5.1 prices in pricing.json + separate 5m/1h billing in session_metrics.py.
 
-Fara valori de pret hardcodate: fiecare model vine din --price.
-  --price NUME=input,output,cache_read,cache_write_5m,cache_write   (repetabil)
+No hardcoded prices: each model comes from --price.
+  --price NAME=input,output,cache_read,cache_write_5m,cache_write   (repeatable)
   --note TEXT   --date YYYY-MM-DD
-  --pricing CALE  --metrics CALE  --only CALE  --dry-run
-Exit != 0 daca un fisier nu are exact numarul de potriviri asteptat.
+  --pricing PATH  --metrics PATH  --only PATH  --dry-run
+Exit != 0 if a file doesn't have exactly the expected number of matches.
 """
 import argparse
 import json
@@ -25,8 +25,8 @@ RULES = [
         "    total = 0.0\n"
         "    for ck, rk in COST_KEYS:\n"
         "        total += counts.get(ck, 0) * float(rates.get(rk, 0.0)) / 1_000_000.0\n"
-        "    # \U0001f534 cache_creation e totalul; portia 5m se retaxeaza la cache_write_5m"
-        " \u2014 DECIZII \u00abv1.8 \u2014 pre\u021buri Fable 5.1\u00bb\n"
+        "    # \U0001f534 cache_creation is the total; the 5m portion is re-taxed at cache_write_5m"
+        " \u2014 DECIZII \u00abv1.8 \u2014 Fable 5.1 pricing\u00bb\n"
         "    n5m = counts.get(\"cache_creation_5m\", 0)\n"
         "    if n5m:\n"
         "        r_1h = float(rates.get(\"cache_write\", 0.0))\n"
@@ -90,8 +90,8 @@ RULES = [
         '    r_cw5 = float(rates.get("cache_write_5m", r_cw))\n'
         '\n'
         '    def cw_cost(call, tokens):\n'
-        '        # \U0001f534 portia 5m se taxeaza la r_cw5, proportional cu apelul'
-        ' — DECIZII «v1.8 — prețuri Fable 5.1»\n'
+        '        # \U0001f534 the 5m portion is taxed at r_cw5, proportional to the call'
+        ' — DECIZII «v1.8 — Fable 5.1 pricing»\n'
         '        total = call.get("cache_creation") or 0\n'
         '        if not total or not tokens:\n'
         '            return 0.0\n'
@@ -136,7 +136,7 @@ def parse_price(spec):
     name, _, vals = spec.partition("=")
     parts = [v.strip() for v in vals.split(",")]
     if not name or len(parts) != 5:
-        raise SystemExit("--price %s: astept NUME=input,output,cache_read,"
+        raise SystemExit("--price %s: expected NAME=input,output,cache_read,"
                          "cache_write_5m,cache_write" % spec)
     keys = ("input", "output", "cache_read", "cache_write_5m", "cache_write")
     return name, {k: float(v) for k, v in zip(keys, parts)}
@@ -146,7 +146,7 @@ def parse_extra(spec):
     name, _, rest = spec.partition("=")
     key, _, val = rest.partition(":")
     if not name or not key or not val:
-        raise SystemExit("--extra %s: astept NUME=CHEIE:VALOARE" % spec)
+        raise SystemExit("--extra %s: expected NAME=KEY:VALUE" % spec)
     return name, key, float(val)
 
 
@@ -164,7 +164,7 @@ def patch_pricing(path, prices, extras, note, date, dry_run):
         doc["models"].setdefault(name, {})[key] = val
     for name, rates in doc["models"].items():
         if "cache_write_5m" not in rates:
-            print("  ! %s: fara cache_write_5m (nedat in --price)" % name)
+            print("  ! %s: no cache_write_5m (not given in --price)" % name)
     if note:
         doc["_note"] = note
     if date:
@@ -193,7 +193,7 @@ def patch_metrics(path, dry_run):
         src = src.replace(anchor, repl, 1)
         applied += 1
         print("  + %s" % label)
-    print("%s: %d aplicate, %d deja prezente, %d erori" %
+    print("%s: %d applied, %d already present, %d errors" %
           (path, applied, skipped, len(errors)))
     for e in errors:
         print("  ! %s" % e)
@@ -211,7 +211,7 @@ def main():
     ap.add_argument("--metrics")
     ap.add_argument("--price", action="append", default=[])
     ap.add_argument("--extra", action="append", default=[],
-                    help="camp informativ: NUME=CHEIE:VALOARE (nefolosit de analizor)")
+                    help="informative field: NAME=KEY:VALUE (unused by the analyzer)")
     ap.add_argument("--note", default="")
     ap.add_argument("--date", default="")
     ap.add_argument("--only")
@@ -229,7 +229,7 @@ def main():
     for t in targets:
         if t == args.pricing:
             if not prices:
-                raise SystemExit("pricing.json fara --price")
+                raise SystemExit("pricing.json without --price")
             patch_pricing(t, prices, [parse_extra(e) for e in args.extra],
                           args.note, args.date, args.dry_run)
         else:

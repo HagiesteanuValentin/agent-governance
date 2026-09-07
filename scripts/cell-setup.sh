@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Uz: cell-setup.sh <task> <run> [--dosar DIR] — vezi scripts/SCRIPTS.md
+# Usage: cell-setup.sh <task> <run> [--dosar DIR] — see scripts/SCRIPTS.md
 set -euo pipefail
 
-MAMA="/home/vali/workflow/proiecte/blueprint_pictura"
-EXPERIMENTE="/home/vali/workflow/experimente"
+# set to your project
+MAMA="${MAMA:-${PROJECT:-${HOME}/workflow/proiecte/your-project}}"
+EXPERIMENTE="${HOME}/workflow/experimente"
 CELLS=(cell-opus-low cell-opus-medium cell-sonnet-medium cell-sonnet-low)
 
 TASK="${1:-}"
@@ -11,7 +12,7 @@ RUN="${2:-}"
 DOSAR=""
 
 if [[ -z "$TASK" || -z "$RUN" ]]; then
-  echo "Uz: cell-setup.sh <task> <run> [--dosar DIR]" >&2
+  echo "Usage: cell-setup.sh <task> <run> [--dosar DIR]" >&2
   exit 1
 fi
 shift 2 || true
@@ -23,14 +24,14 @@ while [[ $# -gt 0 ]]; do
       shift 2
       ;;
     *)
-      echo "Argument necunoscut: $1" >&2
+      echo "Unknown argument: $1" >&2
       exit 1
       ;;
   esac
 done
 
 if [[ ! -d "$MAMA/.git" ]]; then
-  echo "Mama nu e repo git: $MAMA" >&2
+  echo "MAMA is not a git repo: $MAMA" >&2
   exit 1
 fi
 
@@ -45,17 +46,17 @@ for CELL in "${CELLS[@]}"; do
   fi
 
   if [[ -d "$WT/.git" || -f "$WT/.git" ]]; then
-    echo "OK (există deja) $WT"
+    echo "OK (already exists) $WT"
   else
     mkdir -p "$EXPERIMENTE/$TASK"
     git -C "$MAMA" worktree add "$WT" -b "$BRANCH" master
-    echo "CREAT $WT (branch $BRANCH)"
+    echo "CREATED $WT (branch $BRANCH)"
   fi
 
   if [[ -L "$WT/node_modules" ]]; then
-    echo "OK (symlink există) $WT/node_modules"
+    echo "OK (symlink already exists) $WT/node_modules"
   elif [[ -e "$WT/node_modules" ]]; then
-    echo "ATENȚIE: $WT/node_modules există și NU e symlink — nu ating" >&2
+    echo "WARNING: $WT/node_modules exists and is NOT a symlink — leaving it alone" >&2
   else
     ln -s "$MAMA/node_modules" "$WT/node_modules"
     echo "SYMLINK $WT/node_modules -> $MAMA/node_modules"
@@ -64,18 +65,18 @@ for CELL in "${CELLS[@]}"; do
   if [[ -n "$DOSAR" ]]; then
     DEST="$WT/docs/dosar/$TASK"
     if [[ -d "$DEST" ]]; then
-      echo "OK (dosar există deja) $DEST"
+      echo "OK (dosar already exists) $DEST"
     else
       mkdir -p "$DEST"
       cp -r "$DOSAR/." "$DEST/"
-      echo "COPIAT $DOSAR -> $DEST/"
+      echo "COPIED $DOSAR -> $DEST/"
     fi
   fi
 done
 
-# --- baseline: npm run check în primul worktree ---
+# --- baseline: npm run check in the first worktree ---
 BASELINE_FILE="$(cd "$(dirname "$0")" && pwd)/cell-baseline-${TASK}.txt"
-echo "Rulez 'npm run check' în $FIRST_WT ..."
+echo "Running 'npm run check' in $FIRST_WT ..."
 set +e
 CHECK_OUT="$(cd "$FIRST_WT" && npm run check 2>&1)"
 CHECK_EXIT=$?

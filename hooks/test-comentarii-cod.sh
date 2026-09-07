@@ -1,5 +1,5 @@
 #!/bin/bash
-# 🔴 offline, synthetic payloads, no network/Claude — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
+# 🔴 offline, synthetic payloads, no network/Claude — docs/RECIPES.md «State from the transcript, not from a file (read-mare, test-hooks)»
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
@@ -13,7 +13,7 @@ SESSION = "test-%s" % RUN
 LOG = "/tmp/claude-hooks/comentarii-%s.jsonl" % SESSION
 CODE = os.path.join(TMP, "src.js")
 BLOCK2 = "// prima linie de nota\n// a doua linie de nota\nconst a = 1;"
-POINTER = "// \U0001f534 constrangere - PATTERNS «sectiune»\nconst a = 1;"
+POINTER = "// \U0001f534 constrangere - PATTERNS «section»\nconst a = 1;"
 results = []
 
 

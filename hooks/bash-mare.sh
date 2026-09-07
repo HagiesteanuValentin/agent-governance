@@ -1,5 +1,5 @@
 #!/bin/bash
-# 🔴 praguri BIG_LINES/BODY_LINES — RETETE «Scripturi»
+# 🔴 BIG_LINES/BODY_LINES thresholds — RECIPES «Scripts»
 BIG_LINES=300
 BODY_LINES=20
 LOG_DIR=/tmp/claude-hooks
@@ -29,7 +29,7 @@ BODY_LINES = int(sys.argv[3])
 BATCH_MAX = 3
 BATCH_CHARS = 200
 BATCH_IDLE = 90
-# 🔴 sub 3 s = tool_use-uri paralele din același mesaj — PATTERNS «Batching Bash»
+# 🔴 under 3 s = parallel tool_use calls from the same message — PATTERNS «Bash batching»
 BATCH_GAP = 3
 _NUDGE = [False]
 
@@ -38,9 +38,9 @@ def _emit_nudge():
     if _NUDGE[0]:
         print(json.dumps({"hookSpecificOutput": {
             "hookEventName": "PreToolUse",
-            "additionalContext": "3 apeluri Bash mici la rând — comenzile independente "
-                                 "merg într-un singur apel sau în același mesaj; "
-                                 "analizorul marchează batchable_bash"}}))
+            "additionalContext": "3 small Bash calls in a row — independent commands "
+                                 "go into a single call or the same message; "
+                                 "the analyzer flags batchable_bash"}}))
 
 
 def deny(reason):
@@ -91,7 +91,7 @@ def sterile_runs(atp, want, cur_id):
 
 
 def batch_nudge(sid, cmd):
-    # 🔴 „mic" se judecă pe comandă, nu pe output — PATTERNS «Batching Bash»
+    # 🔴 "small" is judged on the command, not on the output — PATTERNS «Bash batching»
     if not sid:
         return
     state = os.path.join("/tmp/claude-hooks", "bash-batch-%s" % re.sub(r"[^\w.-]", "_", sid))
@@ -135,7 +135,7 @@ try:
         acmd = ati.get("command")
         if not (agent_id and sid and tp) or not isinstance(acmd, str) or not acmd.strip():
             sys.exit(0)
-        # 🔴 în sub-agent transcript_path e transcriptul din MAIN — DECIZII «v1.4.1 — 30.08.2026»
+        # 🔴 in a sub-agent, transcript_path is the MAIN transcript — DECIZII «v1.4.1 — 30.08.2026»
         atp = os.path.join(os.path.dirname(tp), sid, "subagents",
                            "agent-%s.jsonl" % agent_id)
         try:
@@ -145,10 +145,10 @@ try:
         if runs >= 2:
             print(json.dumps({"hookSpecificOutput": {
                 "hookEventName": "PreToolUse",
-                "additionalContext": "a 3-a rulare identică fără nicio modificare; "
-                                     "ori repari, ori raportezi neclar/riscant"}}))
+                "additionalContext": "3rd identical run with no fix in between; "
+                                     "either fix it or report it as unclear/risky"}}))
         sys.exit(0)
-    # 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+    # 🔴 model guard, main only — PATTERNS «The model inside hooks»
     _m = subprocess.run(["bash", os.path.join(sys.argv[4], "main-model.sh"), tp],
                         capture_output=True, text=True).stdout.strip().lower()
     if not ("fable" in _m or "mythos" in _m or _m in ("", "unknown")):
@@ -159,7 +159,7 @@ try:
         sys.exit(0)
     cwd = d.get("cwd") or os.getcwd()
     atexit.register(_emit_nudge)
-    # 🔴 contorul stă înaintea ieșirii pe RANGE — PATTERNS «Batching Bash»
+    # 🔴 the counter runs before the RANGE early exit — PATTERNS «Bash batching»
     batch_nudge(d.get("session_id") or "", cmd)
 
     def nlines(path):
@@ -277,7 +277,7 @@ try:
         for a in args:
             n = nlines(a)
             if n > BIG_LINES:
-                deny(">300 lines in main → explorer (sau interval): %s has %d lines" % (a, n))
+                deny(">300 lines in main → explorer (or a range): %s has %d lines" % (a, n))
 except Exception:
     sys.exit(0)
 PY

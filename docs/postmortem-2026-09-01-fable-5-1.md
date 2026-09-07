@@ -29,7 +29,7 @@ For reference, s1 (31.08, fable-5): tool calls 34, Read direct 2, Write+Edit mai
 
 Cell tool calls / Read chars: opus-low 160 / 343.3k; opus-medium 150 / 436.5k; sonnet-medium 171 / 289.0k; sonnet-low 103 / 24.4k.
 
-Brief line 10, identical in all 4 briefs: "Citește integral, fișier cu fișier (Read, în ordinea numerelor), dosarul docs/dosar/simplu/" (20 files, 6,671 lines). `context-agent.sh` skips cell-* (name filter, only implementer*/scripter*).
+Brief line 10, identical in all 4 briefs: "Read the docs/dosar/simplu/ dossier in full, file by file (Read, in number order)" (20 files, 6,671 lines). `context-agent.sh` skips cell-* (name filter, only implementer*/scripter*).
 
 ## 3. Degradation curve (per 50k bucket: calls | Edit/Write | ed_fail | reread | verify(fail) | out_tok | cost$ | $/call)
 

@@ -64,7 +64,7 @@ export function creeazaContext(root) {
   return { root: abs, git, gitSafe, showMaster, masterFiles, isTargetAstro, readCur, currentTargets };
 }
 
-// ---------- I1: culorile hex din <style> și style="…" ----------
+// ---------- I1: hex colors in <style> and style="…" ----------
 const I1_EXCL = /(href="|id="|url\(|name=")$/;
 function styleScope(src) {
   const s = mask(src);
@@ -169,7 +169,7 @@ export function itemiI(ctx) {
     const c = readCur('docs/TODO-CLIENT.md');
     const n = c == null ? 0 : c.split('\n').filter((l) => l.includes('src/content/') && l.includes(':')).length;
     const tinta = gitSafe('grep', '-o', 'TODO-CLIENT', 'master', '--', 'src/content').split('\n').filter(Boolean).length;
-    set('I6', n >= tinta ? 'OK' : 'FAIL', n, tinta, c == null ? 'fișier absent' : '');
+    set('I6', n >= tinta ? 'OK' : 'FAIL', n, tinta, c == null ? 'file missing' : '');
   }
   // I7
   {
@@ -177,7 +177,7 @@ export function itemiI(ctx) {
     const bad = pages.filter((f) => { const c = readCur(f); return c == null || !c.includes('description'); });
     set('I7', bad.length === 0 ? 'OK' : 'FAIL', bad.length, 0, bad.join(' '));
   }
-  // I8 — o singură dată, la final
+  // I8 — once, at the end
   let out = '';
   let code = 0;
   try {
@@ -204,7 +204,7 @@ export function itemiI(ctx) {
 export function afiseazaI(items) {
   for (const id of I_IDS) {
     const it = items[id];
-    console.log(`${id} ${LABEL[id]}: ${it.status} (găsit ${it.found}, țintă ${it.target})`);
+    console.log(`${id} ${LABEL[id]}: ${it.status} (found ${it.found}, target ${it.target})`);
   }
   const ok = I_IDS.filter((id) => items[id].status === 'OK').length;
   console.log(`I: ${ok}/${I_IDS.length} ok, ${I_IDS.length - ok} fail`);
@@ -221,7 +221,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (a === '--json') jsonOut = argv[++i];
     else if (a.startsWith('--')) { console.error(`Argument necunoscut: ${a}`); process.exit(2); }
     else if (!root) root = a;
-    else { console.error(`Argument în plus: ${a}`); process.exit(2); }
+    else { console.error(`Extra argument: ${a}`); process.exit(2); }
   }
   if (!root) { console.error('Uz: verifica-simplu.next.mjs <root> [--json <out>]'); process.exit(2); }
   root = path.resolve(root);

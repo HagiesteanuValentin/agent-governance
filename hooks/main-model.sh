@@ -1,5 +1,5 @@
 #!/bin/bash
-# 🔴 model din ultima linie assistant, nu din coada fișierului — PATTERNS «Modelul în hook-uri»
+# 🔴 model from the last assistant line, not from the file's tail — PATTERNS «The model inside hooks»
 tp="${1:-}"
 if [ -n "${GOV_MODEL:-}" ]; then
     printf '%s\n' "$GOV_MODEL"

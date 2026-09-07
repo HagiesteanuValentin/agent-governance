@@ -1,9 +1,9 @@
 #!/bin/bash
-# 🔴 offline, repo git temporar + transcript sintetic — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
+# 🔴 offline, temporary git repo + synthetic transcript — docs/RECIPES.md «State from the transcript, not from a file (read-mare, test-hooks)»
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
-# 🔴 fixture-urile nu depind de modelul din settings — PATTERNS «Modelul în hook-uri»
+# 🔴 fixtures don't depend on the model in settings — PATTERNS «The model inside hooks»
 export GOV_MODEL=claude-fable-5-1
 python3 - <<'PY'
 import json, os, shutil, subprocess, sys, tempfile, time
@@ -104,57 +104,57 @@ R_TS = repo_with("r-ts", ["src/a.ts"])
 R_MD = repo_with("r-md", ["docs/a.md"])
 NOW = time.time()
 
-# 1. fără marker + diff .ts -> ask
-case("fara marker + diff .ts -> ask", payload("s1", R_TS), "ask", "audit")
+# 1. no marker + diff .ts -> ask
+case("no marker + diff .ts -> ask", payload("s1", R_TS), "ask", "audit")
 case("git -C /x commit -> ask", payload("s1b", R_TS, cmd="git -C /x commit -m y"),
      "ask", "audit")
 case("git --git-dir=... commit -> ask",
      payload("s1c", R_TS, cmd="git --git-dir=/x/.git commit -m y"), "ask", "audit")
 
-# 2. marker proaspăt -> allow
+# 2. fresh marker -> allow
 marker("s2", NOW)
 transcript("s2", NOW - 600)
 d2 = payload("s2", R_TS); d2["transcript_path"] = transcript("s2", NOW - 600)
-case("marker proaspat (Edit mai vechi) -> allow", d2, "allow")
+case("fresh marker (older Edit) -> allow", d2, "allow")
 
-# 3. marker vechi față de un Edit ulterior -> ask
+# 3. old marker vs. a later Edit -> ask
 marker("s3", NOW - 600)
 d3 = payload("s3", R_TS); d3["transcript_path"] = transcript("s3", NOW - 60)
-case("marker vechi + Edit ulterior -> ask", d3, "ask", "audit")
+case("old marker + later Edit -> ask", d3, "ask", "audit")
 
-# 4. diff doar .md -> allow
-case("diff doar .md -> allow", payload("s4", R_MD), "allow")
+# 4. diff .md only -> allow
+case("diff .md only -> allow", payload("s4", R_MD), "allow")
 
-# 5. git commit în subagent -> allow (nefiltrat)
+# 5. git commit in a subagent -> allow (unfiltered)
 case("git commit in subagent -> allow", payload("s5", R_TS, agent_id="a1"), "allow")
 
-# 6-8. margini
-case("alta comanda Bash -> allow", payload("s6", R_TS, cmd="git status"), "allow")
-case("alt tool -> allow", payload("s7", R_TS, tool="Read"), "allow")
-case("cwd inexistent (fail-open) -> allow",
+# 6-8. edge cases
+case("other Bash command -> allow", payload("s6", R_TS, cmd="git status"), "allow")
+case("other tool -> allow", payload("s7", R_TS, tool="Read"), "allow")
+case("cwd missing (fail-open) -> allow",
      payload("s8", os.path.join(TMP, "nope")), "allow")
 
-# 9. .mjs / .astro prinse de extensii
+# 9. .mjs / .astro caught by extensions
 R_MJS = repo_with("r-mjs", ["scripts/a.mjs", "src/pages/b.astro"])
 case("diff .mjs/.astro -> ask", payload("s9", R_MJS), "ask", "audit")
 
-# 10. --extensii restrânge lista
+# 10. --extensii narrows the list
 rc, out, err = call(GATE, payload("s10", R_MJS), args=["--extensii", "ts,js"])
-results.append(("--extensii ts,js pe diff .mjs -> allow",
+results.append(("--extensii ts,js on .mjs diff -> allow",
                 rc == 0 and not out and not err, "rc=%d out=%r" % (rc, out[:40])))
 
 
 d5b = payload("s5b", R_TS)
 d5b["transcript_path"] = os.path.join(TMP, "proj", "subagents", "agent-a2.jsonl")
-case("transcript de subagent (fara agent_id) -> allow", d5b, "allow")
+case("subagent transcript (no agent_id) -> allow", d5b, "allow")
 
-# 11. Edit-ul ulterior e într-un transcript de subagent
+# 11. the later Edit is in a subagent transcript
 marker("s11", NOW - 600)
 d11 = payload("s11", R_TS); d11["transcript_path"] = transcript("s11", NOW - 900)
 sub = os.path.join(TMP, "proj", "s11", "subagents")
 os.makedirs(sub, exist_ok=True)
 shutil.copy(transcript("s11-sub", NOW - 60), os.path.join(sub, "agent-a9.jsonl"))
-case("Edit in subagent dupa marker -> ask", d11, "ask", "audit")
+case("Edit in subagent after marker -> ask", d11, "ask", "audit")
 
 
 # ---------------------------------------------------------------- raport-lung: marker
@@ -177,14 +177,14 @@ def rap_case(name, sid, msg, agent_type, expect_marker):
 rap_case("VERDICT: OK -> marker", "sr1", "VERDICT: OK\nnimic de reparat",
          "auditor", True)
 rap_case("VERDICT: CONFORM -> marker", "sr1b", "VERDICT: CONFORM", "auditor", True)
-rap_case("ABATERI (2), din care 2 reparate -> marker", "sr2",
+rap_case("ABATERI (2), 2 fixed -> marker", "sr2",
          "VERDICT: ABATERI (2), din care 2 reparate", "auditor", True)
-rap_case("ABATERI (2), din care 1 reparate -> fara marker", "sr3",
+rap_case("ABATERI (2), 1 fixed -> no marker", "sr3",
          "VERDICT: ABATERI (2), din care 1 reparate", "auditor", False)
-rap_case("NECONFORM -> fara marker", "sr4", "VERDICT: NECONFORM", "auditor", False)
-rap_case("alt agent cu VERDICT: OK -> fara marker", "sr5", "VERDICT: OK",
+rap_case("NECONFORM -> no marker", "sr4", "VERDICT: NECONFORM", "auditor", False)
+rap_case("other agent with VERDICT: OK -> no marker", "sr5", "VERDICT: OK",
          "implementer", False)
-rap_case("raport prea lung cu VERDICT: OK -> fara marker", "sr6",
+rap_case("report too long with VERDICT: OK -> no marker", "sr6",
          "VERDICT: OK\n" + "x" * 2500, "auditor", False)
 
 fails = [r for r in results if not r[1]]

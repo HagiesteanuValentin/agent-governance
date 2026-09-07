@@ -1,9 +1,9 @@
 #!/bin/bash
-# 🔴 offline, synthetic state in tmp, no Claude — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
+# 🔴 offline, synthetic state in tmp, no Claude — docs/RECIPES.md «State from the transcript, not from a file (read-mare, test-hooks)»
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
-# 🔴 fixture-urile nu depind de modelul din settings — PATTERNS «Modelul în hook-uri»
+# 🔴 fixtures don't depend on the model from settings — PATTERNS «The model inside hooks»
 export GOV_MODEL=claude-fable-5-1
 python3 - <<'PY'
 import json, os, shutil, subprocess, sys, tempfile, time
@@ -88,7 +88,7 @@ check_case("5 live agents -> allow", "s1", [A(1), A(2), A(3), A(4), A(5)], "allo
 
 # 2) 6 live -> ask
 check_case("6 live agents -> ask", "s2", [A(1), A(2), A(3), A(4), A(5), A(6)], "ask",
-           "6 agenți vii")
+           "6 live agents")
 case("message lists type/id", "explorer/a1" in
      decide("check", {"session_id": "s2", "transcript_path": tp("s2"),
                       "tool_name": "Agent", "tool_input": {}})[1], "lista")
@@ -97,7 +97,7 @@ case("message lists type/id", "explorer/a1" in
 check_case("6 live, 1 with jsonl older than 5 min -> allow", "s3",
            [A(1), A(2), A(3), A(4), A(5), ("a6", "scribe", 900, 900)], "allow")
 case("stale row is cleaned from file", len(rows("s3")) == 5,
-     "%d rânduri" % len(rows("s3")))
+     "%d rows" % len(rows("s3")))
 
 # 4) 6 live, one with no jsonl and an old row -> allow
 check_case("6 live, 1 with no jsonl and old row -> allow", "s4",
@@ -105,7 +105,7 @@ check_case("6 live, 1 with no jsonl and old row -> allow", "s4",
 
 # 5) 6 live, one with no jsonl but just started -> ask (grace period)
 check_case("6 live, 1 with no jsonl but fresh -> ask", "s5",
-           [A(1), A(2), A(3), A(4), A(5), ("a6", "scribe", 5, None)], "ask", "6 agenți vii")
+           [A(1), A(2), A(3), A(4), A(5), ("a6", "scribe", 5, None)], "ask", "6 live agents")
 
 # 6) start adds the row in the format agent_id\tagent_type\ttimestamp
 sid = "s6"
@@ -119,7 +119,7 @@ case("start writes 1 row id/type/ts",
 call("start", {"session_id": sid, "transcript_path": tp(sid),
                "agent_id": "b1", "agent_type": "implementer"})
 case("start twice on same id does not duplicate", len(rows(sid)) == 1,
-     "%d rânduri" % len(rows(sid)))
+     "%d rows" % len(rows(sid)))
 
 # 7) stop removes the row
 call("start", {"session_id": sid, "transcript_path": tp(sid),

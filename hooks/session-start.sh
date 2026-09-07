@@ -3,7 +3,7 @@
 d="${CLAUDE_PROJECT_DIR:-$PWD}"
 o="$HOME/.claude/orchestrare.md"
 v="$HOME/.claude/orchestrare-v17.md"
-# 🔴 resume must not snap effort back to medium — PATTERNS «Claude Code — limite verificate în docs (02.09.2026)»
+# 🔴 resume must not snap effort back to medium — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
 in="$(cat 2>/dev/null)"
 src=$(printf '%s' "$in" | python3 -c "
 import json, sys
@@ -19,16 +19,16 @@ try:
 except Exception:
     print('')
 " 2>/dev/null)
-# 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+# 🔴 model guard, main only — PATTERNS «The model inside hooks»
 model=$(bash "$(dirname "$0")/main-model.sh" "$tpath" 2>/dev/null | tr 'A-Z' 'a-z')
 case "$model" in
   *fable*|*mythos*|unknown|"") gov=1 ;;
   *) gov=0 ;;
 esac
-# 🔴 hook-urile SessionStart rulează în paralel — PATTERNS «Hook-uri SessionStart rulează în paralel»
+# 🔴 SessionStart hooks run in parallel — PATTERNS «SessionStart hooks run in parallel»
 reset_effort_for_source() {
   eph="$(dirname "$0")/effort-phase.sh"
-  # 🔴 fork/resume/compact keep effort; unknown source resets — PATTERNS «Claude Code — limite verificate în docs (02.09.2026)»
+  # 🔴 fork/resume/compact keep effort; unknown source resets — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
   if [ -f "$eph" ]; then
     case "$src" in
       resume|fork|compact) ;;

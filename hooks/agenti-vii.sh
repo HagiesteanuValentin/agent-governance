@@ -94,13 +94,13 @@ if MODE == "stop":
     sys.exit(0)
 
 # ---- check (PreToolUse/Agent in main)
-# 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+# 🔴 model guard, main only — PATTERNS «The model inside hooks»
 _m = subprocess.run(["bash", os.path.join(sys.argv[6], "main-model.sh"),
                      d.get("transcript_path") or ""],
                     capture_output=True, text=True).stdout.strip().lower()
 if not ("fable" in _m or "mythos" in _m or _m in ("", "unknown")):
     sys.exit(0)
-# 🔴 marker autonom-<sid> = fără ask — docs/DECIZII.md «Mod autonom (04.09.2026)»
+# 🔴 autonom-<sid> marker = no ask — docs/DECIZII.md «Mod autonom (04.09.2026)»
 if os.path.exists(os.path.join(MARKER_DIR, "autonom-%s" % safe_sid)):
     sys.exit(0)
 rows = read_rows()
@@ -116,6 +116,6 @@ print(json.dumps({"hookSpecificOutput": {
     "hookEventName": "PreToolUse",
     "permissionDecision": "ask",
     "permissionDecisionReason":
-        "%d agenți vii (%s); peste cap — aprobare" % (len(live), lista)}}))
+        "%d live agents (%s); over the cap — approval" % (len(live), lista)}}))
 sys.exit(0)
 PY

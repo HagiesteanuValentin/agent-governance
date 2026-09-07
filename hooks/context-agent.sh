@@ -13,7 +13,7 @@ WARN_AT, BLOCK_AT = 150000, 220000
 SCOPE = "agent"
 ANY_TYPE = False
 PER_TYPE = False
-# 🔴 praguri per tip doar cu --praguri-tip, implicit rămân 150k/220k — docs/DECIZII.md «context-agent — scope main și praguri per tip»
+# 🔴 per-type thresholds only with --praguri-tip, default stays 150k/220k — docs/DECIZII.md «context-agent — scope main și praguri per tip»
 TYPE_LIMITS = {"implementer-sonnet": (100000, 150000),
                "scripter": (100000, 150000)}
 AGENT_PREFIXES = ("implementer", "scripter")
@@ -152,24 +152,24 @@ def run():
         if ctx >= BLOCK_AT:
             reason = None
             if tool == "Read":
-                reason = ("Context >=%dk: nu mai citi; închide task-ul și rulează /handoff "
-                          "(Bash rămâne liber)." % (BLOCK_AT // 1000))
+                reason = ("Context >=%dk: stop reading; close the task and run /handoff "
+                          "(Bash stays free)." % (BLOCK_AT // 1000))
             elif tool == "Agent":
                 st = ti.get("subagent_type") or ""
                 if not str(st).startswith(SAFE_SUBAGENTS):
-                    reason = ("Context >=%dk: doar scribe/auditor; închide task-ul și "
-                              "rulează /handoff." % (BLOCK_AT // 1000))
+                    reason = ("Context >=%dk: scribe/auditor only; close the task and "
+                              "run /handoff." % (BLOCK_AT // 1000))
             elif tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
                 fp = str(ti.get("file_path") or ti.get("notebook_path") or "")
                 if PLAN_DIR not in fp:
-                    reason = ("Context >=%dk: scrii doar în %s; închide task-ul și "
-                              "rulează /handoff." % (BLOCK_AT // 1000, PLAN_DIR))
+                    reason = ("Context >=%dk: write only into %s; close the task and "
+                              "run /handoff." % (BLOCK_AT // 1000, PLAN_DIR))
             if reason:
                 emit("main", "main", ctx, "deny", permissionDecision="deny",
                      permissionDecisionReason=reason)
         if ctx >= WARN_AT and marker_once(safe, "main%dk" % (WARN_AT // 1000)):
             emit("main", "main", ctx, "warn",
-                 additionalContext=("Context >=%dk: închide task-ul, rulează /handoff."
+                 additionalContext=("Context >=%dk: close the task, run /handoff."
                                     % (WARN_AT // 1000)))
         return
 
@@ -216,8 +216,8 @@ def run():
         return
     if prior + 1 >= 3 and marker_once(safe, "verif3"):
         emit(agent_id, agent_type, ctx, "verif3",
-             additionalContext=("A 3-a verificare; brief-ul permite una la sfârșit și una după "
-                                "fix-uri — continuă doar dacă ai făcut un fix de atunci."))
+             additionalContext=("3rd verification run; the brief allows one at the end and one "
+                                "after fixes — continue only if you made a fix since then."))
 
 
 try:

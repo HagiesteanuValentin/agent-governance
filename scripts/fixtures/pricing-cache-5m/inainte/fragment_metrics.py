@@ -1,4 +1,4 @@
-# fixture: fragmente din tools/session_metrics.py, cate unul per regula din pricing-cache-5m.py
+# fixture: fragments from tools/session_metrics.py, one per rule in pricing-cache-5m.py
 
 def cost_of(counts, rates):
     total = 0.0
@@ -153,7 +153,7 @@ def counterfactual_block(main_doc, worker_docs, pricing, as_model, rot_at, windo
 
 
 def turn_cost(call, pricing):
-    # 🔴 turele moștenite au fost facturate la sesiunea-părinte — PATTERNS «Sesiuni reluate»
+    # 🔴 inherited turns were billed to the parent session — PATTERNS «Resumed sessions»
     if call.get("inherited"):
         return 0.0
     return cost_of({"input": call["input"], "output": call["output"],

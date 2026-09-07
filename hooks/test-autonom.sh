@@ -1,9 +1,9 @@
 #!/bin/bash
-# 🔴 offline, synthetic marker dir in tmp, no Claude — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
+# 🔴 offline, synthetic marker dir in tmp, no Claude — docs/RECIPES.md «State from the transcript, not from a file (read-mare, test-hooks)»
 set -u
 HOOKS_DIR=$(cd "$(dirname "$0")" && pwd)
 export HOOKS_DIR
-# 🔴 HOOK=<cale> ca Brief 2 să ruleze aceleași cazuri pe copia live — DECIZII «Mod autonom (04.09.2026)»
+# 🔴 HOOK=<path> so Brief 2 can run the same cases against the live copy — DECIZII «Mod autonom (04.09.2026)»
 export HOOK=${HOOK:-$HOOKS_DIR/autonom.sh}
 python3 - <<'PY'
 import json, os, shutil, subprocess, sys, tempfile
@@ -51,40 +51,45 @@ def gate(sid, tool):
     return h.get("permissionDecision") or "unknown", h.get("permissionDecisionReason", "")
 
 
-# 1) start signal: "/handoff plec"
-rc, out, err = prompt("s1", "/handoff plec")
-case("'/handoff plec' -> marker + text MOD AUTONOM",
+# 1) start signal: "/handoff leaving"
+rc, out, err = prompt("s1", "/handoff leaving")
+case("'/handoff leaving' -> marker + text AUTONOMOUS MODE",
      rc == 0 and not err and os.path.exists(marker("s1"))
-     and out.startswith("MOD AUTONOM pornit") and "ORCHESTRATION" in out,
+     and out.startswith("AUTONOMOUS MODE started") and "ORCHESTRATION" in out,
      "rc=%d out=%r" % (rc, out[:60]))
 case("REGULI has at most 8 lines", len(out.splitlines()) <= 8,
-     "%d rânduri" % len(out.splitlines()))
+     "%d lines" % len(out.splitlines()))
 
-# 2) "nesupravegheat" also starts it
-rc, out, _ = prompt("s2", "rulează suitele, laptopul rămâne NESUPRAVEGHEAT")
-case("'nesupravegheat' (caps) -> marker",
-     rc == 0 and os.path.exists(marker("s2")) and "MOD AUTONOM pornit" in out, out[:40])
+# 2) "unsupervised" also starts it
+rc, out, _ = prompt("s2", "run the suites, the laptop stays UNSUPERVISED")
+case("'unsupervised' (caps) -> marker",
+     rc == 0 and os.path.exists(marker("s2")) and "AUTONOMOUS MODE started" in out, out[:40])
 
-# 3) whole-word regex: "plecăm" does not match
-rc, out, _ = prompt("s3", "plecăm mâine la mare")
-case("'plecăm' -> no marker, no output",
+# 2b) Romanian signal: "plec" also starts it
+rc, out, _ = prompt("s2b", "ma duc, plec de aici")
+case("'plec' (RO) -> marker",
+     rc == 0 and os.path.exists(marker("s2b")) and "AUTONOMOUS MODE started" in out, out[:40])
+
+# 3) whole-word regex: "leavings" does not match
+rc, out, _ = prompt("s3", "leavings scattered on the shore")
+case("'leavings' -> no marker, no output",
      rc == 0 and not out and not os.path.exists(marker("s3")), "out=%r" % out)
 
 # 4) prompt with no signal and no marker -> nothing
-rc, out, _ = prompt("s4", "fă un grep prin hooks")
+rc, out, _ = prompt("s4", "run a grep through hooks")
 case("no signal, no marker -> no output",
      rc == 0 and not out and not os.path.exists(marker("s4")), "out=%r" % out)
 
 # 5) gate with marker -> deny (AskUserQuestion)
 got, body = gate("s1", "AskUserQuestion")
 case("AskUserQuestion + marker -> deny",
-     got == "deny" and "nu e la PC" in body and "nu reîncerca" in body,
+     got == "deny" and "the user is away" in body and "don't retry" in body,
      "%s %s" % (got, body))
 
 # 6) gate with marker -> deny (EnterPlanMode)
 got, body = gate("s1", "EnterPlanMode")
 case("EnterPlanMode + marker -> deny",
-     got == "deny" and "fără plan mode" in body and "nu reîncerca" in body,
+     got == "deny" and "no plan mode" in body and "don't retry" in body,
      "%s %s" % (got, body))
 
 # 7) gate without marker -> allow
@@ -92,20 +97,20 @@ got, body = gate("s4", "AskUserQuestion")
 case("gate without marker -> no output", got == "allow", "%s %s" % (got, body))
 
 # 8) any human prompt with no signal stops it
-rc, out, _ = prompt("s1", "mersi, continuăm cu altceva")
-case("no signal + existing marker -> marker removed + 'oprit'",
-     rc == 0 and not os.path.exists(marker("s1")) and "MOD AUTONOM oprit" in out,
+rc, out, _ = prompt("s1", "thanks, let's move to something else")
+case("no signal + existing marker -> marker removed + 'stopped'",
+     rc == 0 and not os.path.exists(marker("s1")) and "AUTONOMOUS MODE stopped" in out,
      "out=%r" % out)
 got, _ = gate("s1", "AskUserQuestion")
 case("after stop, gate lets it through", got == "allow", got)
 
-# 9) negation is not covered: "nu plec încă" starts it (accepted, documented)
-rc, out, _ = prompt("s5", "nu plec încă")
-case("'nu plec încă' -> starts (negation not covered)",
+# 9) negation is not covered: "not leaving yet" starts it (accepted, documented)
+rc, out, _ = prompt("s5", "not leaving yet")
+case("'not leaving yet' -> starts (negation not covered)",
      rc == 0 and os.path.exists(marker("s5")), "out=%r" % out[:40])
 
 # 10) prompt coming from a sub-agent -> nothing
-rc, out, _ = prompt("s6", "plec", {"agent_id": "a1"})
+rc, out, _ = prompt("s6", "leaving", {"agent_id": "a1"})
 case("prompt with agent_id -> no marker, no output",
      rc == 0 and not out and not os.path.exists(marker("s6")), "out=%r" % out)
 

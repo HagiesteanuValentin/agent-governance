@@ -78,18 +78,18 @@ in parallel, auditor only after the cells finish.
 Do not average r1 with r2/r3; report r1 separately. Under the caps an Opus cell may be cut at
 220k — count items delivered before the cap as the result, not as a failure of the model.
 
-**Resume protocol (r2, then r3)**: 0. new session, smoke the hooks first (RETETE «Smoke
-hook-uri v1.6 și reluarea lotului»); 1. usage window <70% of 5h (a lot ≈ $36, ~20 min);
+**Resume protocol (r2, then r3)**: 0. new session, smoke the hooks first (RECIPES «v1.6 hooks
+smoke test and resuming the batch»); 1. usage window <70% of 5h (a batch ≈ $36, ~20 min);
 2. `scripts/cell-teardown.sh simplu r2 --yes` → `scripts/cell-setup.sh simplu r2 --dosar
 metrics-local/experiments/simplu/dosar` → `r2/env.txt` (`claude --version`, `date -Iseconds`);
 3. one message, 4 Agent calls cell-opus-low/cell-opus-medium/cell-sonnet-low/cell-sonnet-medium
-with prompt „Brief: metrics-local/experiments/simplu/input/brief-3.\<cell\>-r2.md. Îl citești
-integral și îl execuți. Nu faci commit/push."; 4. wait for all four; 5. RETETE «Experiment
-celule — evaluarea unui lot» (cell_metrics.py, evalueaza-simplu.mjs, auditor); killed agents
+with prompt "Brief: metrics-local/experiments/simplu/input/brief-3.\<cell\>-r2.md. Read it in
+full and execute it. Do not commit/push."; 4. wait for all four; 5. RECIPES «Cell experiment
+— evaluating a batch» (cell_metrics.py, evalueaza-simplu.mjs, auditor); killed agents
 → r2/EXCLUDE.txt + `--min-calls 2`; 6. r3 identical; 7. scribe → aggregated table here +
 confounds from r1/audit.md, no default decision.
 
-### r2–r4: protocol fără dosar
+### r2–r4: protocol without a dossier
 
 From r2 on the cells get `input/brief-4.template.md`: no dossier at all, real paths and line
 ranges under `src/`, "before" counts taken from `verifica-simplu.mjs` on clean `master`
@@ -143,7 +143,7 @@ state (commit 42aeb97), `claude --effort medium --permission-mode plan` vs `clau
 --permission-mode plan`, identical prompt, questions answered "decide yourself and note the assumption", plan
 rejected at ExitPlanMode, `/exit`. Plans copied blind as plan-K/plan-M
 (`metrics-local/experiments/plan/T-metrics/r1/`, mapping in `mapping.txt`), compared by an Opus auditor on a
-rubric, then judged by Vali without the mapping.
+rubric, then judged by the user without the mapping.
 
 | criterion | K (high, s8) | M (medium, s9) |
 |---|---|---|
@@ -165,18 +165,18 @@ Missing from both (Opus auditor, blind):
 | s8 (27eea473) | high | 4.29 | 99.6% | 2.2% | 85.8k | 8/13 |
 | s9 (eade8082) | medium | 4.03 | 95.9% | 5.1% | 84.8k | 12/18 |
 
-Verdict: Vali said "equal, you decide". Main (Fable high) chose **M = medium** on rule conformance:
+Verdict: the user said "equal, you decide". Main (Fable high) chose **M = medium** on rule conformance:
 dossier first for a 2.9k-line script (>300 lines rule), both briefs self-contained with 6/6
 mandatory fields, verification with exact expected values + backup; K breaks two hard rules
 (Brief 2 refers to Brief 1's rules, Brief 3 has no verification). Cost nearly equal ($4.03 vs $4.29).
 
-Confounds: one pair only (decision should wait for ≥3 pairs on successive real tasks); partial blinding (Vali
+Confounds: one pair only (decision should wait for ≥3 pairs on successive real tasks); partial blinding (the user
 knew which window was which); medium session's explorer tried to write `docs/dosar/` in plan mode and was
 blocked, leaving a plan-file artifact (`~/.claude/plans/salut-am-de-modificat-snoopy-bubble-agent-*.md`) and
 5.1% wasted; both sessions saw the same HANDOFF; judge = Fable high on the rubric, not a blind human.
 
-Phase 2 (2026-09-02, executed): session `claude --effort medium`, prompt only "planul e aprobat…,
-execută-l"; session was restarted mid-run (transcripts: d959214c killed, f5db2a97 continued), so
+Phase 2 (2026-09-02, executed): session `claude --effort medium`, prompt only "the plan is
+approved…, execute it"; session was restarted mid-run (transcripts: d959214c killed, f5db2a97 continued), so
 main $ is split. Brief 1 → implementer-complex (58k tokens, 46 tool uses) → auditor: ABATERI (3),
 0 fixed (collision branch AttributeError/`?-?` name, dead `first_timestamp`, PATTERNS 7 lines) →
 1 SendMessage to same implementer → re-audit OK. Brief 2 → implementer-complex (96k tokens, 90
@@ -206,24 +206,24 @@ until the advisor and the effort-phase switch have both been observed working en
 Metrics (record key `v17`, benchmark not fail criterion): `effort_turns/effort_cost_usd/effort_runs`,
 `plan.lag_turns_to_low/mismatch_turns`, `advisor.{calls,sendmessages,cost_usd,verdict,n_schimbari,
 plan_edits_after,score}`, `low_phase.{flags,sendmessage_resends,audit_abateri_total,mistakes}`.
-`counterfactual_high` e înlocuit cu `v17.cost_per_turn`: vechiul calcul schimba doar tokenii de
-output per tură cu mediana high din baseline, ignora thinking-ul și numărul de ture, iar
-baseline-ul venea din alte task-uri — dădea „saved −0,70 $", fals. Flag-uri noi, doar la
-v1.7: `advisor_mandatory_missed`, `advisor_trigger_b_missed`, `effort_lag_high`, `no_low_phase`
-(heuristice, nu verdicte). `python3 tools/session_metrics.py --trends metrics-local` scrie
-`metrics-local/V17.md` (tabel per sesiune v1.7 + mediane v1.7 vs high permanent vs medium
-permanent) — folosit ca benchmark alături de `/rate`, nu ca prag de trecere/pică.
-„Greșeli evitabile" = `mistakes`, derivat automat de session_metrics din blocul v1.7
-(la `/rate N` se dă doar nota și o frază); stă în record lângă `advisor_score`.
+`counterfactual_high` is replaced by `v17.cost_per_turn`: the old calculation only swapped the
+output tokens per turn with the high median from baseline, ignored thinking and the turn
+count, and the baseline came from other tasks — it gave "saved −$0.70", false. New flags,
+v1.7 only: `advisor_mandatory_missed`, `advisor_trigger_b_missed`, `effort_lag_high`, `no_low_phase`
+(heuristics, not verdicts). `python3 tools/session_metrics.py --trends metrics-local` writes
+`metrics-local/V17.md` (table per v1.7 session + v1.7 medians vs permanent high vs permanent
+medium) — used as a benchmark alongside `/rate`, not as a pass/fail threshold.
+"Avoidable mistakes" = `mistakes`, derived automatically by session_metrics from the v1.7 block
+(at `/rate N` only the score and one sentence are given); it sits in the record next to `advisor_score`.
 
-Confound: sesiunile 1-3 T-v17 sunt R&D pe workflow-ul agent-governance însuși, nu task
-normal (`task_class = governance-rd`). Comparațiile de cost se fac în clasa `governance-rd`,
-nu contra sesiuni `product`. Verdictul pe workflow normal vine abia după sesiuni `product` —
-Vali trece pe workflow normal după sesiunea asta.
+Confound: T-v17 sessions 1-3 are R&D on the agent-governance workflow itself, not a normal
+task (`task_class = governance-rd`). Cost comparisons are made within the `governance-rd`
+class, not against `product` sessions. The verdict on the normal workflow only comes after
+`product` sessions — the user switches to the normal workflow after this session.
 
-Status 02.09: switch-ul oprit temporar 02.09 după-amiază, repornit seara după fix-ul
-hook-ului și al metricilor. Costul switch-ului = o rescriere ~52k la ExitPlanMode (~0,8 $,
-sub 4% din sesiune). Record 1609 complet. Verdict după încă 2 sesiuni.
+Status 2026-09-02: the switch was stopped temporarily on the afternoon of 09.02, restarted in the evening
+after the hook and metrics fix. Cost of the switch = one ~52k rewrite at ExitPlanMode (~$0.8,
+under 4% of the session). Record 1609 complete. Verdict after 2 more sessions.
 
 ## How to rerun
 

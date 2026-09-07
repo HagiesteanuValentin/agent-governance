@@ -1,5 +1,5 @@
 #!/bin/sh
-# 🔴 effort live only via settings.json, reload-on-live unverified — PATTERNS «Claude Code — limite verificate în docs (02.09.2026)»
+# 🔴 effort live only via settings.json, reload-on-live unverified — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
 
 flag="$HOME/.claude/v17-effort-auto"
 [ -f "$flag" ] || exit 0
@@ -10,7 +10,7 @@ settings="$HOME/.claude/settings.json"
 
 in=$(cat 2>/dev/null)
 
-# 🔴 PostToolUse fires in subagents too — PATTERNS «Claude Code — limite verificate în docs (02.09.2026)»
+# 🔴 PostToolUse fires in subagents too — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
 agent_id=$(printf '%s' "$in" | python3 -c "
 import json, sys
 try:
@@ -22,7 +22,7 @@ except Exception:
 
 case "$mode" in
   low|medium)
-    rm -f "${CLAUDE_JOB_DIR:-/tmp}"/effort-phase-* 2>/dev/null  # 🔴 phase switch re-arms the once-per-session WARN — PATTERNS «Claude Code — limite verificate în docs (02.09.2026)»
+    rm -f "${CLAUDE_JOB_DIR:-/tmp}"/effort-phase-* 2>/dev/null  # 🔴 phase switch re-arms the once-per-session WARN — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
     python3 - "$settings" "$mode" <<'PY' "$in" 2>/dev/null
 import json, os, sys, tempfile
 try:
@@ -47,7 +47,7 @@ except Exception:
 PY
     ;;
   check)
-    # 🔴 low/medium fire on this same tool call — check must not race the write — PATTERNS «Claude Code — limite verificate în docs (02.09.2026)»
+    # 🔴 low/medium fire on this same tool call — check must not race the write — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
     tool_name=$(printf '%s' "$in" | python3 -c "
 import json, sys
 try:

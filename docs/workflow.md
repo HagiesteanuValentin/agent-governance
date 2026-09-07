@@ -41,7 +41,7 @@ it adversarially, then the normal implement → audit loop).
 writes a dossier (structure, reusable site inventory, tokens) while a scripter writes/runs a
 measurement script and takes ≤3 screenshots (≤1568px long side); `refiner` or `refiner-complex`
 (router picks by target) turns those into a plan at `docs/refine/<slug>.md`, reviewed
-adversarially in main (one round) before Vali picks items. `docs/refine/` is never committed,
+adversarially in main (one round) before the user picks items. `docs/refine/` is never committed,
 same as `docs/dosar/`.
 
 Why it saves money: the orchestrator's context is the expensive resource, because every
@@ -78,7 +78,7 @@ Three design notes:
   subagent is *for*; the rule targets the orchestrator. On the main branch they also ask
   `hooks/main-model.sh` for the session model (plus `agenti-vii.sh check` and the
   `ORCHESTRATION` blocks of `session-start.sh`) and stay silent unless it is Fable/Mythos;
-  `unknown` counts as Fable. See PATTERNS «Modelul în hook-uri».
+  `unknown` counts as Fable. See PATTERNS «The model inside hooks».
 - `comentarii-cod.sh` is the only hook that runs everywhere, main and workers alike. It
   runs before the write: a sub-agent is denied on a comment block or an over-long line and
   rewrites the pointer on the spot, main only gets the warning, and the JSONL log lets
@@ -129,7 +129,7 @@ Three design notes:
    post-mortem: anti-safe requests still produced 5-9 item, delta-only plans on the previous
    single-phase flow.
 11. v1.8: phase-based effort is back under `~/.claude/v17-effort-auto` (changelog 2.1.260 —
-   `/effort` no longer rewrites the cache; the hook only warns, Vali runs `/effort`); the
+   `/effort` no longer rewrites the cache; the hook only warns, the user runs `/effort`); the
    advisor is mandatory on triggers a-f, not just on 2+ JS/TS briefs; `bash-mare.sh` nudges
    main on the 3rd consecutive small Bash call; `subagentPromptCacheTtl` is deliberately not
    set (agents already write 100% at 5m); Fable 5.1 pricing corrected (cache read $1 at

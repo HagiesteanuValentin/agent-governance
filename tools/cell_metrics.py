@@ -20,7 +20,7 @@ from session_metrics import (VERIFY_TOKENS, add_usage, blocks, cost_of, dur,  # 
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
-# 🔴 uniunea VERIF (hooks/context-agent.sh) + VERIFY_TOKENS — DECIZII «verify_calls în cell_metrics»
+# 🔴 union of VERIF (hooks/context-agent.sh) + VERIFY_TOKENS — DECIZII «verify_calls în cell_metrics»
 HOOK_VERIF = (r"astro check|npm run build|npm test|vitest|pytest"
               r"|verifica-[\w-]+\.mjs|verify-")
 VERIFY_RE = re.compile(HOOK_VERIF + "|" + "|".join(re.escape(t) for t in VERIFY_TOKENS),
@@ -432,7 +432,7 @@ def main(argv=None):
     parsed = collections.defaultdict(list)
     for cell, path in found:
         run = parse_cell(path, pricing)
-        # 🔴 numerotarea r<k> se face dupa filtrare — DECIZII «verify_calls in cell_metrics»
+        # 🔴 r<k> numbering happens after filtering — DECIZII «verify_calls in cell_metrics»
         if run["tool_calls"] < args.min_calls:
             sys.stderr.write("sarit (--min-calls %d): %s, %d apeluri de unelte\n"
                              % (args.min_calls, os.path.basename(path), run["tool_calls"]))
@@ -440,7 +440,7 @@ def main(argv=None):
         parsed[cell].append(run)
 
     if not any(parsed.values()):
-        sys.stderr.write("0 rulari dupa filtrare (--min-calls %d, --exclude-agent %s)\n"
+        sys.stderr.write("0 runs after filtering (--min-calls %d, --exclude-agent %s)\n"
                          % (args.min_calls, ",".join(sorted(excluded)) or "-"))
         return 1
 

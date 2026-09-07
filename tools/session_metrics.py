@@ -106,7 +106,8 @@ THRESHOLDS = {
 }
 
 FLAG_TEXT = {
-    "reread": "same file read more than once",
+    "reread": ("same file read more than once "
+               "(not counted if a Bash command rewrote it between the reads)"),
     "big_tool_result_main": "large tool_result landed in the main context",
     "full_read_big_file": "Read without offset/limit on a big file",
     "image_in_main": "full-size image read in the main context",
@@ -237,7 +238,7 @@ RECOMMENDATION = {
 
 
 def report_limit_for(agent_type):
-    # 🔴 explorer-max* = 6000, restul 2000 — docs/RETETE.md «Test hook SubagentStop»
+    # 🔴 explorer-max* = 6000, restul 2000 — docs/RECIPES.md «SubagentStop hook test»
     if isinstance(agent_type, str) and agent_type.startswith("explorer-max"):
         return THRESHOLDS["long_agent_report_explorer_max"]
     return THRESHOLDS["long_agent_report"]
@@ -662,7 +663,7 @@ def read_chain_lines(chain):
     """Origin in full, then each fork from its fork marker on: the head is a copy of the origin."""
     last_ts = None
     for i, path in enumerate(chain):
-        # 🔴 without a cutoff, the fork's first ~100 messages get counted twice — PATTERNS «Sesiuni reluate»
+        # 🔴 without a cutoff, the fork's first ~100 messages get counted twice — PATTERNS «Resumed sessions»
         start = None if i == 0 else _fork_start(path)
         for j, obj in enumerate(read_lines(path)):
             if i and start is None:
@@ -679,7 +680,7 @@ def read_chain_lines(chain):
 
 def session_name(jsonl_path, ts=None, cwd=None, out_dir=None):
     """YYYY-MM-DD-HHMM-<project>, local start time; HHMMSS if that minute is another session."""
-    # 🔴 the name does not depend on sibling files — PATTERNS «Nume de sesiune»
+    # 🔴 the name does not depend on sibling files — PATTERNS «Session names»
     if ts is None and cwd is None:
         ts, cwd = first_meta(jsonl_path)
     day = local_day(ts)
@@ -710,7 +711,7 @@ def session_files(jsonl_path, chain=None):
                 size = os.path.getsize(path)
             except OSError:
                 continue
-            # 🔴 the same agent appears in both the origin dir and the fork's — PATTERNS «Sesiuni reluate»
+            # 🔴 the same agent appears in both the origin dir and the fork's — PATTERNS «Resumed sessions»
             if name in best and best[name][1] >= size:
                 continue
             best[name] = (path, size)
@@ -1002,9 +1003,15 @@ def parse_file(path, label, tool_names, tool_inputs, chain=None):
                     fp = inp.get("file_path")
                     if isinstance(fp, str) and fp:
                         doc["reads"][fp] += 1
-                        doc["read_events"].append((fp, slice_of(inp)[0], slice_of(inp)[1]))
+                        doc["read_events"].append(
+                            ("read", fp, slice_of(inp)[0], slice_of(inp)[1]))
                         if fp in doc["written"]:
                             doc["reread_own_write"].append(fp)
+                elif name == "Bash":
+                    # 🔴 Bash lands in the same stream as the reads — PATTERNS «Reread after regeneration»
+                    cmd = inp.get("command")
+                    if isinstance(cmd, str) and cmd:
+                        doc["read_events"].append(("bash", cmd, None, None))
                 elif name in ("Write", "Edit"):
                     fp = inp.get("file_path")
                     body = inp.get("content") or inp.get("new_string") or ""
@@ -1081,7 +1088,7 @@ def parse_file(path, label, tool_names, tool_inputs, chain=None):
         inherited = False
         if label is None:
             sid = obj.get("session_id") or obj.get("sessionId")
-            # 🔴 inherited = foreign session_id AND uuid copied from the parent — PATTERNS «sessionId vs session_id în jsonl»
+            # 🔴 inherited = foreign session_id AND uuid copied from the parent — PATTERNS «sessionId vs session_id in jsonl»
             if (isinstance(sid, str) and sid not in own_ids
                     and obj.get("uuid") in parent_uuids(path, sid)):
                 inherited = True
@@ -1270,12 +1277,73 @@ def slice_of(inp):
     return off, lim
 
 
+READONLY_CMDS = ("cat", "grep", "rg", "ls", "wc", "head", "tail", "diff", "git",
+                 "stat", "identify", "file", "find")
+
+
+SKIP_CMDS = ("cd", "pushd", "popd", "set", "export", "true", "sudo", "time")
+SEP_RE = re.compile(r";|&&|\|\||\||\n")
+
+
+def first_cmd(segment):
+    # 🔴 cd/env prefixes hide the real command — PATTERNS «Reread after regeneration»
+    tokens = segment.strip().split()
+    while tokens and "=" in tokens[0] and not tokens[0].startswith("-"):
+        tokens.pop(0)
+    return os.path.basename(tokens[0]) if tokens else ""
+
+
+def readonly_cmd(command):
+    for seg in SEP_RE.split(command):
+        name = first_cmd(seg)
+        if name and name not in SKIP_CMDS:
+            return name in READONLY_CMDS
+    return True
+
+
+def cmd_touches(command, path):
+    base = os.path.basename(path)
+    if not base:
+        return False
+    return re.search(r"(?<![\w.-])%s(?![\w.-])" % re.escape(base), command) is not None
+
+
+def regenerated(command, paths):
+    # 🔴 only the segment that names the file decides, not the whole line — PATTERNS «Reread after regeneration»
+    out = []
+    for path in paths:
+        for seg in SEP_RE.split(command):
+            if cmd_touches(seg, path) and not readonly_cmd(seg):
+                out.append(path)
+                break
+    return out
+
+
+def read_counts(doc):
+    """Reads per path, restarting the count when a Bash command regenerates the file."""
+    running, best = collections.Counter(), collections.Counter()
+    for ev in doc["read_events"]:
+        if ev[0] == "bash":
+            for path in regenerated(ev[1], list(running)):
+                running[path] = 0
+            continue
+        running[ev[1]] += 1
+        best[ev[1]] = max(best[ev[1]], running[ev[1]])
+    return best
+
+
 def reread_block(doc):
     # 🔴 distinct slices of one file are not a reread — DECIZII «v1.4.1 — 30.08.2026»
     redundant = collections.Counter()
     seen, sliced, full = set(), set(), set()
-    for key in doc["read_events"]:
-        path, off, lim = key
+    for ev in doc["read_events"]:
+        if ev[0] == "bash":
+            for path in regenerated(ev[1], full | sliced):
+                full.discard(path)
+                sliced.discard(path)
+                seen = {k for k in seen if k[1] != path}
+            continue
+        key, path, off, lim = ev, ev[1], ev[2], ev[3]
         whole = off is None and lim is None
         # 🔴 whole read after slices, or any slice after a whole read — hooks/read-mare.sh:96-100
         if key in seen or (whole and path in sliced) or (not whole and path in full):
@@ -1360,7 +1428,7 @@ def main_call_flags(scope, doc, rows):
             hit = False
         if hit:
             item = {"cmd": " ".join(cmd.split())[:60], "chars": r["chars"]}
-            # 🔴 advisor/rapoarte refine citite legitim, 0 tokens — DECIZII «waste: citiri legitime exceptate»
+            # 🔴 advisor plans and refine reports are read legitimately, 0 tokens — DECIZII «waste: citiri legitime exceptate»
             (reports if only_report_paths(cmd) else reads).append(item)
     reads.sort(key=lambda r: -r["chars"])
     reports.sort(key=lambda r: -r["chars"])
@@ -1546,7 +1614,7 @@ def scope_flags(scope, doc, rows, is_main):
                   lambda r: "%s re-read after writing it" % os.path.basename(r["path"]),
                   lambda r: 0)
         plans = []
-        # 🔴 advisor/rapoarte refine citite legitim, 0 tokens — DECIZII «waste: citiri legitime exceptate»
+        # 🔴 advisor plans and refine reports are read legitimately, 0 tokens — DECIZII «waste: citiri legitime exceptate»
         for r in rows if scope.split("#")[0] != "advisor" else []:
             inp = r["input"] or {}
             fp = inp.get("file_path") or ""
@@ -1623,7 +1691,7 @@ def postmortem_block(main_doc, workers, flags, main_counts, by_type):
     pm["delegation_mix_text"] = ", ".join("%s %d" % kv for kv in mix.items())
     pm["agent_report_chars_in_main"] = sum(w["final_report_chars"] for w in workers)
     pm["wasted_total"] = wasted
-    # 🔴 without input volume in main the percentage does not exist (it is not 0) — PATTERNS «Procente cu numitor lipsă»
+    # 🔴 without input volume in main the percentage does not exist (it is not 0) — PATTERNS «Percentages with a missing denominator»
     pm["wasted_pct_of_main_input"] = (round(100.0 * wasted / main_input, 1)
                                       if main_input > 0 else None)
     pm["severity_counts"] = {k: sev.get(k, 0) for k in ("high", "medium", "low")}
@@ -1813,7 +1881,7 @@ def build_effort_baseline(directory, out_path, model=BASELINE_MODEL, effort="hig
         print("not a directory: %s" % directory, file=sys.stderr)
         return 2
     outs, thinks, line_outs = [], [], []
-    # 🔴 a resumed session copies the parent's turns: dedupe across the whole corpus, not per file — PATTERNS «Sesiuni reluate»
+    # 🔴 a resumed session copies the parent's turns: dedupe across the whole corpus, not per file — PATTERNS «Resumed sessions»
     seen = {}
     for name in sorted(os.listdir(directory)):
         if not name.endswith(".jsonl"):
@@ -1839,7 +1907,7 @@ def build_effort_baseline(directory, out_path, model=BASELINE_MODEL, effort="hig
     for o, t in seen.values():
         outs.append(o)
         thinks.append(t)
-    # 🔴 a turn = one message.id, not one assistant line — PATTERNS «Baseline de efort: ture, nu linii»
+    # 🔴 a turn = one message.id, not one assistant line — PATTERNS «Effort baseline: turns, not lines»
     data = {
         "model": model, "effort": effort, "n": len(outs),
         "median_output_tokens": median(outs), "median_thinking_tokens": median(thinks),
@@ -1863,7 +1931,7 @@ def effort_of(call):
 
 
 def turn_cost(call, pricing):
-    # 🔴 inherited turns were billed to the parent session — PATTERNS «Sesiuni reluate»
+    # 🔴 inherited turns were billed to the parent session — PATTERNS «Resumed sessions»
     if call.get("inherited"):
         return 0.0
     return cost_of({"input": call["input"], "output": call["output"],
@@ -1904,7 +1972,7 @@ def v17_block(main_doc, workers, docs_by_scope, tool_inputs, pricing, version,
     """The v1.7 numbers: effort phases, plan lag, advisor, low phase. (block, new flags)."""
     new_flags = []
     all_main = [c for c in main_doc["calls"] if not c["side"]]
-    # 🔴 inherited turns were billed to the parent session — PATTERNS «Sesiuni reluate»
+    # 🔴 inherited turns were billed to the parent session — PATTERNS «Resumed sessions»
     turns = [c for c in all_main if not c.get("inherited")]
     inherited_turns = len(all_main) - len(turns)
     if not turns:
@@ -2177,7 +2245,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             versions=None, browser_threshold=BROWSER_THRESHOLD_DEFAULT,
             # 🔴 effort_baseline is accepted, but ignored — DECIZII «Counterfactual înlocuit»
             effort_baseline=None):
-    _PARENT_UUIDS.clear()  # 🔴 cache per run, otherwise it grows over the whole corpus — PATTERNS «sessionId vs session_id în jsonl»
+    _PARENT_UUIDS.clear()  # 🔴 cache per run, otherwise it grows over the whole corpus — PATTERNS «sessionId vs session_id in jsonl»
     if versions is None:
         versions = []
     if ctx_warn is None:
@@ -2187,7 +2255,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
     if as_model is None:
         as_model = AS_MODEL_DEFAULT
     tool_names, tool_inputs = {}, {}
-    # 🔴 fork-ul nu are record propriu: recordul e al originii — PATTERNS «Sesiuni reluate»
+    # 🔴 a fork has no record of its own: the record belongs to the origin — PATTERNS «Resumed sessions»
     jsonl_path = chain_origin(jsonl_path)
     chain = fork_chain(jsonl_path)
     files = session_files(jsonl_path, chain)
@@ -2207,6 +2275,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
     agent_runs = collections.Counter()
     tool_results = []
     reads = collections.Counter()
+    reads_eff = collections.Counter()
     first_ts = last_ts = None
 
     for path, label, doc in docs:
@@ -2215,6 +2284,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         if doc["last_ts"] and (last_ts is None or doc["last_ts"] > last_ts):
             last_ts = doc["last_ts"]
         reads.update(doc["reads"])
+        reads_eff.update(read_counts(doc))
         for r in doc["results"]:
             tool_results.append((r["chars"], r["tool_use_id"]))
         if label is not None:
@@ -2280,7 +2350,8 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
     top_tools = [{"tool": tool_names.get(tid, "?"), "chars": n, "tool_use_id": tid}
                  for n, tid in tool_results[:10]]
 
-    rereads = [{"path": p, "reads": n} for p, n in reads.most_common() if n >= 2]
+    # 🔴 separate Counter: regeneration resets the count — PATTERNS «Reread after regeneration»
+    rereads = [{"path": p, "reads": n} for p, n in reads_eff.most_common() if n >= 2]
     images = []
     for p, n in sorted(reads.items()):
         if p.lower().endswith(IMG_EXT):
@@ -2580,7 +2651,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         ts0, cwd0 = first_meta(jsonl_path)
     out_total = totals["output"] or 1
     totals["agents_cost_usd"] = round(sum(w["cost_usd"] for w in workers), 4)
-    # 🔴 inherited workers have no transcript of their own (0 calls, $0) — PATTERNS «Sesiuni reluate»
+    # 🔴 inherited workers have no transcript of their own (0 calls, $0) — PATTERNS «Resumed sessions»
     scr = [w for w in workers if w["type"].startswith("scripter") and w.get("transcript")]
     with_files = [w for w in scr if w.get("files_changed")]
     scripter = {
@@ -3025,7 +3096,7 @@ V17_GROUPS = ("v1.7", "high permanent", "medium permanent")
 
 def v17_group_of(s):
     """Which comparison column a session belongs to; None = mixed, not comparable."""
-    # 🔴 a session with no main turns of its own has v17 = null — PATTERNS «Câmpuri noi în recorduri vechi»
+    # 🔴 a session with no main turns of its own has v17 = null — PATTERNS «New fields in old records»
     if not isinstance(s.get("v17"), dict):
         return None
     v = s["v17"]
@@ -3358,7 +3429,7 @@ def edit_cost_of(sessions):
     cost, edits = 0.0, 0
     for s in sessions:
         for w in s.get("workers") or []:
-            # 🔴 old records don't have edit_calls; if included, they'd inflate $/edit — PATTERNS «Câmpuri noi în recorduri vechi»
+            # 🔴 old records don't have edit_calls; if included, they'd inflate $/edit — PATTERNS «New fields in old records»
             if (str(w.get("type") or "").startswith("implementer")
                     and w.get("edit_calls") is not None and w.get("transcript")):
                 cost += w.get("cost_usd") or 0.0
@@ -3395,12 +3466,12 @@ def version_stats(sessions):
     floor = sum(c.get("floor_usd", 0.0) for c in cfs)
     wasted = sum(p.get("wasted_total", 0) for p in pms)
     main_in = sum(main_input_of(s) for s in sessions)
-    # 🔴 the percentage is computed only on sessions with input in main — PATTERNS «Procente cu numitor lipsă»
+    # 🔴 the percentage is computed only on sessions with input in main — PATTERNS «Percentages with a missing denominator»
     with_in = [(p, main_input_of(s)) for s, p in zip(sessions, pms) if main_input_of(s) > 0]
     wasted_in = sum(p.get("wasted_total", 0) for p, _ in with_in)
     main_in_pct = sum(mi for _, mi in with_in)
     scores = [q for q in (quality_score(s) for s in sessions) if q]
-    # 🔴 main_pct's denominator = only sessions that have main.cost_usd — PATTERNS «Câmpuri noi în recorduri vechi»
+    # 🔴 main_pct's denominator = only sessions that have main.cost_usd — PATTERNS «New fields in old records»
     with_main = [s for s in sessions if (s.get("main") or {}).get("cost_usd") is not None]
     main_sum = sum(s["main"]["cost_usd"] for s in with_main)
     main_denom = sum((s.get("totals") or {}).get("cost_usd", 0.0) for s in with_main)
@@ -4047,7 +4118,7 @@ def migrate_names(directory, apply_=False, versions=(), threshold=0.5):
 
 
 def main(argv=None):
-    # 🔴 stdout UTF-8 forced for LANG=C — PATTERNS «analizor: locale»
+    # 🔴 stdout UTF-8 forced for LANG=C — PATTERNS «analyzer: locale»
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -4156,7 +4227,7 @@ def main(argv=None):
     if not targets:
         print("no .jsonl found", file=sys.stderr)
         return 1
-    # 🔴 fork and origin yield a single record — PATTERNS «Sesiuni reluate»
+    # 🔴 fork and origin yield a single record — PATTERNS «Resumed sessions»
     origins = []
     for p in targets:
         origin = chain_origin(p)

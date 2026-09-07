@@ -204,10 +204,10 @@ injected by a third, separate `SessionStart` hook call because the existing
 `orchestrare.md` is already near the 10k-character cap per hook command. Second: effort
 now switches by phase — medium while planning, low while implementing — flipped by hooks
 around `EnterPlanMode`/`ExitPlanMode`, with a `WARN` line when the setting and the actual
-effort disagree. Live-agent cap raised 4 → 6. Metrici: secțiunea «T-v17» din
-`docs/experiments.md` + `metrics-local/V17.md`. Sesiunile se etichetează `task_class`
-(`governance-rd`/`product`), costul se citește ca `v17.cost_per_turn` (nu counterfactual),
-iar `plan.echo` și `Summary` apar în raportul per sesiune din `metrics-local/`.
+effort disagree. Live-agent cap raised 4 → 6. Metrics: section «T-v17» in
+`docs/experiments.md` + `metrics-local/V17.md`. Sessions are labeled `task_class`
+(`governance-rd`/`product`), cost is read as `v17.cost_per_turn` (not counterfactual),
+and `plan.echo` and `Summary` show up in the per-session report under `metrics-local/`.
 
 **What we're testing**: Vali's theory is that heavy reasoning earns its cost at plan time;
 at implementation time governance (briefs, audit, hooks) already does the reasoning's job,
@@ -409,9 +409,12 @@ git clone <this-repo> ~/agent-governance
 cd ~/agent-governance
 
 cp agents/*.md   ~/.claude/agents/
+cp commands/*.md ~/.claude/commands/
 cp hooks/*.sh    ~/.claude/hooks/
 chmod +x         ~/.claude/hooks/*.sh
 ```
+
+`jq` is only needed by `hooks/test-main-guards.sh`.
 
 Merge the `hooks` block from `hooks/settings.example.json` into `~/.claude/settings.json`.
 If you cloned somewhere other than `~/agent-governance`, point the metrics hook at it:
@@ -491,7 +494,7 @@ agents/     the agent definitions (explorer, implementer, implementer-complex, i
             design-lead-expert, refiner, refiner-complex) — model, effort, maxTurns, allowed
             tools, fixed report format
 commands/   slash commands (polish, refine, rate) — mirrors ~/.claude/commands/
-hooks/      the eleven enforcement hooks + settings.example.json
+hooks/      the 14 enforcement hooks + 10 tests + settings.example.json
 templates/  CLAUDE.global.md (orchestration policy), CLAUDE.project.md
             (the sources-of-truth pattern for a project), and SCRIPTS.md (the
             per-project reusable-script log the scripter agent keeps current)

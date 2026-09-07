@@ -1,5 +1,5 @@
 #!/bin/bash
-# 🔴 state from transcript, not a state file; rule 0 applies to everyone — docs/RETETE.md «Stare din transcript, nu din fișier (read-mare, test-hooks)»
+# 🔴 state from transcript, not a state file; rule 0 applies to everyone — docs/RECIPES.md «State from the transcript, not from a file (read-mare, test-hooks)»
 input=$(cat)
 python3 - "$input" "$(dirname "$0")" <<'PY'
 import json, subprocess, sys, os
@@ -24,8 +24,8 @@ def deny(reason):
 
 # ---- 0) saved Bash output, everyone (main + sub-agents)
 if "/tool-results/" in path:
-    deny("output Bash salvat în fișier; nu-l citi — reia comanda pe un interval mai mic "
-         "(`sed -n a,bp | head -150`)")
+    deny("Bash output saved to a file; don't read it — rerun the command on a smaller "
+         "range (`sed -n a,bp | head -150`)")
 
 base = os.path.basename(path)
 ext = os.path.splitext(path)[1].lower()
@@ -136,7 +136,7 @@ def pending_own_write(tpath):
     for kind, tid in reversed(events):
         if kind == "clear":
             return False
-        # 🔴 Edit cu is_error nu contează ca scriere — docs/PATTERNS.md «Recitire după propria scriere»
+        # 🔴 an Edit with is_error doesn't count as a write — docs/PATTERNS.md «Reread after your own write»
         if tid in errors:
             continue
         return True
@@ -167,15 +167,15 @@ if agent_id or "subagent" in tp:
         lim = int(ti.get("limit") or 0)
     except (TypeError, ValueError):
         lim = 0
-    # 🔴 ≤60 de linii = verificare punctuală, nu recitire — docs/PATTERNS.md «Recitire după propria scriere»
+    # 🔴 <=60 lines = spot check, not a reread — docs/PATTERNS.md «Reread after your own write»
     if not (cur_ranged and 0 < lim <= 60):
         try:
             pending = pending_own_write(agent_tp)
         except Exception:
             pending = False
         if pending:
-            deny("ai scris %s; nu-l reciti; verifică punctual cu grep -n sau sed -n "
-                 "pe interval" % base)
+            deny("you wrote %s; don't reread it; spot-check with grep -n or sed -n "
+                 "on a range" % base)
     if cur_ranged:
         sys.exit(0)
     if ext in IMG or "/.claude/plans/" in path:
@@ -192,7 +192,7 @@ if agent_id or "subagent" in tp:
         deny("%d lines (>300)%s" % (n, FIX))
     sys.exit(0)
 
-# 🔴 gardă de model doar pe main — PATTERNS «Modelul în hook-uri»
+# 🔴 model guard, main only — PATTERNS «The model inside hooks»
 _m = subprocess.run(["bash", os.path.join(sys.argv[2], "main-model.sh"), tp],
                     capture_output=True, text=True).stdout.strip().lower()
 if not ("fable" in _m or "mythos" in _m or _m in ("", "unknown")):
@@ -207,7 +207,7 @@ if ext in IMG:
     except OSError:
         size = 0
     if size > 200 * 1024:
-        deny("%s are %d KB; imaginea o vede explorer sau design-lead și raportează în text"
+        deny("%s is %d KB; explorer or design-lead sees the image and reports in text"
              % (base, size // 1024))
     emit(additionalContext=(
         "Reminder (CLAUDE.md): %s is an image - it enters the context and is re-paid on "

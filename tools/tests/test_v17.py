@@ -362,6 +362,23 @@ def test_wasted_total_still_equals_the_sum_of_the_families():
     assert sm.WASTE_FAMILIES["main_read_report"] == "reads"
 
 
+REREAD_REGEN = os.path.join(HERE, "fixtures", "v18-reread-regen.jsonl")
+
+
+def test_reread_skips_a_file_regenerated_between_two_reads():
+    a = analyzed(fixture=REREAD_REGEN)
+    paths = [r["path"] for r in a["reread_files"]]
+    assert "/tmp/proj/shot-a.png" not in paths, paths        # magick rewrote it
+    assert "/tmp/proj/notes-b.md" in paths, paths            # ls is read-only
+    assert "/tmp/proj/src-c.ts" in paths, paths              # Edit does not exempt
+    flagged = [f["detail"] for f in a["flags"] if f["code"] == "reread"]
+    assert not any("shot-a.png" in d for d in flagged), flagged
+    assert any("notes-b.md" in d for d in flagged), flagged
+    assert any("src-c.ts" in d for d in flagged), flagged
+    assert "/tmp/proj/notes-d.md" in paths, paths           # cd prefix, cat is read-only
+    assert any("notes-d.md" in d for d in flagged), flagged
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):
