@@ -325,7 +325,7 @@ def test_wasted_pct_cell_is_na_not_a_huge_number():
 
 
 def test_inherited_needs_the_uuid_copied_from_the_parent():
-    # proc-abc.jsonl are doar u-copiat; u-nou-1/2 sunt proprii deși session_id e străin
+    # proc-abc.jsonl only has u-copied; u-nou-1/2 are its own even though session_id is foreign
     s = analyzed(BASELINE, os.path.join(HERE, "fixtures", "v17-sessionid.jsonl"))
     assert s["v17"]["inherited_turns"] == 1
     assert s["totals"]["main_cost_usd"] > 0

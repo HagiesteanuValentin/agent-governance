@@ -47,7 +47,7 @@ WINDOW_DEFAULT = 1_000_000
 NO_QUALITY = ("no quality claim — the threshold is the operator's, not Anthropic's")
 MAX_TURNS_FM_RE = re.compile(r"^maxTurns:\s*(\d+)\s*$", re.M)
 
-# 🔴 cifrele nu se compară între clase de task — DECIZII «Clasa de task»
+# 🔴 numbers are not compared across task classes — DECIZII «Clasa de task»
 GOVERNANCE_PROJECTS = {"agent-governance"}
 
 
@@ -411,7 +411,7 @@ def cost_of(counts, rates):
     total = 0.0
     for ck, rk in COST_KEYS:
         total += counts.get(ck, 0) * float(rates.get(rk, 0.0)) / 1_000_000.0
-    # 🔴 cache_creation e totalul; portia 5m se retaxeaza la cache_write_5m — DECIZII «v1.8 — prețuri Fable 5.1»
+    # 🔴 cache_creation is the total; the 5m portion is retaxed at cache_write_5m — DECIZII «v1.8 — prețuri Fable 5.1»
     n5m = counts.get("cache_creation_5m", 0)
     if n5m:
         r_1h = float(rates.get("cache_write", 0.0))
@@ -662,7 +662,7 @@ def read_chain_lines(chain):
     """Origin in full, then each fork from its fork marker on: the head is a copy of the origin."""
     last_ts = None
     for i, path in enumerate(chain):
-        # 🔴 fără tăietură, primele ~100 de mesaje ale fork-ului se numără de două ori — PATTERNS «Sesiuni reluate»
+        # 🔴 without a cutoff, the fork's first ~100 messages get counted twice — PATTERNS «Sesiuni reluate»
         start = None if i == 0 else _fork_start(path)
         for j, obj in enumerate(read_lines(path)):
             if i and start is None:
@@ -679,7 +679,7 @@ def read_chain_lines(chain):
 
 def session_name(jsonl_path, ts=None, cwd=None, out_dir=None):
     """YYYY-MM-DD-HHMM-<project>, local start time; HHMMSS if that minute is another session."""
-    # 🔴 numele nu depinde de fișierele frate — PATTERNS «Nume de sesiune»
+    # 🔴 the name does not depend on sibling files — PATTERNS «Nume de sesiune»
     if ts is None and cwd is None:
         ts, cwd = first_meta(jsonl_path)
     day = local_day(ts)
@@ -710,7 +710,7 @@ def session_files(jsonl_path, chain=None):
                 size = os.path.getsize(path)
             except OSError:
                 continue
-            # 🔴 același agent apare în dirul originii și al fork-ului — PATTERNS «Sesiuni reluate»
+            # 🔴 the same agent appears in both the origin dir and the fork's — PATTERNS «Sesiuni reluate»
             if name in best and best[name][1] >= size:
                 continue
             best[name] = (path, size)
@@ -906,7 +906,7 @@ _PARENT_UUIDS = {}
 
 
 def parent_uuids(path, sid):
-    """Uuid-urile din `<dir(path)>/<sid>.jsonl`; set gol dacă părintele lipsește."""
+    """Uuids from `<dir(path)>/<sid>.jsonl`; empty set if the parent is missing."""
     parent = os.path.join(os.path.dirname(os.path.abspath(path)), sid + ".jsonl")
     ids = _PARENT_UUIDS.get(parent)
     if ids is None:
@@ -1081,7 +1081,7 @@ def parse_file(path, label, tool_names, tool_inputs, chain=None):
         inherited = False
         if label is None:
             sid = obj.get("session_id") or obj.get("sessionId")
-            # 🔴 moștenit = session_id străin ȘI uuid copiat din părinte — PATTERNS «sessionId vs session_id în jsonl»
+            # 🔴 inherited = foreign session_id AND uuid copied from the parent — PATTERNS «sessionId vs session_id în jsonl»
             if (isinstance(sid, str) and sid not in own_ids
                     and obj.get("uuid") in parent_uuids(path, sid)):
                 inherited = True
@@ -1295,6 +1295,7 @@ def reread_block(doc):
     return out
 
 
+# matches the Romanian wording of agent reports in the author's transcripts
 FIX_MARK_RE = re.compile(r"(-fix|\bfix\b|repara[țt]ii|\bre-run\b|\bretrimitere\b|\bre-)", re.I)
 
 
@@ -1622,7 +1623,7 @@ def postmortem_block(main_doc, workers, flags, main_counts, by_type):
     pm["delegation_mix_text"] = ", ".join("%s %d" % kv for kv in mix.items())
     pm["agent_report_chars_in_main"] = sum(w["final_report_chars"] for w in workers)
     pm["wasted_total"] = wasted
-    # 🔴 fără volum de input în main procentul nu există (nu e 0) — PATTERNS «Procente cu numitor lipsă»
+    # 🔴 without input volume in main the percentage does not exist (it is not 0) — PATTERNS «Procente cu numitor lipsă»
     pm["wasted_pct_of_main_input"] = (round(100.0 * wasted / main_input, 1)
                                       if main_input > 0 else None)
     pm["severity_counts"] = {k: sev.get(k, 0) for k in ("high", "medium", "low")}
@@ -1641,7 +1642,7 @@ def counterfactual_block(main_doc, worker_docs, pricing, as_model, rot_at, windo
     r_cw5 = float(rates.get("cache_write_5m", r_cw))
 
     def cw_cost(call, tokens):
-        # 🔴 portia 5m se taxeaza la r_cw5, proportional cu apelul — DECIZII «v1.8 — prețuri Fable 5.1»
+        # 🔴 the 5m portion is taxed at r_cw5, proportional to the call — DECIZII «v1.8 — prețuri Fable 5.1»
         total = call.get("cache_creation") or 0
         if not total or not tokens:
             return 0.0
@@ -1775,9 +1776,11 @@ VERDICT_RE = re.compile(r"VERDICT\s*[:\-]\s*(.+)")
 ABATERI_RE = re.compile(r"ABATERI\s*\((\d+)\)")
 TRIGGER_B_RE = re.compile(r"hooks/|settings\.json|migr", re.I)
 ADVISOR_REASON_RE = re.compile(r"^\s*advisor\s*:\s*(.+)$", re.M | re.I)
+# matches the Romanian wording of agent reports in the author's transcripts
 ADVISOR_HEADER_RE = re.compile(r"^\s*(?:VERDICT|CHANGES|SCHIMB\w*|RISK|RISC|EDGE|MARGIN\w*|"
                                r"IMPROVEMENTS|[IÎ]MBUN\w*|NEED|NEVOI\w*)\s*:", re.I)
 CHANGES_RE = re.compile(r"^\s*(?:CHANGES|SCHIMB\w*)\s*:", re.I)
+# matches the Romanian wording of agent reports in the author's transcripts
 IMPROVE_RE = re.compile(r"^\s*(?:IMPROVEMENTS|[IÎ]MBUN\w*)\s*:", re.I)
 V17_VERSION_PREFIX = "v1.7"
 
@@ -1810,7 +1813,7 @@ def build_effort_baseline(directory, out_path, model=BASELINE_MODEL, effort="hig
         print("not a directory: %s" % directory, file=sys.stderr)
         return 2
     outs, thinks, line_outs = [], [], []
-    # 🔴 o sesiune reluată copiază turele părintelui: dedupe peste tot corpusul, nu per fișier — PATTERNS «Sesiuni reluate»
+    # 🔴 a resumed session copies the parent's turns: dedupe across the whole corpus, not per file — PATTERNS «Sesiuni reluate»
     seen = {}
     for name in sorted(os.listdir(directory)):
         if not name.endswith(".jsonl"):
@@ -1836,7 +1839,7 @@ def build_effort_baseline(directory, out_path, model=BASELINE_MODEL, effort="hig
     for o, t in seen.values():
         outs.append(o)
         thinks.append(t)
-    # 🔴 o tură = un message.id, nu o linie assistant — PATTERNS «Baseline de efort: ture, nu linii»
+    # 🔴 a turn = one message.id, not one assistant line — PATTERNS «Baseline de efort: ture, nu linii»
     data = {
         "model": model, "effort": effort, "n": len(outs),
         "median_output_tokens": median(outs), "median_thinking_tokens": median(thinks),
@@ -1860,7 +1863,7 @@ def effort_of(call):
 
 
 def turn_cost(call, pricing):
-    # 🔴 turele moștenite au fost facturate la sesiunea-părinte — PATTERNS «Sesiuni reluate»
+    # 🔴 inherited turns were billed to the parent session — PATTERNS «Sesiuni reluate»
     if call.get("inherited"):
         return 0.0
     return cost_of({"input": call["input"], "output": call["output"],
@@ -1901,7 +1904,7 @@ def v17_block(main_doc, workers, docs_by_scope, tool_inputs, pricing, version,
     """The v1.7 numbers: effort phases, plan lag, advisor, low phase. (block, new flags)."""
     new_flags = []
     all_main = [c for c in main_doc["calls"] if not c["side"]]
-    # 🔴 turele moștenite au fost facturate la sesiunea-părinte — PATTERNS «Sesiuni reluate»
+    # 🔴 inherited turns were billed to the parent session — PATTERNS «Sesiuni reluate»
     turns = [c for c in all_main if not c.get("inherited")]
     inherited_turns = len(all_main) - len(turns)
     if not turns:
@@ -1959,7 +1962,7 @@ def v17_block(main_doc, workers, docs_by_scope, tool_inputs, pricing, version,
     adv_text = "\n".join((docs_by_scope.get(w["scope"]) or {}).get("final_text") or ""
                          for w in adv_workers)
     vm = VERDICT_RE.search(adv_text)
-    # 🔴 primul raport, nu ultimul: runda 2 ar înghiți edit-urile dintre rapoarte — DECIZII «v1.7 — advisor + efort pe faze»
+    # 🔴 the first report, not the last: round 2 would swallow the edits between reports — DECIZII «v1.7 — advisor + efort pe faze»
     adv_ends = [w["ended"] for w in adv_workers if w.get("ended")]
     adv_end = min(adv_ends) if adv_ends else None
     reason = None
@@ -2039,7 +2042,7 @@ def v17_block(main_doc, workers, docs_by_scope, tool_inputs, pricing, version,
                             if isinstance(sm.get("at"), str)])
     bad_audits = sorted(w["ended"] for w, txt in audits
                         if w.get("ended") and sum(int(x) for x in ABATERI_RE.findall(txt)))
-    # 🔴 advisorul există doar din v1.7 — DECIZII «v1.7 — advisor + efort pe faze»
+    # 🔴 the advisor only exists since v1.7 — DECIZII «v1.7 — advisor + efort pe faze»
     for a, b in (zip(bad_audits, bad_audits[1:]) if is_v17 else ()):
         nxt = [t for t in impl_events if t > b]
         if not nxt:
@@ -2103,13 +2106,13 @@ def v17_block(main_doc, workers, docs_by_scope, tool_inputs, pricing, version,
                  "lag_turns_to_low": lags, "mismatch_turns": mismatch, "echo": echo},
         "advisor": advisor,
         "low_phase": low_phase,
-        # 🔴 medianele de corpus se umplu în --trends, nu la analiza unei sesiuni — DECIZII «Counterfactual înlocuit»
+        # 🔴 corpus medians are filled in --trends, not per session — DECIZII «Counterfactual înlocuit»
         "cost_per_turn": None,
     }
     return block, new_flags
 
 
-# 🔴 formula e normativă, nu se ajustează local — DECIZII «Rate: advisor_score și mistakes automate»
+# 🔴 the formula is normative, it is not adjusted locally — DECIZII «Rate: advisor_score și mistakes automate»
 def derive_quality(v17, low_phase=None):
     """advisor_score (1-5 or None) + mistakes + breakdown, computed from the v1.7 block."""
     v = v17 if isinstance(v17, dict) else {}
@@ -2172,9 +2175,9 @@ def apply_quality_to_v17(session):
 def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             as_model=None, rot_at=ROT_AT_DEFAULT, window=WINDOW_DEFAULT,
             versions=None, browser_threshold=BROWSER_THRESHOLD_DEFAULT,
-            # 🔴 effort_baseline e acceptat, dar ignorat — DECIZII «Counterfactual înlocuit»
+            # 🔴 effort_baseline is accepted, but ignored — DECIZII «Counterfactual înlocuit»
             effort_baseline=None):
-    _PARENT_UUIDS.clear()  # 🔴 cache per rulare, altfel crește pe tot corpusul — PATTERNS «sessionId vs session_id în jsonl»
+    _PARENT_UUIDS.clear()  # 🔴 cache per run, otherwise it grows over the whole corpus — PATTERNS «sessionId vs session_id în jsonl»
     if versions is None:
         versions = []
     if ctx_warn is None:
@@ -2577,7 +2580,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         ts0, cwd0 = first_meta(jsonl_path)
     out_total = totals["output"] or 1
     totals["agents_cost_usd"] = round(sum(w["cost_usd"] for w in workers), 4)
-    # 🔴 workerii moșteniți n-au transcript propriu (0 calls, $0) — PATTERNS «Sesiuni reluate»
+    # 🔴 inherited workers have no transcript of their own (0 calls, $0) — PATTERNS «Sesiuni reluate»
     scr = [w for w in workers if w["type"].startswith("scripter") and w.get("transcript")]
     with_files = [w for w in scr if w.get("files_changed")]
     scripter = {
@@ -2768,7 +2771,7 @@ def summary_lines(s):
                % (et.get("medium", 0), ec.get("medium", 0.0), et.get("low", 0),
                   ec.get("low", 0.0), et.get("high", 0), lag,
                   num_or_dash(cpt.get("main_usd_per_turn") or main_usd_per_turn(s))))
-    out.append("Advisor: %s · changes %d items · audit ABATERI %d (OK %d)"
+    out.append("Advisor: %s · changes %d items · audit DEVIATIONS %d (OK %d)"
                % (a.get("verdict") or "not requested", a.get("n_schimbari", 0),
                   lp.get("audit_abateri_total", 0), lp.get("audit_ok", 0)))
     echo = p.get("echo")
@@ -3022,7 +3025,7 @@ V17_GROUPS = ("v1.7", "high permanent", "medium permanent")
 
 def v17_group_of(s):
     """Which comparison column a session belongs to; None = mixed, not comparable."""
-    # 🔴 o sesiune fără ture main proprii are v17 = null — PATTERNS «Câmpuri noi în recorduri vechi»
+    # 🔴 a session with no main turns of its own has v17 = null — PATTERNS «Câmpuri noi în recorduri vechi»
     if not isinstance(s.get("v17"), dict):
         return None
     v = s["v17"]
@@ -3081,7 +3084,7 @@ def apply_cost_per_turn(sessions):
         highs, meds = corpus[tc]["high"], corpus[tc]["medium"]
         v["cost_per_turn"] = {
             "main_usd_per_turn": main_usd_per_turn(s),
-            # 🔴 sub 2 sesiuni mediana nu spune nimic — DECIZII «Counterfactual înlocuit»
+            # 🔴 under 2 sessions the median means nothing — DECIZII «Counterfactual înlocuit»
             "corpus_high_median": round(median(highs), 4) if len(highs) >= 2 else None,
             "corpus_medium_median": round(median(meds), 4) if len(meds) >= 2 else None,
             "corpus_n_high": len(highs),
@@ -3134,7 +3137,7 @@ def v17_md(sessions):
         fl = ", ".join("%s×%d" % (c, n) for c, n in (lp.get("flags") or [])) or "—"
         lag = ", ".join("—" if l is None else str(l)
                         for l in (p.get("lag_turns_to_low") or [])) or "—"
-        # 🔴 medianele se citesc pe clasa lor, fără fallback high↔medium — DECIZII «Clasa de task»
+        # 🔴 medians are read on their own class, no high↔medium fallback — DECIZII «Clasa de task»
         out.append("| %s | %s | %s | %s | %d/%s/%s | %d/%d | %.2f | %.2f | %s | %s | %s "
                    "| %d | %s | %s |"
                    % (s.get("name") or s.get("session"), cpt.get("task_class") or task_class(s),
@@ -3240,7 +3243,7 @@ def load_session_dir(directory):
             if isinstance(rec, dict) and all(k in rec for k in SESSION_KEYS):
                 rec.setdefault("postmortem", {})
                 rec.setdefault("counterfactual", {})
-                # 🔴 record-urile vechi n-au cheia; se derivă la citire, nu se rescriu — DECIZII «Clasa de task»
+                # 🔴 old records don't have the key; it's derived on read, not rewritten — DECIZII «Clasa de task»
                 rec["task_class"] = task_class(rec)
                 sessions.append(rec)
             else:
@@ -3355,7 +3358,7 @@ def edit_cost_of(sessions):
     cost, edits = 0.0, 0
     for s in sessions:
         for w in s.get("workers") or []:
-            # 🔴 recordurile vechi n-au edit_calls; incluse, ar umfla $/edit — PATTERNS «Câmpuri noi în recorduri vechi»
+            # 🔴 old records don't have edit_calls; if included, they'd inflate $/edit — PATTERNS «Câmpuri noi în recorduri vechi»
             if (str(w.get("type") or "").startswith("implementer")
                     and w.get("edit_calls") is not None and w.get("transcript")):
                 cost += w.get("cost_usd") or 0.0
@@ -3392,12 +3395,12 @@ def version_stats(sessions):
     floor = sum(c.get("floor_usd", 0.0) for c in cfs)
     wasted = sum(p.get("wasted_total", 0) for p in pms)
     main_in = sum(main_input_of(s) for s in sessions)
-    # 🔴 procentul se face doar pe sesiunile cu input în main — PATTERNS «Procente cu numitor lipsă»
+    # 🔴 the percentage is computed only on sessions with input in main — PATTERNS «Procente cu numitor lipsă»
     with_in = [(p, main_input_of(s)) for s, p in zip(sessions, pms) if main_input_of(s) > 0]
     wasted_in = sum(p.get("wasted_total", 0) for p, _ in with_in)
     main_in_pct = sum(mi for _, mi in with_in)
     scores = [q for q in (quality_score(s) for s in sessions) if q]
-    # 🔴 numitorul lui main_pct = doar sesiunile care au main.cost_usd — PATTERNS «Câmpuri noi în recorduri vechi»
+    # 🔴 main_pct's denominator = only sessions that have main.cost_usd — PATTERNS «Câmpuri noi în recorduri vechi»
     with_main = [s for s in sessions if (s.get("main") or {}).get("cost_usd") is not None]
     main_sum = sum(s["main"]["cost_usd"] for s in with_main)
     main_denom = sum((s.get("totals") or {}).get("cost_usd", 0.0) for s in with_main)
@@ -3775,7 +3778,7 @@ def trends_md(sessions, skipped, versions=None, threshold=BROWSER_THRESHOLD_DEFA
     out.append("")
     edit_cost = edit_cost_of(kept)
     out.extend(corpus_block(kept, skipped_note, edit_cost))
-    # 🔴 tabelele pe clasă nu se compară între ele — DECIZII «Clasa de task»
+    # 🔴 per-class tables are not compared against each other — DECIZII «Clasa de task»
     for cls, title in (("product", "Versions — product"),
                        ("governance-rd", "Versions — governance-rd"),
                        (None, "Versions — total")):
@@ -4044,7 +4047,7 @@ def migrate_names(directory, apply_=False, versions=(), threshold=0.5):
 
 
 def main(argv=None):
-    # 🔴 stdout UTF-8 forțat pentru LANG=C — PATTERNS «analizor: locale»
+    # 🔴 stdout UTF-8 forced for LANG=C — PATTERNS «analizor: locale»
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -4096,7 +4099,7 @@ def main(argv=None):
                          "write the medians to --effort-baseline, then exit" % BASELINE_MODEL)
     ap.add_argument("--effort-baseline", dest="effort_baseline",
                     default=EFFORT_BASELINE_DEFAULT,
-                    help="ignored since v1.7.2 (see DECIZII «Counterfactual inlocuit»); "
+                    help="ignored since v1.7.2 (see the project's decision log); "
                          "only the target of --build-effort-baseline (default %s)"
                          % EFFORT_BASELINE_DEFAULT)
     ap.add_argument("--pricing", default=os.path.join(here, "pricing.json"))
@@ -4153,7 +4156,7 @@ def main(argv=None):
     if not targets:
         print("no .jsonl found", file=sys.stderr)
         return 1
-    # 🔴 fork și origine dau un singur record — PATTERNS «Sesiuni reluate»
+    # 🔴 fork and origin yield a single record — PATTERNS «Sesiuni reluate»
     origins = []
     for p in targets:
         origin = chain_origin(p)

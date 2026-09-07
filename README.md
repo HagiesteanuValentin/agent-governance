@@ -398,6 +398,10 @@ threshold is the operator's, not Anthropic's.
 Requirements: Claude Code, Python 3.6+ (no f-strings, no walrus, no `match`; 3.7+
 recommended). No dependencies, no config file needed.
 
+Comments shaped `🔴 … — DECIZII/PATTERNS «…»` are pointers to internal decision notes
+not included in this repo. The regexes with Romanian diacritics target the Romanian
+wording of agent reports from the author's own system.
+
 **Install the agents and hooks**
 
 ```sh
