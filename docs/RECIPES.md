@@ -155,3 +155,10 @@ after approval, `effort-phase.sh low`; same WARN.
 big heredocs written straight into the project — the thresholds are `BIG_LINES=300` (lines
 read) and `BODY_LINES=20` (heredoc lines).
 </content>
+
+## Sync offline_telemetry_script
+Manual, nu e în `scripts/export-public.sh`:
+`cp tools/session_metrics.py /home/vali/workflow/proiecte/offline_telemetry_script/session_metrics.py`
+apoi `diff -q` cu pricing.json, commit cu
+`-c user.name=claude_code_king -c user.email=claude_code_king@users.noreply.github.com`,
+`push origin main`.
