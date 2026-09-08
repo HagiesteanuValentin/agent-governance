@@ -160,3 +160,9 @@ main at 163k-187k while two implementers passed 217k/182k undetected). So `conte
 rebuilds `<dir(transcript_path)>/<session_id>/subagents/agent-<agent_id>.jsonl` and returns
 without measuring when that file is missing — it never falls back to main's transcript.
 </content>
+
+## Session folder vs session file
+`~/.claude/projects/<slug>/<uuid>/` holds only `subagents/`; the session itself is the
+sibling `<uuid>.jsonl`. Users (Windows Explorer hides extensions) pass the folder and get
+`no .jsonl found`. `collect_targets` falls back to `<folder>.jsonl` when a folder has no
+`.jsonl` inside; the error message names the two valid targets.

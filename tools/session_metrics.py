@@ -746,9 +746,12 @@ def collect_targets(paths):
     for p in paths:
         p = os.path.abspath(os.path.expanduser(p))
         if os.path.isdir(p):
-            for name in sorted(os.listdir(p)):
-                if name.endswith(".jsonl") and os.path.isfile(os.path.join(p, name)):
-                    targets.append(os.path.join(p, name))
+            found = [os.path.join(p, name) for name in sorted(os.listdir(p))
+                     if name.endswith(".jsonl") and os.path.isfile(os.path.join(p, name))]
+            # 🔴 `<uuid>/` holds only subagents; the session is the sibling `<uuid>.jsonl` — PATTERNS «Session folder vs session file»
+            if not found and os.path.isfile(p.rstrip("/\\") + ".jsonl"):
+                found = [p.rstrip("/\\") + ".jsonl"]
+            targets.extend(found)
         elif os.path.isfile(p):
             targets.append(p)
         else:
@@ -4251,7 +4254,9 @@ def main(argv=None):
 
     targets = collect_targets(args.paths)
     if not targets:
-        print("no .jsonl found", file=sys.stderr)
+        print("no .jsonl found — pass the project folder (~/.claude/projects/<slug>/) or a "
+              "<uuid>.jsonl file; a <uuid>/ folder holds only subagent transcripts",
+              file=sys.stderr)
         return 1
     # 🔴 fork and origin yield a single record — PATTERNS «Resumed sessions»
     origins = []
