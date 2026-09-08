@@ -3450,7 +3450,7 @@ def scripter_saved(sessions, edit_cost):
     return total if seen else None
 
 
-def version_stats(sessions):
+def version_stats(sessions, rot_at=ROT_AT_DEFAULT, window=WINDOW_DEFAULT):
     """Per-session figures for one version group; the Versions table and the Δ line share them."""
     n = len(sessions)
     d = float(n or 1)
@@ -3459,6 +3459,10 @@ def version_stats(sessions):
     ctxs = [s.get("context") or {} for s in sessions]
     sevs = [p.get("severity_counts") or {} for p in pms]
     rr = [c["ratio_realistic"] for c in cfs if c.get("ratio_realistic")]
+    # 🔴 cf peak aggregated only over sessions that have the key — PATTERNS «New fields in old records»
+    peak_cfs = [int(c["peak_context_cf"]) for c in cfs
+                if isinstance(c.get("peak_context_cf"), (int, float))
+                and c["peak_context_cf"] > 0]
     hands = sum(p.get("hands_on_calls", 0) for p in pms)
     calls = sum(p.get("main_tool_calls", 0) for p in pms)
     actual = sum((s.get("totals") or {}).get("cost_usd", 0.0) for s in sessions)
@@ -3514,6 +3518,13 @@ def version_stats(sessions):
         "wasted_na": n - len(with_in),
         "n_pm": sum(1 for p in pms if p.get("wasted_total") is not None),
         "peak_ctx": sum(c.get("main_peak_tokens", 0) for c in ctxs) / d,
+        "peak_cf_max": (max(peak_cfs) if peak_cfs else None),
+        "peak_cf_median": (median(peak_cfs) if peak_cfs else None),
+        "cf_over_rot_pct": ((100.0 * sum(1 for x in peak_cfs if x > rot_at * window)
+                             / len(peak_cfs)) if peak_cfs else None),
+        "cf_over_window_pct": ((100.0 * sum(1 for x in peak_cfs if x > window)
+                               / len(peak_cfs)) if peak_cfs else None),
+        "cf_n": len(peak_cfs),
     }
 
 
@@ -3580,37 +3591,49 @@ def rd_cost_block(order, groups):
     return out
 
 
-def versions_table(order, groups, cum, edit_cost=None, title="Versions", note=True):
+def versions_table(order, groups, cum, edit_cost=None, title="Versions", note=True,
+                   rot_at=ROT_AT_DEFAULT, window=WINDOW_DEFAULT):
     out = ["## %s" % title, ""]
     out.append("| version | sessions | $ actual | $/session | $ Fable realistic | saved $ "
                "| saved % | saved cumulative | wasted tok/session | wasted % "
-               "| issues/session (H/M/L) | main output % | hands-on | peak ctx | quality "
+               "| issues/session (H/M/L) | main output % | hands-on | peak ctx "
+               "| peak ctx cf (max/med) | cf>rot % | quality "
                "| effort | main $ % | $/edit impl | scripter runs / saved $ |")
-    out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:"
-               "|---|---:|---:|---:|")
+    out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:"
+               "|---:|---|---:|---:|---:|")
     for name in order:
         sessions = groups.get(name) or []
-        v = version_stats(sessions)
+        v = version_stats(sessions, rot_at, window)
         if not v["n"]:
-            out.append("| %s | 0 |%s" % (name, " — |" * 17))
+            out.append("| %s | 0 |%s" % (name, " — |" * 19))
             continue
         saved = scripter_saved(sessions, edit_cost)
         scr = "%d / %s" % (v["scr_runs"], "—" if saved is None else usd(saved))
+        cf_cell = ("—" if not v["cf_n"]
+                   else "%s/%s" % (tok(v["peak_cf_max"]), tok(v["peak_cf_median"])))
+        cf_rot_cell = ("—" if not v["cf_n"]
+                       else "%.0f%% (%d/%d)" % (v["cf_over_rot_pct"],
+                                                round(v["cf_over_rot_pct"] * v["cf_n"] / 100.0),
+                                                v["cf_n"]))
         out.append("| %s | %d | %s | %s | %s | %s | %.1f%% | %s | %s | %s "
-                   "| %.1f (%.1f/%.1f/%.1f) | %.1f%% | %d/%d (%.0f%%) | %s | %s · %d/%d "
+                   "| %.1f (%.1f/%.1f/%.1f) | %.1f%% | %d/%d (%.0f%%) | %s | %s | %s "
+                   "| %s · %d/%d "
                    "| %s | %s | %s | %s |"
                    % (name, v["n"], usd(v["actual"]), usd(v["actual_per"]), usd(v["real"]),
                       usd(v["saved"]), v["saved_pct"], usd(cum.get(name, 0.0)),
                       tok(v["wasted_per"]), wasted_pct_cell(v),
                       v["issues_per"], v["high_per"], v["med_per"], v["low_per"],
                       v["out_pct"], v["hands"], v["calls"], v["hands_pct"],
-                      tok(v["peak_ctx"]),
+                      tok(v["peak_ctx"]), cf_cell, cf_rot_cell,
                       "—" if v["q_mean"] is None else "%.1f" % v["q_mean"],
                       v["rated"], v["n"],
                       v["effort_mix"],
                       "—" if v["main_pct"] is None else "%.0f%%" % v["main_pct"],
                       "—" if v["edit_cost"] is None else "$%.2f" % v["edit_cost"],
                       scr))
+    out.append("")
+    out.append("single-context threshold: rot %s · window %s"
+               % (tok(int(rot_at * window)), tok(window)))
     out.append("")
     if edit_cost and note:
         out.append("Scripter saved = files changed by scripts × $%.2f/edit (corpus implementer "
@@ -3808,7 +3831,8 @@ def excluded_table(excluded, threshold):
     return out
 
 
-def trends_md(sessions, skipped, versions=None, threshold=BROWSER_THRESHOLD_DEFAULT):
+def trends_md(sessions, skipped, versions=None, threshold=BROWSER_THRESHOLD_DEFAULT,
+              rot_at=ROT_AT_DEFAULT, window=WINDOW_DEFAULT):
     versions = versions or []
     kept, excluded = [], []
     for s in sessions:
@@ -3855,7 +3879,7 @@ def trends_md(sessions, skipped, versions=None, threshold=BROWSER_THRESHOLD_DEFA
                        (None, "Versions — total")):
         sub = class_groups(order, groups, cls)
         out.extend(versions_table(order, sub, cumulative_saved(order, sub), edit_cost,
-                                  title, note=cls is None))
+                                  title, note=cls is None, rot_at=rot_at, window=window))
     out.extend(rd_cost_block(order, groups))
     out.extend(deltas_table(order, groups))
     live = [name for name in order if groups.get(name)]
@@ -3963,7 +3987,8 @@ def refresh_versions(directory, versions):
     return changed
 
 
-def write_trends(directory, versions, threshold):
+def write_trends(directory, versions, threshold, rot_at=ROT_AT_DEFAULT,
+                 window=WINDOW_DEFAULT):
     if not os.path.isdir(directory):
         print("not a directory: %s" % directory, file=sys.stderr)
         return 2
@@ -3975,7 +4000,7 @@ def write_trends(directory, versions, threshold):
         print("no session report in %s" % directory, file=sys.stderr)
         return 1
     apply_cost_per_turn(sessions)
-    text = trends_md(sessions, skipped, versions, threshold) + "\n"
+    text = trends_md(sessions, skipped, versions, threshold, rot_at, window) + "\n"
     tmp = os.path.join(directory, "TRENDS.md.tmp")
     with open(tmp, "w", encoding="utf-8") as fh:
         fh.write(text)
@@ -4200,7 +4225,8 @@ def main(argv=None):
         return migrate_names(args.migrate_names, args.yes, versions, args.browser_threshold)
 
     if args.trends:
-        return write_trends(args.trends, versions, args.browser_threshold)
+        return write_trends(args.trends, versions, args.browser_threshold,
+                            args.rot_at, args.window)
 
     if args.rate:
         name, raw = args.rate

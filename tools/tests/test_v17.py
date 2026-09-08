@@ -379,6 +379,30 @@ def test_reread_skips_a_file_regenerated_between_two_reads():
     assert any("notes-d.md" in d for d in flagged), flagged
 
 
+def _cf_session(name, peak_cf):
+    s = _session(name, 400000, 40000)
+    if peak_cf is not None:
+        s["counterfactual"] = {"peak_context_cf": peak_cf}
+    return s
+
+
+def test_versions_table_cf_peak_columns():
+    grp = [_cf_session("a", 200000), _cf_session("b", 500000), _cf_session("c", 1200000)]
+    v = sm.version_stats(grp, 0.35, 1000000)
+    assert v["cf_n"] == 3
+    assert v["peak_cf_max"] == 1200000 and v["peak_cf_median"] == 500000
+    assert abs(v["cf_over_rot_pct"] - 66.67) < 0.1, v["cf_over_rot_pct"]
+    assert abs(v["cf_over_window_pct"] - 33.33) < 0.1, v["cf_over_window_pct"]
+    rows = sm.versions_table(["v1.8", "v1.5"], {"v1.8": grp, "v1.5": [_cf_session("d", None)]},
+                             {}, rot_at=0.35, window=1000000)
+    row = [r for r in rows if r.startswith("| v1.8 |")][0]
+    assert "1.2M/500.0k" in row and "67% (2/3)" in row, row
+    other = [r for r in rows if r.startswith("| v1.5 |")][0]
+    assert sm.version_stats([_cf_session("d", None)])["cf_n"] == 0
+    assert "| — | — |" in other, other
+    assert any("single-context threshold: rot 350.0k · window 1.0M" in r for r in rows), rows
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):
