@@ -103,6 +103,12 @@ THRESHOLDS = {
     "main_read_before_agent": 20000, # chars main read itself before launching any agent
     "edit_via_bash_calls": 2,        # heredoc writes into source files, with no Edit/Write
     "effort_lag_turns": 3,           # main turns after ExitPlanMode still not on low
+    "cache_rewrite_pct": 50,         # share of the call's context that is a rewrite
+    "cache_rewrite_prev_tokens": 30000,  # cached context that existed on the previous call
+    "cache_rewrite_max_gap_s": 3600,     # over an hour the cache expires legitimately
+    "agent_resume_gap_s": 300,       # the 5m cache of a sub-agent is gone past this pause
+    "agent_resume_read_pct": 20,     # cache_read share on the first call after the pause
+    "scripter_min_files": 4,         # a scripter under this is cheaper as an implementer
 }
 
 FLAG_TEXT = {
@@ -120,6 +126,12 @@ FLAG_TEXT = {
     "read_tool_results_main": "tool-results/ re-read in the main context",
     "high_context_end": "main context high at the end of the session",
     "cache_churn_main": "cache rewritten too often in main",
+    "cache_rewrite_main": "one main call rewrote the cache although the previous call still "
+                          "had a live cached context (per call, not per session)",
+    "agent_resume_rewrite": "sub-agent resumed after over 5 min: the 5m cache had expired and "
+                            "the context was rewritten",
+    "scripter_below_threshold": "scripter run under the threshold that makes it cheaper than "
+                                "an implementer",
     "agent_max_turns": "worker stopped by maxTurns",
     "agent_no_report": "worker ended without a final report",
     "agent_reread_own_write": "worker re-read a file it had just written",
@@ -172,6 +184,8 @@ SEVERITY_BASE = {
     "main_read_files": "medium",
     "high_context_end": "medium",
     "cache_churn_main": "medium",
+    "cache_rewrite_main": "medium",
+    "agent_resume_rewrite": "medium",
     "long_brief": "medium",
     "plan_echo": "medium",
     "sterile_verification": "medium",
@@ -199,6 +213,12 @@ RECOMMENDATION = {
                               "already paid for once.",
     "high_context_end": "{detail} - hand off earlier; a fresh session starts cheap.",
     "cache_churn_main": "{detail} - keep a stable prefix; do not edit early context.",
+    "cache_rewrite_main": "{detail} - the previous call still had a live cache; check what "
+                          "changed in the prefix (config, hooks, an edited early message).",
+    "agent_resume_rewrite": "{detail} - a resume after more than 5 minutes costs one context "
+                            "rewrite; still cheaper than a fresh agent under 150k.",
+    "scripter_below_threshold": "{detail} - a scripter pays off from 8 changes over at least "
+                                "4 files; below that an implementer is cheaper.",
     "agent_max_turns": "{detail} - the brief was too large; split it instead of re-running.",
     "agent_no_report": "{detail} - brief unclear or the worker died; re-send once with the "
                        "missing piece.",
@@ -2587,6 +2607,31 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         if w["transcript"] and w["final_report_chars"] == 0 and not w["max_turns_hit"]:
             flags.append(flag("agent_no_report", w["scope"],
                               "ended without a final report", None, 0))
+        if (w["type"].startswith("scripter") and w["files_changed"] is not None
+                and w["files_changed"] < THRESHOLDS["scripter_min_files"]):
+            flags.append(flag("scripter_below_threshold", w["scope"],
+                              "%s changed %d file(s) for %s"
+                              % (w["type"], w["files_changed"], usd(w["cost_usd"])),
+                              {"type": w["type"], "files_changed": w["files_changed"],
+                               "usd": round(w["cost_usd"], 4)}, 0))
+        # 🔴 sub-agents only ever hold a 5m cache — PATTERNS «Cache TTL 5m for sub-agents»
+        wdoc = docs_by_scope.get(w["scope"])
+        wcalls = sorted([c for c in wdoc[0]["calls"] if c["at"]],
+                        key=lambda c: c["at"]) if wdoc else []
+        r_5m = float(rates_for(pricing, w["model"]).get("cache_write_5m", 0.0))
+        for prev, cur in zip(wcalls, wcalls[1:]):
+            prev_ctx = prev["cache_read"] + prev["cache_creation"]
+            gap = span_s(prev["at"], cur["at"])
+            if not prev_ctx or gap <= THRESHOLDS["agent_resume_gap_s"]:
+                continue
+            if 100.0 * cur["cache_read"] / prev_ctx >= THRESHOLDS["agent_resume_read_pct"]:
+                continue
+            cost = cur["cache_creation"] * r_5m / 1_000_000.0
+            flags.append(flag("agent_resume_rewrite", w["scope"],
+                              "resume after %.0fs: %s context rewritten (%s)"
+                              % (gap, tok(cur["cache_creation"]), usd(cost)),
+                              {"kind": "resume", "gap_s": round(gap, 1), "at": cur["at"],
+                               "tokens": cur["cache_creation"], "usd": round(cost, 4)}, 0))
     sm_ts = sorted(t for t in main_doc["sendmessage_ts"] if isinstance(t, str))
     audit_ends = sorted(w["ended"] for w in workers
                         if w["type"] == "auditor" and w["ended"])
@@ -2632,6 +2677,23 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
                           "cache rewritten on %.1f%% of the context reads"
                           % context["cache_write_pct"],
                           {"pct": context["cache_write_pct"]}, 0))
+    # 🔴 per call, unlike cache_churn_main which is per session — PATTERNS «Cache TTL 5m for sub-agents»
+    timed = sorted([c for c in calls if c["at"]], key=lambda c: c["at"])
+    for prev, cur in zip(timed, timed[1:]):
+        cur_ctx = cur["cache_read"] + cur["cache_creation"]
+        prev_ctx = prev["cache_read"] + prev["cache_creation"]
+        gap = span_s(prev["at"], cur["at"])
+        if (not cur_ctx or prev_ctx <= THRESHOLDS["cache_rewrite_prev_tokens"]
+                or gap > THRESHOLDS["cache_rewrite_max_gap_s"]):
+            continue
+        if 100.0 * cur["cache_creation"] / cur_ctx <= THRESHOLDS["cache_rewrite_pct"]:
+            continue
+        flags.append(flag("cache_rewrite_main", "main",
+                          "%s: %s rewritten %.0fs after a call with %s cached"
+                          % (local_str(cur["at"], "%H:%M"), tok(cur["cache_creation"]),
+                             gap, tok(prev_ctx)),
+                          {"at": cur["at"], "gap_s": round(gap, 1),
+                           "tokens": cur["cache_creation"], "prev_tokens": prev_ctx}, 0))
     if max_concurrent > THRESHOLDS["max_live_agents"]:
         flags.append(flag("parallel_over_cap", "main",
                           "main: %d sub-agents running at once (cap %d)"
@@ -3370,6 +3432,9 @@ WASTE_FAMILIES = {
     "long_brief": "orchestration turns",
     "batchable_bash": "orchestration turns",
     "cache_churn_main": "orchestration turns",
+    "cache_rewrite_main": "orchestration turns",
+    "agent_resume_rewrite": "agent overhead",
+    "scripter_below_threshold": "discipline",
     "fable_wrote_code": "discipline",
     "too_many_runs": "discipline",
     "high_context_end": "discipline",
@@ -3453,6 +3518,31 @@ def scripter_saved(sessions, edit_cost):
     return total if seen else None
 
 
+CACHE_FLAG_CODES = ("cache_rewrite_main", "agent_resume_rewrite", "scripter_below_threshold")
+
+
+def cache_flag_stats(sessions):
+    # 🔴 records analyzed before v1.8 have no such flags: "seen" separates them from a real 0 — PATTERNS «New fields in old records»
+    out = {"cache_rw_n": 0, "cache_rw_tok": 0, "resume_n": 0, "resume_usd": 0.0,
+           "scr_below_n": 0, "seen": False}
+    for s in sessions:
+        for f in s.get("flags") or []:
+            code = f.get("code")
+            if code not in CACHE_FLAG_CODES:
+                continue
+            out["seen"] = True
+            ev = f.get("evidence") or {}
+            if code == "cache_rewrite_main":
+                out["cache_rw_n"] += 1
+                out["cache_rw_tok"] += int(ev.get("tokens") or 0)
+            elif code == "agent_resume_rewrite":
+                out["resume_n"] += 1
+                out["resume_usd"] += float(ev.get("usd") or 0.0)
+            else:
+                out["scr_below_n"] += 1
+    return out
+
+
 def version_stats(sessions, rot_at=ROT_AT_DEFAULT, window=WINDOW_DEFAULT):
     """Per-session figures for one version group; the Versions table and the Δ line share them."""
     n = len(sessions)
@@ -3485,6 +3575,7 @@ def version_stats(sessions, rot_at=ROT_AT_DEFAULT, window=WINDOW_DEFAULT):
     efforts = collections.Counter((s.get("main") or {}).get("effort")
                                   for s in sessions if (s.get("main") or {}).get("effort"))
     scrs = [s.get("scripter") or {} for s in sessions]
+    cache_new = cache_flag_stats(sessions)
     return {
         "n": n,
         "effort_mix": " · ".join("%s %d" % (k, v) for k, v in efforts.most_common()) or "—",
@@ -3528,6 +3619,16 @@ def version_stats(sessions, rot_at=ROT_AT_DEFAULT, window=WINDOW_DEFAULT):
         "cf_over_window_pct": ((100.0 * sum(1 for x in peak_cfs if x > window)
                                / len(peak_cfs)) if peak_cfs else None),
         "cf_n": len(peak_cfs),
+        "cache_rw_n": cache_new["cache_rw_n"],
+        "cache_rw_tok": cache_new["cache_rw_tok"],
+        "resume_n": cache_new["resume_n"],
+        "resume_usd": cache_new["resume_usd"],
+        "scr_below_n": cache_new["scr_below_n"],
+        "cache_flags_seen": cache_new["seen"],
+        # 🔴 None, not 0, when the version has no such records — PATTERNS «New fields in old records»
+        "cache_rw_per": (cache_new["cache_rw_n"] / d) if cache_new["seen"] else None,
+        "resume_per": (cache_new["resume_n"] / d) if cache_new["seen"] else None,
+        "scr_below_per": (cache_new["scr_below_n"] / d) if cache_new["seen"] else None,
     }
 
 
@@ -3535,7 +3636,10 @@ def version_stats(sessions, rot_at=ROT_AT_DEFAULT, window=WINDOW_DEFAULT):
 DELTA_FIELDS = (("$/session", "actual_per", "rel"), ("saved %", "saved_pct", "pts"),
                 ("wasted/session", "wasted_per", "rel"), ("wasted %", "wasted_pct", "pts"),
                 ("issues/session", "issues_per", "rel"), ("main output %", "out_pct", "pts"),
-                ("hands-on %", "hands_pct", "pts"))
+                ("hands-on %", "hands_pct", "pts"),
+                ("cache rewrites/session", "cache_rw_per", "rel"),
+                ("agent resumes/session", "resume_per", "rel"),
+                ("scripter <4 files/session", "scr_below_per", "rel"))
 
 
 def delta_cell(base, cur, key, unit):
@@ -3601,14 +3705,16 @@ def versions_table(order, groups, cum, edit_cost=None, title="Versions", note=Tr
                "| saved % | saved cumulative | wasted tok/session | wasted % "
                "| issues/session (H/M/L) | main output % | hands-on | peak ctx "
                "| peak ctx cf (max/med) | cf>rot % | quality "
-               "| effort | main $ % | $/edit impl | scripter runs / saved $ |")
+               "| effort | main $ % | $/edit impl | scripter runs / saved $ "
+               "| cache rewrites main n / tok | agent resume rewrites n / $ "
+               "| scripter runs below threshold n |")
     out.append("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:"
-               "|---:|---|---:|---:|---:|")
+               "|---:|---|---:|---:|---:|---:|---:|---:|")
     for name in order:
         sessions = groups.get(name) or []
         v = version_stats(sessions, rot_at, window)
         if not v["n"]:
-            out.append("| %s | 0 |%s" % (name, " — |" * 19))
+            out.append("| %s | 0 |%s" % (name, " — |" * 22))
             continue
         saved = scripter_saved(sessions, edit_cost)
         scr = "%d / %s" % (v["scr_runs"], "—" if saved is None else usd(saved))
@@ -3618,10 +3724,14 @@ def versions_table(order, groups, cum, edit_cost=None, title="Versions", note=Tr
                        else "%.0f%% (%d/%d)" % (v["cf_over_rot_pct"],
                                                 round(v["cf_over_rot_pct"] * v["cf_n"] / 100.0),
                                                 v["cf_n"]))
+        seen = v["cache_flags_seen"]
+        cache_cell = "—" if not seen else "%d / %s" % (v["cache_rw_n"], tok(v["cache_rw_tok"]))
+        resume_cell = "—" if not seen else "%d / %s" % (v["resume_n"], usd(v["resume_usd"]))
+        below_cell = "—" if not seen else "%d" % v["scr_below_n"]
         out.append("| %s | %d | %s | %s | %s | %s | %.1f%% | %s | %s | %s "
                    "| %.1f (%.1f/%.1f/%.1f) | %.1f%% | %d/%d (%.0f%%) | %s | %s | %s "
                    "| %s · %d/%d "
-                   "| %s | %s | %s | %s |"
+                   "| %s | %s | %s | %s | %s | %s | %s |"
                    % (name, v["n"], usd(v["actual"]), usd(v["actual_per"]), usd(v["real"]),
                       usd(v["saved"]), v["saved_pct"], usd(cum.get(name, 0.0)),
                       tok(v["wasted_per"]), wasted_pct_cell(v),
@@ -3633,7 +3743,7 @@ def versions_table(order, groups, cum, edit_cost=None, title="Versions", note=Tr
                       v["effort_mix"],
                       "—" if v["main_pct"] is None else "%.0f%%" % v["main_pct"],
                       "—" if v["edit_cost"] is None else "$%.2f" % v["edit_cost"],
-                      scr))
+                      scr, cache_cell, resume_cell, below_cell))
     out.append("")
     out.append("single-context threshold: rot %s · window %s"
                % (tok(int(rot_at * window)), tok(window)))

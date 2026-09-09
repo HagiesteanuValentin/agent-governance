@@ -40,7 +40,7 @@ cur_id = d.get("tool_use_id")
 
 
 def prior_reads(tpath, skip_sidechain):
-    """(call index, offset, limit) for every earlier Read of the same file."""
+    """(call index, offset, limit, pages) for every earlier Read of the same file."""
     out = []
     seen = 0
     if not tpath or not os.path.exists(tpath):
@@ -78,7 +78,8 @@ def prior_reads(tpath, skip_sidechain):
                 except OSError:
                     same_file = fp == path
                 if same_file:
-                    out.append((seen, inp.get("offset"), inp.get("limit")))
+                    out.append((seen, inp.get("offset"), inp.get("limit"),
+                                inp.get("pages")))
     return out
 
 
@@ -155,7 +156,8 @@ agent_id = d.get("agent_id") or ""
 agent_type = d.get("agent_type") or ""
 if agent_id or "subagent" in tp:
     FIX = " → Read with offset/limit on the range you need"
-    if not agent_type.startswith(("implementer", "scripter", "cell-")):
+    read_only = agent_type.startswith(("explorer", "auditor"))
+    if not (read_only or agent_type.startswith(("implementer", "scripter", "cell-"))):
         sys.exit(0)
     session_id = d.get("session_id") or ""
     if not agent_id or not tp or not session_id:
@@ -163,6 +165,20 @@ if agent_id or "subagent" in tp:
     # 🔴 in a sub-agent transcript_path is the MAIN transcript — DECIZII «v1.4.1 — 30.08.2026»
     agent_tp = os.path.join(os.path.dirname(tp), session_id, "subagents",
                             "agent-%s.jsonl" % agent_id)
+    if read_only:
+        # 🔴 read-only agents: only the reread rule, no >300 and no pending_own_write — docs/PATTERNS.md «Reread after your own write»
+        if cur_ranged or ext in IMG or "/.claude/plans/" in path:
+            sys.exit(0)
+        try:
+            prior = prior_reads(agent_tp, skip_sidechain=False)
+        except Exception:
+            sys.exit(0)
+        cur_pages = ti.get("pages")
+        if cur_pages:
+            prior = [p for p in prior if p[3] == cur_pages]
+        if prior:
+            deny("already read at call %d in this agent%s" % (prior[0][0], FIX))
+        sys.exit(0)
     try:
         lim = int(ti.get("limit") or 0)
     except (TypeError, ValueError):
@@ -218,8 +234,8 @@ if ext in IMG:
 prior = prior_reads(tp, skip_sidechain=True)
 
 if prior:
-    ranged_prior = all(o or l for _, o, l in prior)
-    repeat_range = any((o, l) == cur for _, o, l in prior)
+    ranged_prior = all(o or l for _, o, l, _p in prior)
+    repeat_range = any((o, l) == cur for _, o, l, _p in prior)
     # a different slice of a file read before with offset/limit is new information
     if not (ranged_prior and cur_ranged and not repeat_range):
         deny("already read at call %d; re-check with offset/limit or ask the explorer"

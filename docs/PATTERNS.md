@@ -119,6 +119,11 @@ The hook skips it and keeps looking further back. A `Bash` call that contains th
 basename (a build/test run on it) resets the counter: the result may call for a reread.
 A Read with `offset`/`limit` over ≤60 lines stays allowed — it's a spot check, not a reread.
 
+Any second whole-file Read of the same path is denied for read-only agents too
+(`explorer*`, `auditor`): an explorer-max that read the same PDF twice cost 124k tokens.
+They get only this rule — no >300-line limit and no `pending_own_write`, because reading is
+their job. A Read with `offset`/`limit`, or a PDF with different `pages`, stays allowed.
+
 ## Reread after regeneration
 A second read of a file that was regenerated in between — by `magick`/`convert`, a build, or
 similar — is not waste. The analyzer exempts the Read if an intervening Bash command whose
@@ -166,3 +171,10 @@ without measuring when that file is missing — it never falls back to main's tr
 sibling `<uuid>.jsonl`. Users (Windows Explorer hides extensions) pass the folder and get
 `no .jsonl found`. `collect_targets` falls back to `<folder>.jsonl` when a folder has no
 `.jsonl` inside; the error message names the two valid targets.
+
+## Cache TTL 5m for sub-agents
+Sub-agents only ever write a 5m cache, so any pause over 300 s costs a full context rewrite
+(`agent_resume_rewrite`, scope = the agent, wasted 0); still cheaper than a fresh agent under
+150k. `cache_rewrite_main` is the same idea in main but **per call** (this call rewrote while
+the previous one still had over 30k cached, under an hour before); `cache_churn_main` is per
+session (share of cache writes over the whole run) — one does not tell you the other.

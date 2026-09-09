@@ -34,7 +34,7 @@ session only.
   hook flags the 3rd.
 - Large output (build, tests, diffs) and screenshots stay in the agent's own context: report
   exit code + numbers.
-- Plans under `docs/polish/` aren't read in main; the summary comes from design-lead's report.
+- Plans under `docs/polish/` aren't read in main; summary comes from design-lead's report.
 
 ## Flow
 - Flow: plan mode, I approve the plan → brief to implementer → audit per `/audit` →
@@ -76,10 +76,10 @@ session only.
 - The plan = ≤10 lines of context + briefs + verification; no alternatives, no narration.
 
 ## Scripter and dossier
-- At plan time: ≥8 changes with the same pattern across ≥4 files, measurements across ≥3
-  states, or one verification used in ≥2 briefs → the first brief is for scripter: it writes
-  the script into `scripts/`, runs it (dry-run → 1 file → all → idempotency), adds a line to
-  `scripts/SCRIPTS.md`.
+- At plan: scripter-complex (Opus) only ≥4 files AND ≥8 changes confirmed (counted, not
+  estimated); measurements over ≥3 states or a check reused ≥2 briefs also qualify →
+  scripter writes the script (dry-run → 1 file → all → idempotency), adds a line to
+  `scripts/SCRIPTS.md`. Below it, implementer edits; flag `scripter_below_threshold`.
 - scripter-complex when the transform needs parsing (AST, multiline regex, frontmatter, JSON),
   per-file conditions, JS/TS logic, or the verifier isn't a plain exit code.
 - Before the brief, read `scripts/SCRIPTS.md` (≤40 lines): a script marked "adaptation: easy"
@@ -105,11 +105,13 @@ session only.
 - HARD CAP: ≤6 live agents at once, any type — the analyzer flags `parallel_over_cap`.
 - I want to see only the plan and the conclusion, not the execution. Audit after parallel
   runs: brief by brief.
-- Worktree (`isolation: worktree`) only when declared at plan time, when the lists can't be
-  guaranteed disjoint or the delivery is risky: it costs a merge you audit and doesn't solve
-  the dependency between briefs.
+- Worktree (`isolation: worktree`) only declared at plan, when lists can't be disjoint or
+  delivery is risky: costs an audited merge, doesn't solve the dependency between briefs.
 
 ## Caps
+- Agent cache expires at 5 min; SendMessage after audit ≈ rewriting context (80k ≈ $0.50
+  Opus), cheaper than a new agent (only past 150k, implementer-max's cap, or unrelated fix).
+  Auditor starts right after the report, no main text.
 - ≤2 re-sends to implementer per task (3 runs total); one implementer-sonnet,
   implementer-complex or scripter run counts toward them.
 - SendMessage to a live agent is not a re-send; it's the first option for small deviations.

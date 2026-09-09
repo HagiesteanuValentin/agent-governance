@@ -27,12 +27,14 @@ def jsonl(rel, objs):
     return write(rel, [json.dumps(o) for o in objs])
 
 
-def read_use(tid, path, offset=None, limit=None):
+def read_use(tid, path, offset=None, limit=None, pages=None):
     inp = {"file_path": path}
     if offset is not None:
         inp["offset"] = offset
     if limit is not None:
         inp["limit"] = limit
+    if pages is not None:
+        inp["pages"] = pages
     return {"type": "tool_use", "id": tid, "name": "Read", "input": inp}
 
 
@@ -103,6 +105,11 @@ jsonl("proj/%s/subagents/agent-ab.jsonl" % SID, [
 jsonl("proj/%s/subagents/agent-ao.jsonl" % SID, [
     assistant([tool_use("w1", "Write", {"file_path": small, "content": "x"})], side=True),
 ])
+# --- read-only agents (explorer*, auditor): reread rule only
+pdf = write("doc.pdf", ["%%PDF-1.4"])
+jsonl("proj/%s/subagents/agent-ax.jsonl" % SID, [
+    assistant([read_use("p1", pdf, pages="1-20")], side=True),
+])
 bigimg = blob("big.png", 300 * 1024)
 smallimg = blob("small.png", 50 * 1024)
 
@@ -169,8 +176,25 @@ case("agent scripter filtered too", agent_in(bigmd, agent_type="scripter-complex
      "deny", "400 lines (>300)")
 case("agent cell-* filtered too", agent_in(bigmd, agent_type="cell-runner"),
      "deny", "400 lines (>300)")
-case("explorer not filtered", agent_in(bigmd, agent_type="explorer"), "allow")
-case("auditor not filtered", agent_in(big, agent_type="auditor"), "allow")
+case("explorer 400 lines not filtered", agent_in(bigmd, agent_type="explorer"), "allow")
+case("auditor 400 lines not filtered", agent_in(bigmd, agent_type="auditor"), "allow")
+case("explorer reread whole file -> deny", agent_in(big, agent_type="explorer",
+     tool_use_id="x"), "deny", "already read at call")
+case("explorer-max reread whole file -> deny", agent_in(big, agent_type="explorer-max",
+     tool_use_id="x"), "deny", "already read at call")
+case("auditor reread whole file -> deny", agent_in(big, agent_type="auditor",
+     tool_use_id="x"), "deny", "already read at call")
+case("explorer reread with offset -> allow",
+     agent_in(big, agent_type="explorer", offset=100, limit=50), "allow")
+case("explorer other file -> allow", agent_in(fresh, agent_type="explorer"), "allow")
+case("explorer PDF other pages -> allow",
+     agent_in(pdf, agent_id="ax", agent_type="explorer", pages="21-40"), "allow")
+case("explorer PDF same pages -> deny",
+     agent_in(pdf, agent_id="ax", agent_type="explorer", pages="1-20"),
+     "deny", "already read at call")
+case("explorer after own Write -> allow (no pending_own_write)",
+     agent_in(wrote, agent_id="aw", agent_type="explorer"), "allow")
+case("explorer plan file exempt", agent_in(planmd, agent_type="explorer"), "allow")
 case("agent plan file exempt", agent_in(planmd), "allow")
 case("agent image exempt", agent_in(img), "allow")
 case("agent tool-results still denied",
