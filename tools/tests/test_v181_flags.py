@@ -107,9 +107,43 @@ def test_dev_null_redirect_stays_batchable():
 
 
 def test_mutating_regex_edges():
-    for cmd in ("git add -A", "npm run build", "python3 tools/x.py", "rm /tmp/a",
-                "node scripts/a.mjs", "echo hi > /tmp/out.txt"):
+    for cmd in ("git add -A", "rm /tmp/a", "echo hi > /tmp/out.txt",
+                "mv a b", "cp a b", "mkdir -p x", "touch f", "chmod +x f",
+                "cat f | tee out.txt", "git add f && git commit -m x",
+                "sed -i 's/a/b/' f", "git reset --hard", "git merge main"):
         assert sm.BATCH_MUTATING_RE.search(cmd), cmd
     for cmd in ("grep -n foo a.md 2>&1", "ls -la", "git log --oneline",
-                "cat a.md | wc -l", "ls /tmp >/dev/null", "make 2>/dev/null"):
+                "cat a.md | wc -l", "ls /tmp >/dev/null", "make 2>/dev/null",
+                "npm test", "npx tsc --noEmit", "python3 tools/x.py",
+                "node scripts/a.mjs", "bash scripts/check.sh",
+                "git status --short", "git diff --stat", "git show HEAD",
+                "echo format", "rmdir olddir", "cat cpio.log"):
         assert not sm.BATCH_MUTATING_RE.search(cmd), cmd
+
+
+def test_verifier_chain_is_batchable():
+    a = analyzed(batch_records(["npm test", "python3 tools/x.py", "node b.mjs"]))
+    codes = [f["code"] for f in a["flags"]]
+    assert "batchable_bash" in codes, codes
+
+
+def test_git_readonly_chain_is_batchable():
+    a = analyzed(batch_records(["git status --short", "git log -1", "git diff --stat"]))
+    codes = [f["code"] for f in a["flags"]]
+    assert "batchable_bash" in codes, codes
+
+
+def test_chain_with_rm_is_not_batchable():
+    cmds = list(BATCH_READONLY)
+    cmds[1] = "rm /tmp/proj/a.md"
+    a = analyzed(batch_records(cmds))
+    codes = [f["code"] for f in a["flags"]]
+    assert "batchable_bash" not in codes, codes
+
+
+def test_file_redirect_chain_is_not_batchable():
+    cmds = list(BATCH_READONLY)
+    cmds[0] = "ls /tmp/proj > out.txt"
+    a = analyzed(batch_records(cmds))
+    codes = [f["code"] for f in a["flags"]]
+    assert "batchable_bash" not in codes, codes

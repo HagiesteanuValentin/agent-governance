@@ -194,6 +194,11 @@ flagged afterwards. `BIG_CHARS=10000` (file size on disk) is the second threshol
 the same reader arguments; a `sed -n` with a range exits earlier and is never measured.
 `hooks/read-mare.sh` applies the 200 KB image rule regardless of the `-mic`/`-small` name
 (the name only suppresses the reminder), same as `image_in_main` in the analyzer.
-On the analyzer side, `BATCH_MUTATING_RE` in `tools/session_metrics.py` carries a
-`(?!/dev/null)` after the redirect branch, so a read-only `... >/dev/null` is not counted as a
-mutating command and the call still qualifies as batchable.
+On the analyzer side, `BATCH_MUTATING_RE` in `tools/session_metrics.py` only lists commands that
+really change state: `sed -i`, `rm|mv|cp|mkdir|touch|chmod|tee` matched at command-name position
+(start, or after `;`, `&&`, `|`, `$(`), writing `git` verbs (`add|commit|push|checkout|stash|
+reset|rebase|merge`) and a redirect to a file. Verifiers (`npm`, `npx`, `node x`, `python x.py`,
+`bash x.sh`, `git status|log|diff|show`) are NOT mutating: they do not make the next call depend
+on the previous one, so such a chain stays batchable. Name-position matching keeps `format` and
+`rmdir` out of the `rm` branch. The redirect branch carries `(?!/dev/null)` (and excludes `2>&1`
+/ `>&`), so a read-only `... >/dev/null` still qualifies as batchable.

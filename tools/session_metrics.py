@@ -1447,7 +1447,11 @@ def emit_many(flags, code, scope, items, fmt_one, wasted_of):
                           None, sum(wasted_of(i) for i in rest)))
 
 
-BATCH_MUTATING_RE = re.compile(r"sed -i|git (add|commit|push|checkout|stash)|npx |npm |python3? \S+\.py|node \S+|bash \S+\.sh|(?<![0-9&])>(?!&)\s*(?!/dev/null)\S|\b(rm|mv|cp|tee|mkdir|touch) ")
+# 🔴 doar mutatorii reali, ca nume de comandă — PATTERNS «Hook counts lines, analyzer counts chars»
+BATCH_MUTATING_RE = re.compile(
+    r"(?:^|[;&|]|\$\()\s*(?:sed +-i|rm|mv|cp|mkdir|touch|chmod|tee)\b"
+    r"|\bgit +(?:add|commit|push|checkout|stash|reset|rebase|merge)\b"
+    r"|(?<![0-9&])>(?!&)\s*(?!/dev/null)\S")
 
 
 def main_call_flags(scope, doc, rows):
