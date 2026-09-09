@@ -66,7 +66,8 @@ def task_class(record_or_project):
     return "product"
 
 IMG_EXT = (".png", ".jpg", ".jpeg", ".webp")
-SMALL_IMG = ("-mic", "-small")
+IMAGE_CHARS = 6000
+IMG_BIG_BYTES = 200 * 1024
 COST_KEYS = (("input", "input"), ("output", "output"),
              ("cache_read", "cache_read"), ("cache_creation", "cache_write"))
 
@@ -491,6 +492,29 @@ def text_of(value):
 def text_len(value):
     """Character length of a tool_result content (str or list of blocks)."""
     return len(text_of(value))
+
+
+def is_image_block(b):
+    if not isinstance(b, dict):
+        return False
+    if b.get("type") == "image":
+        return True
+    src = b.get("source")
+    return isinstance(src, dict) and src.get("type") == "base64"
+
+
+def result_chars(value):
+    """Cost-weighted length of a tool_result: an image block counts IMAGE_CHARS, not its base64."""
+    # 🔴 image = IMAGE_CHARS — PATTERNS «Image blocks in the analyzer»
+    if not isinstance(value, list):
+        return len(text_of(value))
+    total = 0
+    for b in value:
+        if is_image_block(b):
+            total += IMAGE_CHARS
+        else:
+            total += len(text_of([b]))
+    return total
 
 
 def zeros():
@@ -1098,7 +1122,7 @@ def parse_file(path, label, tool_names, tool_inputs, chain=None):
                     doc["max_turns_ids"].add(tuid)
                 doc["results"].append({
                     "tool_use_id": b.get("tool_use_id"),
-                    "chars": len(body),
+                    "chars": result_chars(b.get("content")),
                     "lines": body.count("\n") + 1 if body else 0,
                     "at": ts,
                 })
@@ -1423,6 +1447,9 @@ def emit_many(flags, code, scope, items, fmt_one, wasted_of):
                           None, sum(wasted_of(i) for i in rest)))
 
 
+BATCH_MUTATING_RE = re.compile(r"sed -i|git (add|commit|push|checkout|stash)|npx |npm |python3? \S+\.py|node \S+|bash \S+\.sh|(?<![0-9&])>(?!&)\s*(?!/dev/null)\S|\b(rm|mv|cp|tee|mkdir|touch) ")
+
+
 def main_call_flags(scope, doc, rows):
     """Flags that need the API-call timeline of main, plus the counters the postmortem uses."""
     flags = []
@@ -1512,7 +1539,11 @@ def main_call_flags(scope, doc, rows):
         while j < len(calls) and calls[j]["tool_names"] == ["Bash"]:
             j += 1
         run = calls[i:j]
-        if len(run) >= THRESHOLDS["batchable_calls"]:
+        # 🔴 a mutating command makes the chain dependent — DECIZII «v1.8.1 — batchable exclude lanțuri dependente»
+        mutating = any(BATCH_MUTATING_RE.search(
+                       (input_by_id.get(t) or {}).get("command") or "")
+                       for c in run for t in c["tool_ids"] if t)
+        if len(run) >= THRESHOLDS["batchable_calls"] and not mutating:
             chars = sum(chars_by_id.get(t, 0) for c in run
                         for t in c["tool_ids"] if t)
             if chars < THRESHOLDS["batchable_chars"]:
@@ -1601,8 +1632,15 @@ def scope_flags(scope, doc, rows, is_main):
         imgs = []
         for path, n in sorted(doc["reads"].items()):
             base = os.path.basename(path).lower()
-            if base.endswith(IMG_EXT) and not any(s in base for s in SMALL_IMG):
-                imgs.append({"path": path, "reads": n})
+            if not base.endswith(IMG_EXT):
+                continue
+            # 🔴 size decides, not the -mic name — PATTERNS «Image blocks in the analyzer»
+            try:
+                size = os.path.getsize(os.path.expanduser(path))
+            except OSError:
+                continue
+            if size > IMG_BIG_BYTES:
+                imgs.append({"path": path, "reads": n, "bytes": size})
         emit_many(flags, "image_in_main", scope, imgs,
                   lambda r: "%s read %d× at full size" % (os.path.basename(r["path"]), r["reads"]),
                   lambda r: 0)

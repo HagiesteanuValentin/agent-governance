@@ -157,7 +157,28 @@ case("3 calls at <3s (same message) -> silent",
      got == "silent" and open(state_path("b3")).read().split()[0] == "1",
      "%s %s state=%s" % (got, body, open(state_path("b3")).read()))
 
-for _f in ("b1", "b2", "b3"):
+def wmd(name, lines, width):
+    p = os.path.join(TMP, name)
+    with open(p, "w") as fh:
+        for _i in range(lines):
+            fh.write("y" * width + "\n")
+    return p
+
+
+md_big = wmd("big-chars.md", 120, 91)      # 120 lines, ~11k chars
+md_small = wmd("small.md", 50, 39)         # 50 lines, ~2k chars
+
+got, body = main_call("c1", "cat %s" % md_big)
+case("md 120 lines / 11k chars via cat -> deny",
+     got == "deny" and "10k chars" in body, "%s %s" % (got, body))
+
+got, body = main_call("c2", "cat %s" % md_small)
+case("md 50 lines / 2k chars -> allow", got == "silent", "%s %s" % (got, body))
+
+got, body = main_call("c3", "sed -n 1,50p %s" % md_big)
+case("sed -n range on 11k chars md -> allow", got == "silent", "%s %s" % (got, body))
+
+for _f in ("b1", "b2", "b3", "c1", "c2", "c3"):
     try:
         os.remove(state_path(_f))
     except OSError:

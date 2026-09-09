@@ -178,3 +178,22 @@ Sub-agents only ever write a 5m cache, so any pause over 300 s costs a full cont
 150k. `cache_rewrite_main` is the same idea in main but **per call** (this call rewrote while
 the previous one still had over 30k cached, under an hour before); `cache_churn_main` is per
 session (share of cache writes over the whole run) — one does not tell you the other.
+
+## Image blocks in the analyzer
+A `tool_result` with an `image` block has no `text` key, so `text_of` falls back to
+`json.dumps(block)` and counts the whole base64 payload (a 300 KB PNG shows up as 400k
+chars, while the real cost is about 1.5k tokens). `result_chars` counts each image block as
+`IMAGE_CHARS = 6000` instead; `text_of` itself stays untouched, the launch/files regexes
+depend on it. `image_in_main` decides on the file size on disk (`IMG_BIG_BYTES`, 200 KB —
+the same threshold as hooks/read-mare.sh), not on a `-mic`/`-small` name.
+
+## Hook counts lines, analyzer counts chars
+`hooks/bash-mare.sh` used to deny only over `BIG_LINES=300`, while the analyzer flags
+`big_tool_result_main` over 10000 chars — a 120-line md of 11k chars passed the hook and was
+flagged afterwards. `BIG_CHARS=10000` (file size on disk) is the second threshold, applied to
+the same reader arguments; a `sed -n` with a range exits earlier and is never measured.
+`hooks/read-mare.sh` applies the 200 KB image rule regardless of the `-mic`/`-small` name
+(the name only suppresses the reminder), same as `image_in_main` in the analyzer.
+On the analyzer side, `BATCH_MUTATING_RE` in `tools/session_metrics.py` carries a
+`(?!/dev/null)` after the redirect branch, so a read-only `... >/dev/null` is not counted as a
+mutating command and the call still qualifies as batchable.

@@ -1,12 +1,14 @@
 #!/bin/bash
 # 🔴 BIG_LINES/BODY_LINES thresholds — RECIPES «Scripts»
 BIG_LINES=300
+# 🔴 BIG_CHARS = analyzer threshold — PATTERNS «Hook counts lines, analyzer counts chars»
+BIG_CHARS=10000
 BODY_LINES=20
 LOG_DIR=/tmp/claude-hooks
 mkdir -p "$LOG_DIR" 2>/dev/null
 payload=$(mktemp "$LOG_DIR/bash-mare-XXXXXX" 2>/dev/null || mktemp) || exit 0
 cat > "$payload"
-python3 - "$payload" "$BIG_LINES" "$BODY_LINES" "$(dirname "$0")" <<'PY'
+python3 - "$payload" "$BIG_LINES" "$BODY_LINES" "$(dirname "$0")" "$BIG_CHARS" <<'PY'
 import atexit, json, os, re, shlex, subprocess, sys, time
 
 try:
@@ -24,6 +26,7 @@ finally:
 
 BIG_LINES = int(sys.argv[2])
 BODY_LINES = int(sys.argv[3])
+BIG_CHARS = int(sys.argv[5]) if len(sys.argv) > 5 else 10000
 
 
 BATCH_MAX = 3
@@ -176,6 +179,19 @@ try:
         except OSError:
             return 0
 
+    def nchars(path):
+        if not isinstance(path, str) or not path:
+            return 0
+        p = os.path.expanduser(path)
+        if not os.path.isabs(p):
+            p = os.path.join(cwd, p)
+        try:
+            if not os.path.isfile(p):
+                return 0
+            return os.path.getsize(p)
+        except OSError:
+            return 0
+
     # ---- a) heredoc that writes a project file
     HD = re.search(r"<<-?\s*[\"']?([A-Za-z_][A-Za-z0-9_]*)[\"']?", cmd)
     if HD:
@@ -278,6 +294,10 @@ try:
             n = nlines(a)
             if n > BIG_LINES:
                 deny(">300 lines in main → explorer (or a range): %s has %d lines" % (a, n))
+            c = nchars(a)
+            if c > BIG_CHARS:
+                deny(">10k chars in main → explorer or head/sed -n range: %s has %d chars"
+                     % (a, c))
 except Exception:
     sys.exit(0)
 PY

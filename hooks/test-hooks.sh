@@ -62,6 +62,7 @@ hugemd = write("huge.md", ["line %d" % i for i in range(700)])
 planmd = write("fakehome/.claude/plans/plan.md", ["line %d" % i for i in range(700)])
 img = write("shot.png", ["x"])
 imgmic = write("shot-mic.png", ["x"])
+imgmicbig = write("x-mic.png", ["y" * 1000 for _ in range(256)])
 
 MAIN = jsonl("main.jsonl", [
     {"type": "user", "message": {"role": "user", "content": "go"}},
@@ -156,7 +157,8 @@ case("md under 600 -> allow", READ_HOOK, read_in(bigmd), "allow")
 case("md over 600 -> deny", READ_HOOK, read_in(hugemd), "deny", "700 lines")
 case("plan file exempt", READ_HOOK, read_in(planmd), "allow")
 case("image -> warning", READ_HOOK, read_in(img), "context", "image")
-case("image -mic -> allow", READ_HOOK, read_in(imgmic), "allow")
+case("image -mic under 200 KB -> allow", READ_HOOK, read_in(imgmic), "allow")
+case("image -mic over 200 KB -> deny", READ_HOOK, read_in(imgmicbig), "deny", "KB")
 case("other slice of ranged file -> allow", READ_HOOK,
      read_in(ranged, offset=200, limit=50), "allow")
 case("same slice again -> deny", READ_HOOK, read_in(ranged, offset=1, limit=50), "deny",

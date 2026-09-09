@@ -216,15 +216,16 @@ if not ("fable" in _m or "mythos" in _m or _m in ("", "unknown")):
 
 if ext in IMG:
     low = base.lower()
-    if "-small" in low or "-mic" in low:
-        sys.exit(0)
     try:
         size = os.path.getsize(real)
     except OSError:
         size = 0
+    # 🔴 the size rule applies regardless of the -mic/-small name — PATTERNS «Hook counts lines, analyzer counts chars»
     if size > 200 * 1024:
         deny("%s is %d KB; explorer or design-lead sees the image and reports in text"
              % (base, size // 1024))
+    if "-small" in low or "-mic" in low:
+        sys.exit(0)
     emit(additionalContext=(
         "Reminder (CLAUDE.md): %s is an image - it enters the context and is re-paid on "
         "every following message. Comparing screenshots is the implementer's job; if you "
