@@ -19,6 +19,8 @@ python3 tools/session_metrics.py <paths…> --json --md --out-dir metrics-local
 python3 tools/session_metrics.py --trends metrics-local
 ```
 `/rate` notes are kept automatically. Check the `quality` count before/after.
+`sed -n`/`awk` on the whole TRENDS.md is blocked by bash-mare in main (>300 lines); read it
+with `grep -n` filtered to line numbers, or via explorer.
 
 ## Hook tests and /rate
 `bash hooks/test-hooks.sh` — 39 offline cases, exit 0. `/rate` matches the note by the cwd's
