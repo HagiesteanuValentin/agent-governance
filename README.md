@@ -6,6 +6,7 @@ stop verbose agents from flooding the orchestrator's context.
 
 Current version: **v1.8** (frozen) — the rules aren't changing anymore, it's now being
 tested on product sessions (≥3 from 2026-09-05T14:45 onward, until a verdict is reached).
+v1.8.1 (2026-09-09) changes nothing in the governance itself: only the analyzer (`tools/session_metrics.py`) was fixed so it stops reporting waste that wasn't there (false `big_tool_result_main` on image reads, false `batchable_bash` on non-mutating chains).
 Phase-based effort is back (plan medium / implementation low, `/effort` given by hand by
 claude_code_king, Claude Code 2.1.260), the advisor is now mandatory on a wide set of triggers (a-f) and
 re-reads the plan in round 2, `bash-mare.sh` nudges main on the 3rd consecutive small Bash
