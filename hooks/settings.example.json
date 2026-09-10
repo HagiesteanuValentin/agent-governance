@@ -111,6 +111,16 @@
             "command": "$HOME/.claude/hooks/comentarii-cod.sh"
           }
         ]
+      },
+      {
+        "_note": "main only: if the effective effort differs from the per-session target (or from settings), every tool is denied with an order to ask the user for /effort; ExitPlanMode/EnterPlanMode/AskUserQuestion are always allowed and an unknown effort never denies",
+        "matcher": ".*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/effort-phase.sh gate"
+          }
+        ]
       }
     ],
     "SubagentStart": [
@@ -143,6 +153,10 @@
           {
             "type": "command",
             "command": "$HOME/.claude/hooks/session-metrics.sh"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/effort-phase.sh medium"
           }
         ]
       }

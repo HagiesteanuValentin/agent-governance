@@ -7,8 +7,9 @@ stop verbose agents from flooding the orchestrator's context.
 Current version: **v1.8** (frozen) — the rules aren't changing anymore, it's now being
 tested on product sessions (≥3 from 2026-09-05T14:45 onward, until a verdict is reached).
 v1.8.1 (2026-09-09) changes nothing in the governance itself: only the analyzer (`tools/session_metrics.py`) was fixed so it stops reporting waste that wasn't there (false `big_tool_result_main` on image reads, false `batchable_bash` on non-mutating chains).
-Phase-based effort is back (plan medium / implementation low, `/effort` given by hand by
-claude_code_king, Claude Code 2.1.260), the advisor is now mandatory on a wide set of triggers (a-f) and
+Phase-based effort is back (plan medium / implementation low; as of v1.8.2 a PreToolUse gate
+blocks tools until claude_code_king runs `/effort <target>` and types go, Claude Code
+2.1.260), the advisor is now mandatory on a wide set of triggers (a-f) and
 re-reads the plan in round 2, `bash-mare.sh` nudges main on the 3rd consecutive small Bash
 call, Fable 5.1 pricing and 5m/1h cache billing are corrected in the analyzer, the `/refine`
 skill (agents `refiner` / `refiner-complex`, both Fable 5.1) ships for single-page changes,
@@ -104,6 +105,13 @@ implementer to Opus 5 low effort after the "simplu" experiment — see `docs/exp
 «r2–r4 results»: opus-low audit 4/4/4 and eval 11/0 in all three lots at a mean $2.35 per
 lot, vs opus-medium 4/4/3, eval 9–10/11, $2.52 (confounds listed in the same section); added
 `implementer-complex` (Opus medium) as the plan-time choice for multi-file logic.
+
+## v1.8.2 (2026-09-10)
+
+settings.json does not hot-reload effort, and SessionStart writes the target too late for
+the current session. Fix: SessionEnd writes medium for the next launch, and a new PreToolUse
+gate denies tools until effective effort matches the `/effort <target>` claude_code_king ran, then
+he types go. See `docs/DECIZII.md` «v1.8.2 — effort gate».
 
 ## v1.8 (2026-09-05)
 

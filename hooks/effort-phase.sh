@@ -23,10 +23,22 @@ except Exception:
 case "$mode" in
   low|medium)
     rm -f "${CLAUDE_JOB_DIR:-/tmp}"/effort-phase-* 2>/dev/null  # 🔴 phase switch re-arms the once-per-session WARN — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
-    python3 - "$settings" "$mode" <<'PY' "$in" 2>/dev/null
+    python3 - "$settings" "$mode" "${CLAUDE_JOB_DIR:-/tmp}" <<'PY' "$in" 2>/dev/null
 import json, os, sys, tempfile
 try:
-    settings_path, mode, stdin_json = sys.argv[1], sys.argv[2], sys.argv[3]
+    settings_path, mode, state_dir, stdin_json = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+    # 🔴 gate target is per session, settings is shared by all sessions — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
+    try:
+        sid = json.loads(stdin_json).get("session_id") or ""
+    except Exception:
+        sid = ""
+    if sid:
+        try:
+            os.makedirs(state_dir, exist_ok=True)
+            with open(os.path.join(state_dir, "effort-target-%s" % sid), "w") as f:
+                f.write(mode)
+        except Exception:
+            pass
     try:
         old_effort = json.loads(stdin_json).get("effort", {}).get("level", "unknown")
     except Exception:
@@ -83,6 +95,45 @@ try:
         ctx = "WARN effort effective=%s settings=%s -> You: /effort %s" % (eff, want, want)
         print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse",
                                                   "additionalContext": ctx}}))
+except Exception:
+    pass
+PY
+    ;;
+  gate)
+    python3 - "$settings" "${CLAUDE_JOB_DIR:-/tmp}" "${CLAUDE_EFFORT:-}" <<'PY' "$in" 2>/dev/null
+import json, os, sys
+try:
+    settings_path, state_dir, env_effort, stdin_json = sys.argv[1:5]
+    data_in = json.loads(stdin_json)
+    tool = data_in.get("tool_name") or ""
+    # 🔴 the gate must not deny the tools that let the user answer — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
+    if tool in ("ExitPlanMode", "EnterPlanMode", "AskUserQuestion"):
+        sys.exit(0)
+    eff = data_in.get("effort", {}).get("level") or env_effort or ""
+    if not eff:
+        sys.exit(0)
+    want = ""
+    sid = data_in.get("session_id") or ""
+    if sid:
+        try:
+            with open(os.path.join(state_dir, "effort-target-%s" % sid)) as f:
+                want = f.read().strip()
+        except OSError:
+            want = ""
+    if not want:
+        with open(settings_path) as f:
+            want = json.load(f).get("modelSettings", {}).get(
+                "claude-fable-5-1", {}).get("effortLevel", "")
+    if not want or eff == want:
+        sys.exit(0)
+    reason = ("STOP: effort effective=%s, settings=%s. Write ONE line to the user: "
+              "«Tu: /effort %s, apoi scrie go» and end the turn. "
+              "Do not retry tools." % (eff, want, want))
+    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
+                                             "permissionDecision": "deny",
+                                             "permissionDecisionReason": reason}}))
+except SystemExit:
+    raise
 except Exception:
     pass
 PY

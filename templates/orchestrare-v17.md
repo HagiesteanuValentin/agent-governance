@@ -38,8 +38,8 @@ build, no cross-brief dependency) still apply; do not parallelize for the count'
 Main effort per phase: `medium` in plan mode, `low` after ExitPlanMode. Only the user changes the
 effort with `/effort`; the `effort-phase.sh` hook (guard `~/.claude/v17-effort-auto`) writes
 the target into settings and warns on mismatch. Main, first line after ExitPlanMode approved:
-«You: /effort low»; on EnterPlanMode: «You: /effort medium». Resumed 2026-09-05: Claude Code
+«You: /effort low, then type go»; on EnterPlanMode: «You: /effort medium, then type go». Resumed 2026-09-05: Claude Code
 2.1.260 no longer invalidates the cache on `/effort`. Escalation = advisor or re-entering
 plan mode. Reason: `DECIZII «v1.8 — efort pe faze reluat»`.
 In /polish and /refine the command itself runs the hook at step 0 (medium) and 5 (low); same
-«You: /effort».
+«You: /effort, then type go».

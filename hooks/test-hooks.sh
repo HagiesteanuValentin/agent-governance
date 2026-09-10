@@ -329,6 +329,62 @@ rap_case("explorer-max 6500 chars -> block (over 6000)", True, needle="6000",
 rap_case("explorer 2500 chars -> block (over 2000)", True, needle="2000",
          agent_id="rm3", agent_type="explorer", msg="x" * 2500)
 
+# ---------------------------------------------------------------- effort-phase gate
+EPH_HOOK = os.path.join(HOOKS, "effort-phase.sh")
+
+def gate_case(name, payload, expect_deny, guard=True, want="medium", target=None):
+    home = tempfile.mkdtemp(prefix="eph-home-", dir=TMP)
+    os.makedirs(os.path.join(home, ".claude"))
+    if guard:
+        open(os.path.join(home, ".claude", "v17-effort-auto"), "w").close()
+    with open(os.path.join(home, ".claude", "settings.json"), "w") as fh:
+        json.dump({"modelSettings": {"claude-fable-5-1": {"effortLevel": want}}}, fh)
+    if target:
+        with open(os.path.join(home, "effort-target-%s" % payload.get("session_id")), "w") as fh:
+            fh.write(target)
+    env = dict(os.environ, HOME=home, CLAUDE_PROJECT_DIR=home, CLAUDE_JOB_DIR=home)
+    env.pop("CLAUDE_EFFORT", None)
+    p = subprocess.run(["sh", EPH_HOOK, "gate"], input=json.dumps(payload), text=True,
+                       capture_output=True, env=env)
+    out = p.stdout.strip()
+    try:
+        denied = json.loads(out)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    except Exception:
+        denied = False
+    results.append((name, p.returncode == 0 and denied == expect_deny,
+                    "%s (rc=%d)" % (out[:80] or "empty", p.returncode)))
+
+gate_case("gate mismatch -> deny", {"session_id": "g1", "tool_name": "Bash",
+                                    "effort": {"level": "low"}}, True)
+gate_case("gate match -> empty", {"session_id": "g2", "tool_name": "Bash",
+                                  "effort": {"level": "medium"}}, False)
+gate_case("gate in sub-agent -> empty", {"session_id": "g3", "tool_name": "Bash",
+                                         "agent_id": "a1", "effort": {"level": "low"}}, False)
+gate_case("gate ExitPlanMode mismatch -> empty", {"session_id": "g4", "tool_name": "ExitPlanMode",
+                                                  "effort": {"level": "low"}}, False)
+gate_case("gate without guard -> empty", {"session_id": "g5", "tool_name": "Bash",
+                                          "effort": {"level": "low"}}, False, guard=False)
+gate_case("gate without effort in stdin -> empty", {"session_id": "g6", "tool_name": "Bash"}, False)
+gate_case("gate target low + settings medium + effective low -> empty",
+          {"session_id": "g7", "tool_name": "Bash", "effort": {"level": "low"}},
+          False, want="medium", target="low")
+
+def eph_target_case(name, mode):
+    home = tempfile.mkdtemp(prefix="eph-t-", dir=TMP)
+    os.makedirs(os.path.join(home, ".claude"))
+    open(os.path.join(home, ".claude", "v17-effort-auto"), "w").close()
+    with open(os.path.join(home, ".claude", "settings.json"), "w") as fh:
+        json.dump({"modelSettings": {"claude-fable-5-1": {"effortLevel": "high"}}}, fh)
+    env = dict(os.environ, HOME=home, CLAUDE_PROJECT_DIR=home, CLAUDE_JOB_DIR=home)
+    p = subprocess.run(["sh", EPH_HOOK, mode], input=json.dumps({"session_id": "t1"}),
+                       text=True, capture_output=True, env=env)
+    tgt = os.path.join(home, "effort-target-t1")
+    got = open(tgt).read().strip() if os.path.exists(tgt) else "none"
+    results.append((name, p.returncode == 0 and got == mode, "%s (rc=%d)" % (got, p.returncode)))
+
+eph_target_case("effort-phase low writes the session target", "low")
+eph_target_case("effort-phase medium writes the session target", "medium")
+
 # ---------------------------------------------------------------- session-start (effort reset)
 SS_HOOK = os.path.join(HOOKS, "session-start.sh")
 

@@ -30,6 +30,9 @@ would come from all sessions, the denominator only from the new ones. Tables sho
 2. Only the user changes main's effort: `/effort` (persists per model in settings),
    `effortLevel`/`modelSettings.<model>.effortLevel`, env `CLAUDE_CODE_EFFORT_LEVEL`; the model
    has no tool for it; reloading settings.json live is NOT documented.
+   settings.json is not hot-reloaded for effort (verified 2026-09-10, 10 min after
+   ExitPlanMode); SessionStart writes too late for the current session, so SessionEnd writes
+   medium for the next launch and a PreToolUse gate denies tools until `/effort` matches.
 3. Hooks receive `effort.level` on stdin (PreToolUse/PostToolUse/Stop/SubagentStop),
    `permission_mode`, `transcript_path`, `session_id`.
 4. Subagent frontmatter: `model: sonnet|opus|haiku|fable|inherit|<id>`,
