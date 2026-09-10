@@ -159,8 +159,8 @@ read) and `BODY_LINES=20` (heredoc lines).
 </content>
 
 ## Sync offline_telemetry_script
-Manual, nu e în `scripts/export-public.sh`:
-`cp tools/session_metrics.py /home/vali/workflow/proiecte/offline_telemetry_script/session_metrics.py`
-apoi `diff -q` cu pricing.json, commit cu
+Manual; the public export script does not cover it:
+copy `tools/session_metrics.py` over `session_metrics.py` in the offline_telemetry_script checkout,
+then `diff -q` against pricing.json, commit with
 `-c user.name=claude_code_king -c user.email=claude_code_king@users.noreply.github.com`,
 `push origin main`.
