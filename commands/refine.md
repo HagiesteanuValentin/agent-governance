@@ -8,7 +8,7 @@ your head. The flow, in order:
    `refine: <page|section> → refiner-complex|refiner`
    `refiner-complex` for a whole page or two or more sections; `refiner` for one section or
    one element. Mixed signals → `refiner-complex`. Slug: the target, lowercased, dashes.
-   Effort: run `bash ~/.claude/hooks/effort-phase.sh medium </dev/null` in the same Bash as
+   Effort: run `bash ~/.claude/hooks/effort-phase.sh medium </dev/null && bash ~/.claude/hooks/effort-phase.sh hold </dev/null` in the same Bash as
    the first command of step 1 (ignore its JSON line); if that result carries `WARN effort`,
    print «You: /effort medium» and wait.
 

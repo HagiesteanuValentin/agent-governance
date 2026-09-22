@@ -168,6 +168,71 @@ of Opus 5's cost. (2) medium only for complicated tasks — YES, on "simple" med
 low (only +15% cost). (3) auditor medium can reach high — PARTIALLY: good on mechanical deviations
 and no new false positives, but misses logic traps (I7) just like high does on complex diffs.
 
+## r8–r10 — complex task: Opus 5.5 low vs medium, auditor high vs medium (2026-09-23)
+
+Protocol: repo blueprint_pictura pinned `da90148`, CC 2.1.280, task = parse "de la N lei" into
+`pretRon` in the generator (`scripts/index-lucrari.mjs`), `pretEstimat` flag propagated to the
+artist email (`functions/api/lead.ts`), scoring reads it; trap T1: brief item I3 asks for a new
+`pretMinRon` field although `pretRon` already exists; trap T2: brief claims `email.ts` has no
+access to works (true but misleading; lead.ts has). Verifier `scripts/verifica-complex.mjs`
+(I1–I5), cells see it; audit rubric `metrics-local/experiments/complex/input/audit-brief.md`;
+each patch audited blind (A/B) by `auditor` (Opus 5.5 high) AND `auditor-medium`. Cells got 2
+verifier runs max.
+
+Table cells (from `metrics-local/experiments/complex/results/cells.md`, rows r1–r3 = r8–r10):
+opus55-low: $0.344/0.358/0.371 (avg 0.358), 9/11/11 calls, 1m02/1m09/1m07, ctx peak ~33k, tool
+errors 4 each run (Edit before Read); T1: r8 FELL and stayed (pretMinRon kept, verifier 4/5); r9
+fell, reverted after verifier FAIL, 5/5; r10 fell, reverted, 5/5.
+opus55-medium: $0.464/0.404/0.380 (avg 0.416), 11/11/12 calls, 1m22/1m15/1m10, ctx ~36–42k, 0 tool
+errors; T1: r8 fell, READ the verifier (grep on ../verifica-complex.mjs, leak) then reverted, 5/5;
+r9 fell and stayed (kept pretMinRon citing "words win over verifier"), 4/5; r10 fell, reverted,
+5/5.
+Both cells fell into T1 in 6/6 runs at first attempt; what pulled them out was the verifier's I3
+check (unchanged scoring line), not the effort level. T2 caught 6/6 (all put the suffix in
+lead.ts).
+
+Sub-table auditor high vs medium, 6 patches × 2 auditors = 12 pairs: verdict identical 12/12 (OK
+on the 4 clean patches, ABATERI (1) + T1 flagged with the same line numbers on the 2 patches with
+pretMinRon); no false positives either side. Cost per audit: high $0.20–0.26 (7–10 calls, 42–54
+s), medium $0.18–0.19 (6–7 calls, 35–40 s) — from
+`metrics-local/experiments/complex/results-auditor/cells.md` (auditor rows r3–r8 are the
+experiment; r1–r2 are other audits from the same session, exclude).
+
+Confounds: task turned out small for Opus 5.5 (~1 min, ~$0.4), so low vs medium is not tested on a
+genuinely long task; the verifier leaks the T1 answer (I3 checks the scoring line is unchanged) —
+every "revert" happened after a verifier FAIL, so T1 measures reaction to the verifier, not
+judgment; medium r8 read the verifier (forbidden); grader = Opus 5.5 auditors; prompt cache not
+controlled; CLAUDE.md of the target repo inherited.
+
+Verdict (hypotheses): (1) implementer-complex (medium) adds nothing over low on this task: same
+trap behaviour, +16% cost, +15% time — candidate for retirement, decision pending a longer task;
+(2) auditor medium = high on 12/12 verdicts at ~20% less cost and ~25% less time — candidate for
+`auditor` default = medium, keep high as `auditor-max`/escalation; (3) decision by the user.
+
+## scripter A/B — Sonnet 5 high vs Opus 5.5 low (2026-09-23)
+
+Protocol: same spec (`metrics-local/experiments/complex/input/spec-verificator.md`: write
+`verifica-complex.mjs` for the r8 task, read-only on blueprint_pictura master), 2 cells × 3 runs,
+`cell-scripter-sonnet` (claude-sonnet-5 high) vs `cell-scripter-opus55` (claude-opus-5-5 low),
+identical prompts, outputs in `metrics-local/experiments/complex/scripter/`, blind audit A–F by
+`auditor` (Opus 5.5 high), mapping in `scripter/mapping.txt`.
+
+Table (from `scripter/cells.md`): opus55-low $0.221/0.197/0.208 (avg 0.209), 6 calls each, 47/42/49
+s, ctx ~25k; sonnet-high $0.447/0.295/0.272 (avg 0.338), 17/11/14 calls, 3m24/2m49/2m20, ctx
+40–51k, 1–2 tool errors per run.
+
+Blind audit ranking: C (opus55 r3) > A (opus55 r2) > E (sonnet r2) > D (sonnet r3) > F (sonnet r1)
+> B (opus55 r1). Scores correct/robust/readable: C 5/5/5, A 5/4/4, E 4/4/4, D 4/3/4, F 3/4/3, B
+2/3/4. B (opus55 r1) fails without `--json` (argument index bug → exit 2); all others OK 2/5 exit
+1 on master as expected. C became `scripts/verifica-complex.mjs`.
+
+Confounds: one spec only, a read-only verifier (no dry-run/idempotence path exercised); higher
+variance on Opus (best and worst script); cells hardcode slug lists as the spec asked.
+
+Verdict: Opus 5.5 low = 62% of Sonnet's cost, ~4× faster, better quality in 2/3 runs but one fatal
+bug in 1/3 → candidate for `scripter` model = claude-opus-5-5 low, with the verifier run on the
+script's own output kept mandatory; decision by the user.
+
 ## 2026-09-02 — orchestrator (Fable 5.1): effort medium vs high, real task T-metrics
 
 Protocol: one real task (prompt in `metrics-local/experiments/plan/T-metrics/task.md`: session naming order +

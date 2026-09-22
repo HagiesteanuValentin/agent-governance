@@ -385,6 +385,34 @@ def eph_target_case(name, mode):
 eph_target_case("effort-phase low writes the session target", "low")
 eph_target_case("effort-phase medium writes the session target", "medium")
 
+def eph_hold_case(name, mode, stdin_text, expect_target, expect_hold, pre="medium"):
+    home = tempfile.mkdtemp(prefix="eph-h-", dir=TMP)
+    os.makedirs(os.path.join(home, ".claude"))
+    open(os.path.join(home, ".claude", "v17-effort-auto"), "w").close()
+    with open(os.path.join(home, ".claude", "settings.json"), "w") as fh:
+        json.dump({"modelSettings": {"claude-fable-5-1": {"effortLevel": "medium"}}}, fh)
+    with open(os.path.join(home, "effort-target-h1"), "w") as fh:
+        fh.write(pre)
+    env = dict(os.environ, HOME=home, CLAUDE_PROJECT_DIR=home, CLAUDE_JOB_DIR=home,
+               CLAUDE_CODE_SESSION_ID="h1")
+    if expect_hold is not None:
+        subprocess.run(["sh", EPH_HOOK, "hold"], input="", text=True, capture_output=True, env=env)
+    p = subprocess.run(["sh", EPH_HOOK, mode], input=stdin_text, text=True,
+                       capture_output=True, env=env)
+    got = open(os.path.join(home, "effort-target-h1")).read().strip()
+    held = os.path.exists(os.path.join(home, "effort-hold-h1"))
+    ok = p.returncode == 0 and got == expect_target and held == bool(expect_hold)
+    results.append((name, ok, "target=%s hold=%s (rc=%d)" % (got, held, p.returncode)))
+
+EPH_EXIT = json.dumps({"hook_event_name": "PostToolUse", "tool_name": "ExitPlanMode", "session_id": "h1"})
+EPH_ENTER = json.dumps({"hook_event_name": "PostToolUse", "tool_name": "EnterPlanMode", "session_id": "h1"})
+eph_hold_case("hold + ExitPlanMode low -> target stays medium", "low", EPH_EXIT, "medium", True)
+eph_hold_case("hold + manual low -> target low, hold cleared", "low", "", "low", False)
+eph_hold_case("no hold + ExitPlanMode low -> target low", "low", EPH_EXIT, "low", None)
+eph_hold_case("hold + EnterPlanMode medium -> hold kept", "medium", EPH_ENTER, "medium", True)
+eph_hold_case("manual low without hold -> no target write", "low", "", "none", None, pre="none")
+eph_hold_case("manual medium -> no target write", "medium", "", "low", None, pre="low")
+
 # ---------------------------------------------------------------- session-start (effort reset)
 SS_HOOK = os.path.join(HOOKS, "session-start.sh")
 

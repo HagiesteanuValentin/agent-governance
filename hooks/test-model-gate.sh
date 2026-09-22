@@ -123,8 +123,12 @@ check("brief-mare: main on Fable -> additionalContext",
 # ------------------------------------------------------------------ session-start
 start_payload = {"session_id": "s1", "transcript_path": OPUS, "source": "startup",
                  "cwd": TMP}
-env_opus = {"GOV_MODEL": "claude-opus-5", "CLAUDE_PROJECT_DIR": TMP}
-env_fable = {"GOV_MODEL": "claude-fable-5-1", "CLAUDE_PROJECT_DIR": TMP}
+ss_home = tempfile.mkdtemp(prefix="ss-home-", dir=TMP)
+shutil.copytree(os.path.expanduser("~/.claude"), os.path.join(ss_home, ".claude"),
+                ignore=lambda d, n: [x for x in n if not (x.endswith(".md") or x in ("settings.json", "v17-effort-auto"))] if d == os.path.expanduser("~/.claude") else n)
+ss_env = {"HOME": ss_home, "CLAUDE_JOB_DIR": ss_home}
+env_opus = dict(ss_env, GOV_MODEL="claude-opus-5", CLAUDE_PROJECT_DIR=TMP)
+env_fable = dict(ss_env, GOV_MODEL="claude-fable-5-1", CLAUDE_PROJECT_DIR=TMP)
 rc, out, err = call(START_HOOK, start_payload, env=env_opus, args=("rules",))
 check("session-start rules on Opus: no ORCHESTRATION, with effort line",
       rc == 0 and "=== ORCHESTRATION" not in out and "effort main" in out,

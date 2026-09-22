@@ -14,7 +14,7 @@ your head. The flow, in order:
    docs/DECISIONS.md, PATTERNS.md, docs/RECIPES.md), the breakpoints from CLAUDE.md if you
    know them. Concepts path: `docs/polish/<target-slug>.concepts.md` (only the expert uses
    it).
-   Effort: run `bash ~/.claude/hooks/effort-phase.sh medium </dev/null` in the same Bash as
+   Effort: run `bash ~/.claude/hooks/effort-phase.sh medium </dev/null && bash ~/.claude/hooks/effort-phase.sh hold </dev/null` in the same Bash as
    the first command of step 1 (ignore its JSON line); if that result carries `WARN effort`,
    print «You: /effort medium» and wait.
    Choosing the design lead, BEFORE any explorer. `lead=` forces it. Otherwise

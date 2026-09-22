@@ -212,3 +212,10 @@ reset|rebase|merge`) and a redirect to a file. Verifiers (`npm`, `npx`, `node x`
 on the previous one, so such a chain stays batchable. Name-position matching keeps `format` and
 `rmdir` out of the `rm` branch. The redirect branch carries `(?!/dev/null)` (and excludes `2>&1`
 / `>&`), so a read-only `... >/dev/null` still qualifies as batchable.
+
+## effort hold for /polish and /refine
+Step 1 of /polish and /refine runs `effort-phase.sh hold` (marker `effort-hold-<sid>`); while it
+exists, `low` from the ExitPlanMode hook skips the target. Env sid (`$CLAUDE_CODE_SESSION_ID`,
+inherited by sub-agents) serves ONLY `hold` and the step-5 release (manual `low` with the marker);
+other stdin-less calls never write a target. SessionEnd also clears. Leak: an abandoned /polish
+leaves the target on medium until `low </dev/null` or SessionEnd — a cost, not a STOP.

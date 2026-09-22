@@ -20,10 +20,48 @@ except Exception:
 " 2>/dev/null)
 [ -n "$agent_id" ] && exit 0
 
+# 🔴 /polish and /refine hold medium across ExitPlanMode — PATTERNS «effort hold for /polish and /refine»
+if [ "$mode" != check ] && [ "$mode" != gate ]; then
+  meta=$(printf '%s' "$in" | python3 -c "
+import json, sys
+try:
+    d = json.load(sys.stdin)
+    print('%s %s %s' % (d.get('session_id') or '-', d.get('tool_name') or '-', d.get('hook_event_name') or '-'))
+except Exception:
+    print('- - -')
+" 2>/dev/null)
+  set -- $meta
+  h_sid="${1:--}"; h_tool="${2:--}"; h_event="${3:--}"
+  if [ "$h_sid" = "-" ]; then
+    h_sid=""
+    env_sid="${CLAUDE_CODE_SESSION_ID:-}"
+    hold="${CLAUDE_JOB_DIR:-/tmp}/effort-hold-$env_sid"
+    if [ -n "$env_sid" ]; then
+      if [ "$mode" = hold ]; then
+        h_sid="$env_sid"
+      elif [ "$mode" = low ] && [ -f "$hold" ]; then
+        h_sid="$env_sid"; rm -f "$hold" 2>/dev/null
+      fi
+    fi
+  else
+    hold="${CLAUDE_JOB_DIR:-/tmp}/effort-hold-$h_sid"
+    if [ "$h_event" = SessionEnd ]; then
+      rm -f "$hold" 2>/dev/null
+    elif [ "$mode" = low ] && [ "$h_tool" = ExitPlanMode ] && [ -f "$hold" ]; then
+      exit 0
+    fi
+  fi
+fi
+
 case "$mode" in
+  hold)
+    [ -n "$h_sid" ] || exit 0
+    mkdir -p "${CLAUDE_JOB_DIR:-/tmp}" 2>/dev/null
+    : > "$hold" 2>/dev/null
+    ;;
   low|medium)
     rm -f "${CLAUDE_JOB_DIR:-/tmp}"/effort-phase-* 2>/dev/null  # 🔴 phase switch re-arms the once-per-session WARN — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
-    python3 - "$settings" "$mode" "${CLAUDE_JOB_DIR:-/tmp}" <<'PY' "$in" 2>/dev/null
+    python3 - "$settings" "$mode" "${CLAUDE_JOB_DIR:-/tmp}" <<'PY' "$in" "${h_sid:-}" 2>/dev/null
 import json, os, sys, tempfile
 try:
     settings_path, mode, state_dir, stdin_json = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
@@ -32,6 +70,7 @@ try:
         sid = json.loads(stdin_json).get("session_id") or ""
     except Exception:
         sid = ""
+    sid = sid or (sys.argv[5] if len(sys.argv) > 5 else "")
     if sid:
         try:
             os.makedirs(state_dir, exist_ok=True)
