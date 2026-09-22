@@ -11,6 +11,8 @@ Phase-based effort is back (plan medium / implementation low; as of v1.8.2 a Pre
 blocks tools until claude_code_king runs `/effort <target>` and types go, Claude Code
 2.1.260), the advisor is now mandatory on a wide set of triggers (a-f) and
 re-reads the plan in round 2, `bash-mare.sh` nudges main on the 3rd consecutive small Bash
+call (2 lines).
+v1.9 (2026-09-22): a lot of 12 cell runs (r5–r7) shows Opus 5.5 low as the new implementer default (better quality, ~55% of Opus 5's cost; medium adds nothing on the "simplu" task). Auditor-medium can replace high on mechanical drift but still misses logic traps (I7) like high does.
 call, Fable 5.1 pricing and 5m/1h cache billing are corrected in the analyzer, the `/refine`
 skill (agents `refiner` / `refiner-complex`, both Fable 5.1) ships for single-page changes,
 and `orchestrare.md` is kept under 10 KB. Phase-based effort now also runs inside `/polish`

@@ -1,6 +1,6 @@
 {
   "_note": "USD per 1,000,000 tokens. The figures are updated MANUALLY - nothing syncs them automatically. cache_write_5m = 1.25 x input (TTL 5 min), cache_write = 2 x input (TTL 1h); the analyzer reads cache_creation.ephemeral_5m/1h_input_tokens and charges them separately, fallback: everything at 1h. cache_read = 0.1x on every model (subscription convention); the real API price for Fable 5.1 is in api_cache_read, informative only. The 'default' key is used for any model not listed here (exact match, then prefix). Prices re-checked on platform.claude.com/docs/en/about-claude/pricing on 2026-09-05.",
-  "_updated": "2026-09-05",
+  "_updated": "2026-09-22",
   "models": {
     "claude-fable-5": {
       "input": 10.0,
@@ -44,6 +44,14 @@
       "cache_write_5m": 12.5,
       "cache_write": 20.0,
       "api_cache_read": 0.25
+    },
+    "claude-opus-5-5": {
+      "input": 4.0,
+      "output": 20.0,
+      "cache_read": 0.4,
+      "cache_write_5m": 5.0,
+      "cache_write": 8.0,
+      "api_cache_read": 0.2
     }
   }
 }

@@ -5,7 +5,7 @@ set -euo pipefail
 # set to your project
 MAMA="${MAMA:-${PROJECT:-${HOME}/workflow/proiecte/your-project}}"
 EXPERIMENTE="${HOME}/workflow/experimente"
-CELLS=(cell-opus-low cell-opus-medium cell-sonnet-medium cell-sonnet-low)
+CELLS=(cell-opus-low cell-opus-medium cell-sonnet-medium cell-sonnet-low cell-opus55-low cell-opus55-medium)
 
 TASK="${1:-}"
 RUN="${2:-}"
@@ -49,7 +49,7 @@ for CELL in "${CELLS[@]}"; do
     echo "OK (already exists) $WT"
   else
     mkdir -p "$EXPERIMENTE/$TASK"
-    git -C "$MAMA" worktree add "$WT" -b "$BRANCH" master
+    git -C "$MAMA" worktree add "$WT" -b "$BRANCH" "${BASE:-master}"
     echo "CREATED $WT (branch $BRANCH)"
   fi
 

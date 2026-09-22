@@ -27,8 +27,8 @@ session only.
 
 ## Reading in main
 - Main reads only `git diff --stat`, agent reports, and at most one dossier.
-- Over ~3k chars of FACTS → explorer. A table/list over 1.5k → explorer-max, or a dossier in
-  `docs/dossier/`. Not fitting the report is no reason to read directly.
+- Read, Bash, WebFetch, WebSearch: >3k chars FACTS → explorer; table/list >1.5k →
+  explorer-max or a dossier in `docs/dosar/`. Not fitting the report is no reason.
 - Bash: first list what you need, then ALL independent commands in a single call (`;`/`&&`)
   or the same message — never one per turn; the analyzer flags `batchable_bash`, the bash-mare
   hook flags the 3rd.

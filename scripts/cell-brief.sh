@@ -3,7 +3,7 @@
 set -euo pipefail
 
 EXPERIMENTE="${HOME}/workflow/experimente"
-CELLS=(cell-opus-low cell-opus-medium cell-sonnet-medium cell-sonnet-low)
+CELLS=(cell-opus-low cell-opus-medium cell-sonnet-medium cell-sonnet-low cell-opus55-low cell-opus55-medium)
 
 TASK="${1:-}"
 RUN="${2:-}"
