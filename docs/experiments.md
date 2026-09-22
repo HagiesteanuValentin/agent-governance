@@ -135,38 +135,38 @@ Confounds:
 - `verify` column in cells.md counts greps/seds on the verifier as verification runs (hook regex `VERIF` in `~/.claude/hooks/context-agent.sh:96`)
 - r1 (dossier design) is not comparable and not averaged in
 
-## r5–r7 — Opus 5.5 vs Opus 5, low/medium (22.09.2026)
+## r5–r7 — Opus 5.5 vs Opus 5, low/medium (2026-09-22)
 
-Protocol: same "simplu" task as r2–r4, base `bcb7075` pinned (master had advanced since), 4 cells
-× 3 runs (opus-low, opus-medium, opus55-low, opus55-medium), CC 2.1.280. Cifrele din `r7/cells.md`
-(agregat pe 3 rulări, medie, min-max).
+Protocol: same "simple" task as r2–r4, base `bcb7075` pinned (master had advanced since), 4 cells
+x 3 runs (opus-low, opus-medium, opus55-low, opus55-medium), CC 2.1.280. Numbers from `r7/cells.md`
+(aggregated over 3 runs, average, min-max).
 
-| celulă | model | efort | $ mediu (min–max) | durată | calls | capcana I7 (recunoscut/căzut) | abateri reale medii | eval ok/fail |
+| cell | model | effort | avg $ (min-max) | duration | calls | I7 trap (caught/missed) | avg real deviations | eval ok/fail |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| opus-low | claude-opus-5 | low | 2,53 (2,37–2,72) | 6m15s | 52 (49–53) | căzut 2/3 (r6, r7) | ~3 + sed/markup | 3/3 ok, capcana nedeclarată 2/3 |
-| opus-medium | claude-opus-5 | medium | 3,19 (2,99–3,31) | 8m02s | 64 (61–68) | căzut 2/3 (r6, r7) | ~3,3 + comentarii | 3/3 ok, capcana nedeclarată 2/3 |
-| opus55-low | claude-opus-5-5 | low | 1,36 (1,33–1,39) | 3m53s | 32 (31–33) | recunoscut 3/3 | ~2 (Lightbox, eager) | 3/3 ok |
-| opus55-medium | claude-opus-5-5 | medium | 1,55 (1,43–1,70) | 4m23s | 37 (33–43) | recunoscut 3/3 | ~0,7 (r7 = OK) | 3/3 ok |
+| opus-low | claude-opus-5 | low | 2.53 (2.37-2.72) | 6m15s | 52 (49-53) | missed 2/3 (r6, r7) | ~3 + sed/markup | 3/3 ok, undeclared trap 2/3 |
+| opus-medium | claude-opus-5 | medium | 3.19 (2.99-3.31) | 8m02s | 64 (61-68) | missed 2/3 (r6, r7) | ~3.3 + comments | 3/3 ok, undeclared trap 2/3 |
+| opus55-low | claude-opus-5-5 | low | 1.36 (1.33-1.39) | 3m53s | 32 (31-33) | caught 3/3 | ~2 (Lightbox, eager) | 3/3 ok |
+| opus55-medium | claude-opus-5-5 | medium | 1.55 (1.43-1.70) | 4m23s | 37 (33-43) | caught 3/3 | ~0.7 (r7 = OK) | 3/3 ok |
 
-Toate cele 12 rulări: check 0/0/0, zero NOT RUN pe maxTurns/hook.
+All 12 runs: check 0/0/0, zero NOT RUN on maxTurns/hook.
 
-### Sub-tabel: auditor high vs medium (12 perechi)
+### Sub-table: auditor high vs medium (12 pairs)
 
-| relație | frecvență | exemple |
+| relation | frequency | examples |
 | --- | --- | --- |
-| medium ⊆ high | 10/12 | majoritatea diff-urilor mecanice (Lightbox, spații, comentarii) |
-| medium > high | 2/12 | I7 redenumire forțată (r7 opus-medium); eager în buclă (r6 opus-low) |
-| capcana I7 prinsă | high 1× (r7 opus-low), medium 1× (r7 opus-medium) | ratată de ambii în 3/4 diff-uri cu capcana (r6 ×2, r7 opus-low) |
+| medium subset of high | 10/12 | most mechanical diffs (Lightbox, spacing, comments) |
+| medium > high | 2/12 | I7 forced rename (r7 opus-medium); eager in loop (r6 opus-low) |
+| I7 trap caught | high 1x (r7 opus-low), medium 1x (r7 opus-medium) | missed by both in 3/4 diffs with the trap (r6 x2, r7 opus-low) |
 
-Confound-uri: grader-ul care a scris această sinteză rulează el însuși pe Opus 5.5; starea repo-ului
-(`bcb7075`) diferă de cea din r2–r4, deci costurile/duratele nu sunt direct comparabile între loturi;
-Claude Code 2.1.280 (altă versiune decât r2–r4); CLAUDE.md-ul repo-ului țintă e moștenit de toate
-celulele, neschimbat; cache-ul de prompt nu a fost controlat între rulări.
+Confounds: the grader that wrote this summary itself runs on Opus 5.5; the repo state
+(`bcb7075`) differs from r2-r4, so costs/durations are not directly comparable across batches;
+Claude Code 2.1.280 (a different version than r2-r4); the target repo's CLAUDE.md is inherited by
+every cell, unchanged; prompt cache was not controlled between runs.
 
-Verdict pe cele 3 ipoteze: (1) implementer default = Opus 5.5 low — DA, calitate mai bună la ~55%
-din costul Opus 5. (2) medium doar la task complicat — DA, pe „simplu" medium nu adaugă nimic peste
-low (doar +15% cost). (3) auditor medium poate ajunge la high — PARȚIAL: bun pe abateri mecanice și
-fără false pozitive noi, dar ratează capcanele de logică (I7) la fel ca high pe diff-uri complexe.
+Verdict on the 3 hypotheses: (1) implementer default = Opus 5.5 low — YES, better quality at ~55%
+of Opus 5's cost. (2) medium only for complicated tasks — YES, on "simple" medium adds nothing over
+low (only +15% cost). (3) auditor medium can reach high — PARTIALLY: good on mechanical deviations
+and no new false positives, but misses logic traps (I7) just like high does on complex diffs.
 
 ## 2026-09-02 — orchestrator (Fable 5.1): effort medium vs high, real task T-metrics
 
