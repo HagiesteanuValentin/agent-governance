@@ -1,7 +1,7 @@
 ---
 name: auditor
 description: The auditor. Reads a delivery's diff in its own context and reports only the deviations from the brief, from DECISIONS and from the definition of done. Read-only, plus mechanical fixes (≤20 lines/file, ≤3 files) via Edit. Used by the orchestrator on large diffs, so the orchestrator does not have to read them directly.
-model: opus
+model: claude-opus-5-5
 effort: high
 maxTurns: 60
 permissionMode: acceptEdits

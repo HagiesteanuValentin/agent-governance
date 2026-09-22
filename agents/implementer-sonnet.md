@@ -1,6 +1,6 @@
 ---
 name: implementer-sonnet
-description: The cheap implementer (Sonnet 5, high effort, 100 calls) for briefs with a cheap verifier — CSS, markup, config, docs, mechanical items, scripts. Not for debugging or multi-file JS/TS logic. Identical to implementer-max in its rules.
+description: RETIRED v1.9 (Opus 5.5 low is cheaper and faster, r2–r7); kept for experiments. The cheap implementer (Sonnet 5, high effort, 100 calls) for briefs with a cheap verifier — CSS, markup, config, docs, mechanical items, scripts. Not for debugging or multi-file JS/TS logic. Identical to implementer-max in its rules.
 model: sonnet
 effort: high
 maxTurns: 100

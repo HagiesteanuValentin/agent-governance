@@ -10,18 +10,15 @@ session only.
   change scope silently.
 
 ## Agents
-- explorer(-max), implementer(-complex/-max/-sonnet), scripter(-complex), scribe, auditor,
+- explorer(-max), implementer(-complex/-max), scripter(-complex), scribe, auditor,
   design-lead(-expert) only through /polish, refiner(-complex) only through /refine — nothing
   else without my OK.
 - Models: explorer* Sonnet 5 medium, read-only (max: report ≤6k, table-shaped answers) ·
-  auditor Opus 5 high · implementer Opus 5 low, DEFAULT for any brief, including logic ·
-  implementer-complex Opus 5 medium, chosen AT PLAN for multi-file logic, non-trivial verifier
-  or declared debugging · implementer-max Opus 5 high · implementer-sonnet Sonnet 5 high ·
+  auditor Opus 5.5 high · implementer Opus 5.5 low, DEFAULT for any brief, including logic ·
+  implementer-complex Opus 5.5 medium, chosen AT PLAN for multi-file logic, non-trivial verifier
+  or declared debugging · implementer-max Opus 5.5 high ·
   scripter Sonnet 5 high · scripter-complex Opus 5 medium.
 - maxTurns: implementer* 100 (max 120), scripter* 80-100, explorer-max 60.
-- implementer-sonnet ONLY with a cheap verifier (script, build, test, grep), no debugging, no
-  cross-file JS/TS logic: CSS, markup, config, docs, mechanical items. AT PLAN TIME. Logic
-  deviations at audit → implementer-max; SendMessage to Sonnet only for mechanical ones.
 - Light tasks (docs, HANDOFF, renames, one-line fixes) → scribe, given the target SECTIONS
   (heading, range), not whole files.
 
@@ -112,8 +109,8 @@ session only.
 - Agent cache expires at 5 min; SendMessage after audit ≈ rewriting context (80k ≈ $0.50
   Opus), cheaper than a new agent (only past 150k, implementer-max's cap, or unrelated fix).
   Auditor starts right after the report, no main text.
-- ≤2 re-sends to implementer per task (3 runs total); one implementer-sonnet,
-  implementer-complex or scripter run counts toward them.
+- ≤2 re-sends to implementer per task (3 runs total); one implementer-complex or scripter
+  run counts toward them.
 - SendMessage to a live agent is not a re-send; it's the first option for small deviations.
 - ≤3 explorer runs per task, can run parallel.
 - An agent stopped by `maxTurns` = partial output; continue it ONCE via SendMessage (sub-agents

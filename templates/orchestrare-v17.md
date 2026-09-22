@@ -7,7 +7,7 @@ base rules in `orchestrare.md` still apply; this file only adds/overrides what f
 Call the `advisor` Agent MANDATORY when any: (a) ≥2 briefs carry JS/TS logic · (b) hooks,
 live settings/config, data migration · (c) the user writes risky/complex/advisor · (d) any
 implementer-complex, implementer-max, or scripter-complex brief · (e) ≥3 briefs · (f)
-implementers in parallel or worktree. Optional only at 1–2 scribe/implementer-sonnet/simple
+implementers in parallel or worktree. Optional only at 1–2 scribe/simple
 implementer briefs. Print one line in main: `advisor: <reason a/b/c/d/e/f>`.
 
 ## Advisor flow

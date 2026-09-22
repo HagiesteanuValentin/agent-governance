@@ -48,15 +48,12 @@ The orchestrator plans, writes briefs, audits diffs, reports. It does not write 
 else runs in a disposable subagent context on the cheapest model that can do the job. Only
 conclusions cross back.
 
-There are four executors. `implementer` (Opus 5, low effort, 100 calls) is the DEFAULT for
-any brief, logic included. `implementer-complex` (Opus 5, medium effort, 100 calls) is chosen
+There are three executors. `implementer` (Opus 5.5, low effort, 100 calls) is the DEFAULT for
+any brief, logic included. `implementer-complex` (Opus 5.5, medium effort, 100 calls) is chosen
 at plan time for multi-file logic, a non-trivial verifier, or declared debugging.
-`implementer-sonnet` (Sonnet 5, high effort, 100 calls) is chosen
-at plan time only for briefs with a cheap checker (a `verifica-*.mjs` script, build, test, a
-grep that catches failure) and no cross-file JS/TS debugging. `implementer-max` (Opus, high
+`implementer-max` (Opus 5.5, high
 effort, 120 calls) is an escalation, not a default: only a re-send after a failed audit on
-the same brief, or debugging declared at plan time with a written reason; a logic deviation
-at audit on Sonnet work goes to `implementer-max`, not a second Sonnet run. Worker turns and
+the same brief, or debugging declared at plan time with a written reason. Worker turns and
 tokens are not a cost to save: the worker's
 context dies at the end of the run and only a ≤1,500-character report reaches the
 orchestrator. The plan file holds the briefs as `## Brief N` sections; the `Agent` prompt
@@ -103,7 +100,7 @@ turns from 62 to 11 (5 of them residual). v1.6 (2026-09-02) added `bash-mare.sh`
 notes, not published. Smoke-tested live 2026-09-02: deny hooks
 enforce, ask hooks (commit gate, live-agent cap) are advisory under auto permission mode by
 design; v1.6 is tuned for Fable 5.1 as orchestrator. v1.6.1 (2026-09-02) moved the default
-implementer to Opus 5 low effort after the "simplu" experiment — see `docs/experiments.md`
+implementer to Opus 5.5 low effort after the "simplu" experiment — see `docs/experiments.md`
 «r2–r4 results»: opus-low audit 4/4/4 and eval 11/0 in all three lots at a mean $2.35 per
 lot, vs opus-medium 4/4/3, eval 9–10/11, $2.52 (confounds listed in the same section); added
 `implementer-complex` (Opus medium) as the plan-time choice for multi-file logic.

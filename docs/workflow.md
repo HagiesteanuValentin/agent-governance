@@ -19,7 +19,7 @@ project has its own HANDOFF / PATTERNS / DECISIONS.
   | `implementer` | expensive | low | 100 | default for any brief, including logic |
   | `implementer-complex` | expensive | medium | 100 | plan-time choice for multi-file logic / declared debugging |
   | `implementer-max` | expensive | high | 120 | escalation only: re-send after a failed audit, or debugging declared at plan time |
-  | `implementer-sonnet` | cheap (sonnet) | high | 100 | briefs with a cheap checker only, no cross-file JS/TS debugging |
+  | `implementer-sonnet` | cheap (sonnet) | high | 100 | retired v1.9 — briefs with a cheap checker only, no cross-file JS/TS debugging |
   | `scripter` / `scripter-complex` | cheap / expensive | high / medium | 80 / 100 | write + run a one-off or reusable script under `scripts/` before repetitive edits; log it in `scripts/SCRIPTS.md` |
   | `scribe` | cheap | low | 40 | docs, renames, one-line fixes |
   | `auditor` | expensive | high | 60 | diffs over 150 lines / 3 files / new JS logic; reads, plus mechanical fixes via Edit (v1.4.1: tested against medium, medium misses silent deletions — stays high) |
