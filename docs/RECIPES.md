@@ -160,6 +160,22 @@ big heredocs written straight into the project — the thresholds are `BIG_LINES
 read) and `BODY_LINES=20` (heredoc lines).
 </content>
 
+## Complex cell batch (r8+)
+`MAMA=<project> BASE=<sha> bash scripts/cell-setup.sh complex rN` then
+`bash scripts/cell-brief.sh complex rN metrics-local/experiments/complex/input/brief-1.template.md`.
+Launch both cells (e.g. cell-opus55-low, cell-opus55-medium) in one message.
+Collect diffs: `git -C <worktree> diff master > rN/diff-<cell>.patch`; make blind copies
+A/B plus a mapping.txt kept out of the auditors' sight; cell reports saved as
+rN/raport-<cell>.md.
+Run 4 auditors (auditor and auditor-medium, each on A and B, same prompt, read-only);
+each writes its report with `cat >` to rN/audit-<A|B>-<high|medium>.md.
+Metrics: `python3 tools/cell_metrics.py --subagents-dir <session>/subagents --agent-prefix
+cell-opus55 --min-calls 2 --md --out-dir results` — no `--first-run`; map rows r1..r3 to
+rN..rN+2 by hand.
+Teardown: `MAMA=<project> bash scripts/cell-teardown.sh complex rN --yes`.
+Trap rule: pick a trap the verifier cannot check directly (r8-r10's verifier leaked the
+answer for a checkable trap).
+
 ## Sync offline_telemetry_script
 Manual; the public export script does not cover it:
 copy `tools/session_metrics.py` over `session_metrics.py` in the offline_telemetry_script checkout,
