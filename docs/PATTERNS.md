@@ -24,6 +24,13 @@ Records in `metrics-local/` are not re-analyzed on every run, so a new field is 
 the old ones. In aggregates (averages, $/edit) skip them, don't treat them as 0: the numerator
 would come from all sessions, the denominator only from the new ones. Tables show `—`.
 
+## Gate-ul de effort — fără țintă la start
+Gate-ul PreToolUse citește un fișier țintă per sesiune, dar niciun hook SessionStart nu-l
+scrie — cade pe settings, pe care `/effort` tocmai le-a rescris, deci fără deny la începutul
+sesiunii. Fix posibil: un rând în SessionStart (`effort-phase.sh medium`), dar sparge
+înghețul hook-urilor (DECIZII 09.09). Capcană: `claude -p` dintr-un agent rescrie
+settings=medium la SessionEnd-ul lui → deny neașteptat la mijlocul sesiunii.
+
 ## Claude Code — limits verified in docs (2026-09-02)
 1. Hook output ≤10,000 characters PER hook command; above that → file + preview. Alternatives
    with no hard cap: CLAUDE.md `@import`, `.claude/rules/`.

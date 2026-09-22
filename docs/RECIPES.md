@@ -89,6 +89,8 @@ only in `scripts/evalueaza-simplu.mjs`, never exposed to the cells.
 In fish, `--exclude-agent` is given repeatedly right in the command, not through a variable
 with spaces (argparse sees it as a single argument). `--results-dir` must contain the JSON
 files of ALL rounds in the session (copy `r2/*.json` into `r3/`, etc.), otherwise status `-`.
+Pin the base: `MAMA=<repo> BASE=<sha> cell-setup.sh <task> <run>`; evaluator ignores the I7
+trap — read audits.
 
 ## v1.6 hooks smoke test and resuming the batch
 Smoke, a NEW session, in this order:
