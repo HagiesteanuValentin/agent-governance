@@ -364,6 +364,30 @@ postmortem (s10) main read 64k characters before the first agent because "the ta
 fit in 2k"; on another (s1) two `implementer-max` runs cost $7.8 for 9 of 10 deviations that
 were mechanical.
 
+### Autonomous mode
+
+For runs where the operator steps away. A `UserPromptSubmit` hook (`hooks/autonom.sh`)
+sets a per-session marker when the prompt contains `leaving`/`unsupervised` (RO:
+`plec`/`nesupravegheat`) or the case-sensitive `AUTONOMOUS MODE`/`MOD AUTONOM`. Once set, it
+injects a short rule block into the session: no clarifying questions, no plan mode, pick the
+conservative option over any cap, ignore context/usage-cap warnings, and finish
+handoff/commit/push if the operator asked for them before leaving.
+
+Enforcement is structural, not a suggestion in the prompt: a `PreToolUse` gate denies
+`AskUserQuestion`/`EnterPlanMode` while the marker exists, and `agenti-vii.sh` stops emitting
+`ask` verdicts for the duration.
+
+The marker clears on any human prompt that carries no autonomous-mode signal. Subagent
+hand-backs (`<task-notification>`) are explicitly ignored for both triggering and clearing,
+since the harness runs `UserPromptSubmit` on those too — an agent's report merely quoting
+the trigger words used to start the mode, and the next hand-back used to stop it.
+
+The trigger is case-sensitive so that an ordinary lower-case mention of "autonomous mode" in
+a prompt does not activate it by accident.
+
+Tests: `bash hooks/test-autonom.sh` (23 cases, EN/RO), also runnable against the live copy
+with `HOOK=~/.claude/hooks/autonom.sh`.
+
 ## Measured results
 
 From `metrics/baseline-2026-08.md`, regenerated 2026-08-30 over 51 kept sessions
