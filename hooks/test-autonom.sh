@@ -31,6 +31,18 @@ def call(mode, payload, raw=None):
     return p.returncode, p.stdout.strip(), p.stderr.strip()
 
 
+def started(out):
+    return "AUTONOMOUS MODE started" in out or "MOD AUTONOM pornit" in out
+
+
+def stopped(out):
+    return "AUTONOMOUS MODE stopped" in out or "MOD AUTONOM oprit" in out
+
+
+def any_of(body, *parts):
+    return any(p in body for p in parts)
+
+
 def prompt(sid, text, extra=None):
     d = {"session_id": sid, "prompt": text}
     if extra:
@@ -55,20 +67,20 @@ def gate(sid, tool):
 rc, out, err = prompt("s1", "/handoff leaving")
 case("'/handoff leaving' -> marker + text AUTONOMOUS MODE",
      rc == 0 and not err and os.path.exists(marker("s1"))
-     and out.startswith("AUTONOMOUS MODE started") and "ORCHESTRATION" in out,
+     and started(out) and "ORCHESTRATION" in out,
      "rc=%d out=%r" % (rc, out[:60]))
-case("REGULI has at most 8 lines", len(out.splitlines()) <= 8,
+case("REGULI has at most 9 lines", len(out.splitlines()) <= 9,
      "%d lines" % len(out.splitlines()))
 
 # 2) "unsupervised" also starts it
 rc, out, _ = prompt("s2", "run the suites, the laptop stays UNSUPERVISED")
 case("'unsupervised' (caps) -> marker",
-     rc == 0 and os.path.exists(marker("s2")) and "AUTONOMOUS MODE started" in out, out[:40])
+     rc == 0 and os.path.exists(marker("s2")) and started(out), out[:40])
 
 # 2b) Romanian signal: "plec" also starts it
 rc, out, _ = prompt("s2b", "ma duc, plec de aici")
 case("'plec' (RO) -> marker",
-     rc == 0 and os.path.exists(marker("s2b")) and "AUTONOMOUS MODE started" in out, out[:40])
+     rc == 0 and os.path.exists(marker("s2b")) and started(out), out[:40])
 
 # 3) whole-word regex: "leavings" does not match
 rc, out, _ = prompt("s3", "leavings scattered on the shore")
@@ -83,13 +95,15 @@ case("no signal, no marker -> no output",
 # 5) gate with marker -> deny (AskUserQuestion)
 got, body = gate("s1", "AskUserQuestion")
 case("AskUserQuestion + marker -> deny",
-     got == "deny" and "the user is away" in body and "don't retry" in body,
+     got == "deny" and any_of(body, "the user is away", "Vali nu e la PC")
+     and any_of(body, "don't retry", "nu reîncerca"),
      "%s %s" % (got, body))
 
 # 6) gate with marker -> deny (EnterPlanMode)
 got, body = gate("s1", "EnterPlanMode")
 case("EnterPlanMode + marker -> deny",
-     got == "deny" and "no plan mode" in body and "don't retry" in body,
+     got == "deny" and any_of(body, "no plan mode", "fără plan mode")
+     and any_of(body, "don't retry", "nu reîncerca"),
      "%s %s" % (got, body))
 
 # 7) gate without marker -> allow
@@ -99,7 +113,7 @@ case("gate without marker -> no output", got == "allow", "%s %s" % (got, body))
 # 8) any human prompt with no signal stops it
 rc, out, _ = prompt("s1", "thanks, let's move to something else")
 case("no signal + existing marker -> marker removed + 'stopped'",
-     rc == 0 and not os.path.exists(marker("s1")) and "AUTONOMOUS MODE stopped" in out,
+     rc == 0 and not os.path.exists(marker("s1")) and stopped(out),
      "out=%r" % out)
 got, _ = gate("s1", "AskUserQuestion")
 case("after stop, gate lets it through", got == "allow", got)
@@ -123,6 +137,43 @@ case("gate without session_id -> exit 0", rc == 0 and not out, "rc=%d" % rc)
 # 12) marker is per session: s2 stays on while s1 is off
 got, _ = gate("s2", "AskUserQuestion")
 case("marker per session", got == "deny", got)
+
+# 13) task-notification hand-back without signal -> marker stays, no output
+prompt("s7", "leaving")
+rc, out, _ = prompt("s7", "<task-notification><result>no signal here</result></task-notification>")
+case("task-notification with marker -> marker stays, no output",
+     rc == 0 and not out and os.path.exists(marker("s7")), "out=%r" % out)
+
+# 14) task-notification quoting the signal -> no marker
+rc, out, _ = prompt("s8", "<task-notification><result>regex plec|nesupravegheat</result></task-notification>")
+case("task-notification with signal -> no marker, no output",
+     rc == 0 and not out and not os.path.exists(marker("s8")), "out=%r" % out)
+
+# 15) uppercase MOD AUTONOM starts it
+rc, out, _ = prompt("s9", "MOD AUTONOM")
+case("'MOD AUTONOM' -> starts", rc == 0 and os.path.exists(marker("s9")) and started(out), out[:40])
+
+# 16) lowercase / 'modul autonom' does not start it
+rc, out, _ = prompt("s10", "mod autonom")
+rc2, out2, _ = prompt("s10", "modul autonom e stricat")
+case("'mod autonom' / 'modul autonom' -> no start",
+     not out and not out2 and not os.path.exists(marker("s10")), "out=%r %r" % (out, out2))
+
+# 17) origin.kind == task-notification without tag -> ignored
+prompt("s11", "leaving")
+rc, out, _ = prompt("s11", "plain text", {"origin": {"kind": "task-notification"}})
+case("origin.kind task-notification -> ignored",
+     rc == 0 and not out and os.path.exists(marker("s11")), "out=%r" % out)
+
+# 18) human prompt mentioning the tag mid-text -> starts
+rc, out, _ = prompt("s12", "plec, hook-ul rulează pe <task-notification>")
+case("tag mid-text + signal -> starts",
+     rc == 0 and os.path.exists(marker("s12")) and started(out), out[:40])
+
+# 19) origin as a string -> no crash, normal behaviour
+rc, out, err = prompt("s13", "leaving", {"origin": "x"})
+case("origin string -> normal start",
+     rc == 0 and not err and os.path.exists(marker("s13")) and started(out), "err=%r" % err)
 
 shutil.rmtree(TMP, ignore_errors=True)
 failed = [r for r in results if not r[1]]

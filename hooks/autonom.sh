@@ -21,11 +21,13 @@ REGULI = (
     "If you're in plan mode now: ExitPlanMode immediately, while the user is still here.\n"
     "At the end do what was asked (handoff/commit/push, if requested) and close "
     "the turn without waiting.\n"
-    "Push rejected: report it, don't insist."
+    "Push rejected: report it, don't insist.\n"
+    "Ignore the 150k/250k context warnings and the usage-cap pause (94%); on resume continue from config."
 )
 
 # 🔴 the hook's own name is excluded from signals: it would match any prompt about this hook — DECIZII «Mod autonom (04.09.2026)»
 SEMNAL = re.compile(r"\b(plec|nesupravegheat|leaving|unsupervised)\b", re.IGNORECASE)
+SEMNAL_STRICT = re.compile(r"\b(MOD AUTONOM|AUTONOMOUS MODE)\b")
 
 session_id = str(d.get("session_id") or "")
 if not session_id:
@@ -37,7 +39,13 @@ if MODE == "prompt":
     if d.get("agent_id"):
         sys.exit(0)
     prompt = str(d.get("prompt") or "")
-    if SEMNAL.search(prompt):
+    origin = d.get("origin")
+    # 🔴 UserPromptSubmit also fires on <task-notification> hand-backs — PATTERNS «Autonomous-mode hook stops on agent hand-back»
+    if (prompt.lstrip().startswith("<task-notification>")
+            or (isinstance(origin, dict) and origin.get("kind") == "task-notification")
+            or d.get("turnOrigin") == "task_notification"):
+        sys.exit(0)
+    if SEMNAL.search(prompt) or SEMNAL_STRICT.search(prompt):
         try:
             os.makedirs(MARKER_DIR, exist_ok=True)
             with open(MARKER, "w") as fh:

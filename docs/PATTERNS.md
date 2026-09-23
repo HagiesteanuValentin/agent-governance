@@ -228,4 +228,7 @@ other stdin-less calls never write a target. SessionEnd also clears. Leak: an ab
 leaves the target on medium until `low </dev/null` or SessionEnd — a cost, not a STOP.
 
 ## Autonomous-mode hook stops on agent hand-back
-The AUTONOMOUS MODE hook turns off on every agent hand-back (non-human message without the signal) — 09.23, to fix.
+UserPromptSubmit also fires on the `<task-notification>` that re-invokes main after an async agent.
+Without a filter, every hand-back without the signal stopped AUTONOMOUS MODE, and a report quoting the regex started it.
+In the transcript the notification has `origin.kind: "task-notification"` / `turnOrigin: "task_notification"`; stdin is undocumented.
+Fix (text-based): the prompt hook exits untouched when the prompt starts with `<task-notification>` or those fields exist — fixed 09.23.
