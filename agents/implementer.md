@@ -1,6 +1,6 @@
 ---
 name: implementer
-description: The implementer. DEFAULT for any brief, including logic, Opus 5.5 LOW effort, chosen after the "simplu" experiment (docs/experiments.md «r2–r4 results»); `implementer-complex` (Opus 5.5 medium) is picked at plan for multi-file logic or declared debugging; `implementer-max` stays the re-send after a non-conforming audit.
+description: The implementer. DEFAULT for any brief, including logic, Opus 5.5 LOW effort, chosen after the "simplu" experiment (docs/experiments.md «r2–r4 results»); `implementer-complex` (Opus 5.5 medium) is picked AT PLAN for genuinely complex tasks (non-trivial cross-file logic) OR as the 3rd run after 2 DEVIATIONS of the implementer; `implementer-max` ONLY for debugging declared at plan.
 model: claude-opus-5-5
 effort: low
 maxTurns: 100

@@ -20,6 +20,8 @@ and `/refine` (both commands run the `effort-phase.sh` hook), and the `/refine` 
 brief asks for line ranges plus per-project measurement scripts. Metrics from
 2026-09-05T14:45 (local time) onward are the ones that count for v1.8.
 
+v1.10 (2026-09-23): new defaults after r8–r16 — `auditor` runs Opus 5.5 medium, the new `auditor-complex` (high) covers new JS/TS logic in ≥2 files or a re-audit after logic deviations, `scripter` moves to Opus 5.5 low, and `implementer-complex` replaces `implementer-max` as the escalation (3rd run after 2 deviations); `implementer-max` is left for declared debugging only.
+
 ## The problem
 
 In a multi-agent Claude Code setup, the expensive orchestrator model burns its budget on
@@ -50,10 +52,10 @@ conclusions cross back.
 
 There are three executors. `implementer` (Opus 5.5, low effort, 100 calls) is the DEFAULT for
 any brief, logic included. `implementer-complex` (Opus 5.5, medium effort, 100 calls) is chosen
-at plan time for multi-file logic, a non-trivial verifier, or declared debugging.
-`implementer-max` (Opus 5.5, high
-effort, 120 calls) is an escalation, not a default: only a re-send after a failed audit on
-the same brief, or debugging declared at plan time with a written reason. Worker turns and
+at plan time for genuinely complex tasks (non-trivial cross-file logic), or as the 3rd run
+after 2 deviations of `implementer`. `implementer-max` (Opus 5.5, high
+effort, 120 calls) is neither a default nor the escalation: only debugging declared at plan
+time with a written reason. Worker turns and
 tokens are not a cost to save: the worker's
 context dies at the end of the run and only a ≤1,500-character report reaches the
 orchestrator. The plan file holds the briefs as `## Brief N` sections; the `Agent` prompt
@@ -103,7 +105,7 @@ design; v1.6 is tuned for Fable 5.1 as orchestrator. v1.6.1 (2026-09-02) moved t
 implementer to Opus 5.5 low effort after the "simplu" experiment — see `docs/experiments.md`
 «r2–r4 results»: opus-low audit 4/4/4 and eval 11/0 in all three lots at a mean $2.35 per
 lot, vs opus-medium 4/4/3, eval 9–10/11, $2.52 (confounds listed in the same section); added
-`implementer-complex` (Opus medium) as the plan-time choice for multi-file logic.
+`implementer-complex` (Opus medium) as the plan-time choice for multi-file logic (from v1.10 also the 3rd run after 2 deviations).
 
 ## v1.8.2 (2026-09-10)
 
@@ -356,7 +358,7 @@ one dossier — facts over 3k characters go to `explorer`, table-shaped answers 
 `explorer-max` (Sonnet 5 medium, 6k report cap, per-agent cap in `raport-lung.sh`). Each
 agent gets its brief as its own file, never the whole plan. After a non-compliant audit the
 order is auditor-fix → `SendMessage` to the live implementer → `implementer-max` only for
-logic deviations with a written reason. The analyzer flags `main_read_before_first_agent`,
+logic deviations with a written reason (from v1.10: `implementer-complex`; -max only for declared debugging). The analyzer flags `main_read_before_first_agent`,
 `max_without_sendmessage`, `agent_read_plan_whole`, `edit_via_bash`. Reason: on one
 postmortem (s10) main read 64k characters before the first agent because "the table didn't
 fit in 2k"; on another (s1) two `implementer-max` runs cost $7.8 for 9 of 10 deviations that
@@ -508,7 +510,7 @@ session data never leaves the machine.
 
 ```
 agents/     the agent definitions (explorer, implementer, implementer-complex, implementer-max,
-            implementer-sonnet, scripter, scripter-complex, scribe, auditor, design-lead,
+            implementer-sonnet, scripter, scripter-complex, scribe, auditor, auditor-complex, design-lead,
             design-lead-expert, refiner, refiner-complex) — model, effort, maxTurns, allowed
             tools, fixed report format
 commands/   slash commands (polish, refine, rate) — mirrors ~/.claude/commands/

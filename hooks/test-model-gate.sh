@@ -130,12 +130,12 @@ ss_env = {"HOME": ss_home, "CLAUDE_JOB_DIR": ss_home}
 env_opus = dict(ss_env, GOV_MODEL="claude-opus-5", CLAUDE_PROJECT_DIR=TMP)
 env_fable = dict(ss_env, GOV_MODEL="claude-fable-5-1", CLAUDE_PROJECT_DIR=TMP)
 rc, out, err = call(START_HOOK, start_payload, env=env_opus, args=("rules",))
-check("session-start rules on Opus: no ORCHESTRATION, with effort line",
-      rc == 0 and "=== ORCHESTRATION" not in out and "effort main" in out,
+check("session-start rules on Opus: no ORCHESTRATION, no effort line",
+      rc == 0 and "=== ORCHESTRATION" not in out and "effort main" not in out,
       "rc=%d len=%d" % (rc, len(out)))
 rc, out, err = call(START_HOOK, start_payload, env=env_opus, args=("v17",))
 check("session-start v17 on Opus: no ORCHESTRATION v1.7",
-      rc == 0 and "=== ORCHESTRATION" not in out and "effort main" in out,
+      rc == 0 and "=== ORCHESTRATION" not in out and "effort main" not in out,
       "rc=%d len=%d" % (rc, len(out)))
 rc_f, out_f, err_f = call(START_HOOK, start_payload, env=env_fable, args=("rules",))
 has_rules = os.path.isfile(os.path.expanduser("~/.claude/orchestrare.md"))

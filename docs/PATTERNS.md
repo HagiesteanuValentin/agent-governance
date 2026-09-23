@@ -27,9 +27,16 @@ would come from all sessions, the denominator only from the new ones. Tables sho
 ## Gate-ul de effort — fără țintă la start
 Gate-ul PreToolUse citește un fișier țintă per sesiune, dar niciun hook SessionStart nu-l
 scrie — cade pe settings, pe care `/effort` tocmai le-a rescris, deci fără deny la începutul
-sesiunii. Fix posibil: un rând în SessionStart (`effort-phase.sh medium`), dar sparge
-înghețul hook-urilor (DECIZII 09.09). Capcană: `claude -p` dintr-un agent rescrie
+sesiunii. Înlocuit: vezi «Effort hook is per-session only». Capcană: `claude -p` dintr-un agent rescrie
 settings=medium la SessionEnd-ul lui → deny neașteptat la mijlocul sesiunii.
+
+## Effort hook is per-session only
+`~/.claude/settings.json` is shared by every open session and Claude Code does not reload it
+live, so writing the effort there only leaks one session's phase into the others. The target
+lives in `${CLAUDE_JOB_DIR:-/tmp}/effort-target-<sid>` and is compared with `effort.level`
+from stdin; `effort-phase.sh` never reads or writes settings. SessionEnd (`end`) removes only
+that sid's files; SessionStart (`start`) only warns when a new session is not on medium.
+`effort.level` on SessionStart stdin is undocumented: if it is missing, `start` stays silent.
 
 ## Claude Code — limits verified in docs (2026-09-02)
 1. Hook output ≤10,000 characters PER hook command; above that → file + preview. Alternatives

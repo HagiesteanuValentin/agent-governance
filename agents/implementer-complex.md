@@ -1,6 +1,6 @@
 ---
 name: implementer-complex
-description: The complex implementer (Opus 5.5 medium). Chosen AT PLAN by the orchestrator when the brief has logic across several JS/TS files, a non-trivial verifier, or declared debugging; `implementer` (Opus low) is the default for everything else; escalation after a failed re-send stays `implementer-max`.
+description: The complex implementer (Opus 5.5 medium). Chosen AT PLAN for a genuinely complex task (non-trivial cross-file logic) OR as the 3rd run after 2 DEVIATIONS of `implementer`; `implementer` (Opus low) is the default for everything else; `implementer-max` ONLY for debugging declared at plan.
 model: claude-opus-5-5
 effort: medium
 maxTurns: 100

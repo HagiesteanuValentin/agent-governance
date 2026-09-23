@@ -26,38 +26,20 @@ case "$model" in
   *) gov=0 ;;
 esac
 # 🔴 SessionStart hooks run in parallel — PATTERNS «SessionStart hooks run in parallel»
-reset_effort_for_source() {
-  eph="$(dirname "$0")/effort-phase.sh"
-  # 🔴 fork/resume/compact keep effort; unknown source resets — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
-  if [ -f "$eph" ]; then
-    case "$src" in
-      resume|fork|compact) ;;
-      *) sh "$eph" medium >/dev/null 2>&1 </dev/null ;;
-    esac
-  fi
-}
 if [ "${1:-rules}" = "v17" ]; then
-  reset_effort_for_source
   if [ "$gov" = 1 ] && [ -f "$v" ]; then
     echo "=== ORCHESTRATION v1.8 (injected by SessionStart; main session only) ==="
     cat "$v"
     echo
   fi
-  s="$HOME/.claude/settings.json"
-  x=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['modelSettings']['claude-fable-5-1']['effortLevel'])" "$s" 2>/dev/null)
-  echo "effort main (settings): ${x:-unknown}"
   exit 0
 fi
 if [ "${1:-rules}" != "handoff" ]; then
-  reset_effort_for_source
   if [ "$gov" = 1 ] && [ -f "$o" ]; then
     echo "=== ORCHESTRATION (injected by SessionStart; main session only) ==="
     cat "$o"
     echo
   fi
-  s="$HOME/.claude/settings.json"
-  x=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['modelSettings']['claude-fable-5-1']['effortLevel'])" "$s" 2>/dev/null)
-  echo "effort main (settings): ${x:-unknown}"
 fi
 # In a worktree this also picks up its own mini-handoff (HANDOFF-<name>.md); on the main
 # branch, after a merge, it picks up mini-handoffs that are not consolidated yet.

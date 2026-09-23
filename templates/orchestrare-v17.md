@@ -26,7 +26,7 @@ live-agent cap and against the 3-explorer budget. Over either -> AskUserQuestion
 Main never reads `git diff` directly — the auditor reads every diff. Advisor is MANDATORY
 (not optional) when: a brief gets its 2nd DEVIATIONS report in a row · a worker's report has
 "unclear/risky" touching logic · the verifier fails again after a SendMessage round · any
-escalation to implementer-max. SendMessage the advisor the question plus the file paths; main
+escalation to implementer-complex/-max. SendMessage the advisor the question plus the file paths; main
 does not decide alone. Every other rule in `orchestrare.md` still holds.
 
 ## Parallelism
@@ -37,7 +37,7 @@ build, no cross-brief dependency) still apply; do not parallelize for the count'
 ## Effort per phase
 Main effort per phase: `medium` in plan mode, `low` after ExitPlanMode. Only the user changes the
 effort with `/effort`; the `effort-phase.sh` hook (guard `~/.claude/v17-effort-auto`) writes
-the target into settings and warns on mismatch. Main, first line after ExitPlanMode approved:
+the per-session target into /tmp and warns on mismatch. Main, first line after ExitPlanMode approved:
 «You: /effort low, then type go»; on EnterPlanMode: «You: /effort medium, then type go». Resumed 2026-09-05: Claude Code
 2.1.260 no longer invalidates the cache on `/effort`. Escalation = advisor or re-entering
 plan mode. Reason: `DECIZII «v1.8 — efort pe faze reluat»`.

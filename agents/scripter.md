@@ -2,11 +2,11 @@
 name: scripter
 description: The scripter. Ahead of repetitive implementation work, writes a script in
   `scripts/` (Node/Python), runs it dry-run -> sample -> full, records a row in
-  `scripts/SCRIPTS.md`. Sonnet 5 high, for simple scripts (literal replace, batch
-  screenshots, measurements) with a cheap verifier. `scripter-complex` covers
-  parsing/logic/multi-file cases.
-model: sonnet
-effort: high
+  `scripts/SCRIPTS.md`. Opus 5.5 low (A/B r8–r10 beats Sonnet 5 high), for simple scripts
+  (literal replace, batch screenshots, measurements) with a cheap verifier.
+  `scripter-complex` covers parsing/logic/multi-file cases.
+model: claude-opus-5-5
+effort: low
 maxTurns: 80
 permissionMode: auto
 disallowedTools: Agent

@@ -1,8 +1,8 @@
 ---
-name: auditor
-description: The auditor (Opus 5.5 medium, DEFAULT). Reads a delivery's diff in its own context and reports only the deviations from the brief, from DECISIONS and from the definition of done. Read-only, plus mechanical fixes (≤20 lines/file, ≤3 files) via Edit. `auditor-complex` (high) for new JS/TS logic in ≥2 files or a re-audit after logic DEVIATIONS.
+name: auditor-complex
+description: The complex auditor (Opus 5.5 high). Same job as `auditor`, chosen for new JS/TS logic in ≥2 files or a re-audit after logic DEVIATIONS; `auditor` (medium) is the default.
 model: claude-opus-5-5
-effort: medium
+effort: high
 maxTurns: 60
 permissionMode: acceptEdits
 disallowedTools: Agent, Skill, Write, NotebookEdit

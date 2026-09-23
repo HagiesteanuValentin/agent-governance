@@ -355,7 +355,9 @@ def gate_case(name, payload, expect_deny, guard=True, want="medium", target=None
                     "%s (rc=%d)" % (out[:80] or "empty", p.returncode)))
 
 gate_case("gate mismatch -> deny", {"session_id": "g1", "tool_name": "Bash",
-                                    "effort": {"level": "low"}}, True)
+                                    "effort": {"level": "low"}}, True, target="medium")
+gate_case("gate without target (settings ignored) -> empty", {"session_id": "g0", "tool_name": "Bash",
+                                    "effort": {"level": "low"}}, False)
 gate_case("gate match -> empty", {"session_id": "g2", "tool_name": "Bash",
                                   "effort": {"level": "medium"}}, False)
 gate_case("gate in sub-agent -> empty", {"session_id": "g3", "tool_name": "Bash",
@@ -413,30 +415,37 @@ eph_hold_case("hold + EnterPlanMode medium -> hold kept", "medium", EPH_ENTER, "
 eph_hold_case("manual low without hold -> no target write", "low", "", "none", None, pre="none")
 eph_hold_case("manual medium -> no target write", "medium", "", "low", None, pre="low")
 
-# ---------------------------------------------------------------- session-start (effort reset)
-SS_HOOK = os.path.join(HOOKS, "session-start.sh")
+# ---------------------------------------------------------------- effort-phase start/end/check
+def eph_mode(home, mode, payload):
+    env = dict(os.environ, HOME=home, CLAUDE_PROJECT_DIR=home, CLAUDE_JOB_DIR=home)
+    return subprocess.run(["sh", EPH_HOOK, mode], input=json.dumps(payload), text=True,
+                          capture_output=True, env=env)
 
-def ss_case(name, stdin_text, expect):
-    home = tempfile.mkdtemp(prefix="ss-home-", dir=TMP)
+def eph_home():
+    home = tempfile.mkdtemp(prefix="eph-s-", dir=TMP)
     os.makedirs(os.path.join(home, ".claude"))
     open(os.path.join(home, ".claude", "v17-effort-auto"), "w").close()
-    with open(os.path.join(home, ".claude", "settings.json"), "w") as fh:
-        json.dump({"modelSettings": {"claude-fable-5-1": {"effortLevel": "low"}}}, fh)
-    env = dict(os.environ, HOME=home, CLAUDE_PROJECT_DIR=home, CLAUDE_JOB_DIR=home)
-    p = subprocess.run(["sh", SS_HOOK, "rules"], input=stdin_text, text=True,
-                       capture_output=True, env=env)
-    got = ""
-    for line in p.stdout.splitlines():
-        if line.startswith("effort main (settings):"):
-            got = line.split(":", 1)[1].strip()
-    results.append((name, p.returncode == 0 and got == expect,
-                    "%s (rc=%d)" % (got or "none", p.returncode)))
+    return home
 
-ss_case("session-start startup -> medium", json.dumps({"source": "startup"}), "medium")
-ss_case("session-start stdin gol -> medium", "", "medium")
-ss_case("session-start fork -> low", json.dumps({"source": "fork"}), "low")
-ss_case("session-start resume -> low", json.dumps({"source": "resume"}), "low")
-ss_case("session-start compact -> low", json.dumps({"source": "compact"}), "low")
+h = eph_home()
+p = eph_mode(h, "start", {"session_id": "s1", "effort": {"level": "low"}})
+results.append(("effort-phase start low -> warns", "/effort medium" in p.stdout, p.stdout.strip()[:60] or "empty"))
+p = eph_mode(h, "start", {"session_id": "s1", "effort": {"level": "medium"}})
+results.append(("effort-phase start medium -> silent", p.stdout.strip() == "", p.stdout.strip()[:60] or "empty"))
+eph_mode(h, "low", {"session_id": "e1", "tool_name": "ExitPlanMode", "effort": {"level": "medium"}})
+eph_mode(h, "medium", {"session_id": "e2", "tool_name": "EnterPlanMode", "effort": {"level": "medium"}})
+w1 = eph_mode(h, "check", {"session_id": "e1", "tool_name": "Bash", "effort": {"level": "medium"}}).stdout
+w2 = eph_mode(h, "check", {"session_id": "e1", "tool_name": "Bash", "effort": {"level": "medium"}}).stdout
+w3 = eph_mode(h, "check", {"session_id": "e2", "tool_name": "Bash", "effort": {"level": "medium"}}).stdout
+results.append(("effort-phase check: one WARN per sid, other sid silent",
+                "WARN" in w1 and w2 == "" and w3 == "", "%r %r %r" % (w1[:20], w2, w3)))
+eph_mode(h, "end", {"session_id": "e1", "hook_event_name": "SessionEnd"})
+left = sorted(os.listdir(h))
+results.append(("effort-phase end removes only its sid",
+                not any(x.endswith("-e1") for x in left) and "effort-target-e2" in left, str(left)))
+p = eph_mode(h, "low", {"session_id": "e3", "tool_name": "ExitPlanMode"})
+results.append(("effort-phase never touches settings.json",
+                not os.path.exists(os.path.join(h, ".claude", "settings.json")), "ok"))
 
 # ---------------------------------------------------------------- timing (1 MB transcript)
 def timed(hook, payload, n=3):

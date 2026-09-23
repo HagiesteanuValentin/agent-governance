@@ -172,7 +172,7 @@ symlink into the patch).
 Pipe the check/tsc/render log through `sed` replacing the worktree path and
 `cell-opus55-(low|medium)` with `CELL` before showing it to evaluators (r11 leaked the
 cell name to evaluators).
-Run 4 auditors (auditor and auditor-medium, each on A and B, same prompt, read-only);
+Run 4 auditors (auditor-complex and auditor, each on A and B, same prompt, read-only);
 each writes its report with `cat >` to rN/audit-<A|B>-<high|medium>.md.
 `--dosar docs/dosar/<slug>` = directory copied to `<WT>/docs/dosar/<task>/` (`complex` here);
 the cell gets a dossier like the real implementer; the cell prompt never names the trap.

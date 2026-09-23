@@ -10,14 +10,14 @@ session only.
   change scope silently.
 
 ## Agents
-- explorer(-max), implementer(-complex/-max), scripter(-complex), scribe, auditor,
+- explorer(-max), implementer(-complex/-max), scripter(-complex), scribe, auditor(-complex),
   design-lead(-expert) only through /polish, refiner(-complex) only through /refine — nothing
   else without my OK.
 - Models: explorer* Sonnet 5 medium, read-only (max: report ≤6k, table-shaped answers) ·
-  auditor Opus 5.5 high · implementer Opus 5.5 low, DEFAULT for any brief, including logic ·
-  implementer-complex Opus 5.5 medium, chosen AT PLAN for multi-file logic, non-trivial verifier
-  or declared debugging · implementer-max Opus 5.5 high ·
-  scripter Sonnet 5 high · scripter-complex Opus 5 medium.
+  auditor Opus 5.5 medium (-complex high) · implementer Opus 5.5 low, DEFAULT ·
+  implementer-complex Opus 5.5 medium, at plan: cross-file logic, or 3rd run after 2
+  DEVIATIONS · implementer-max Opus 5.5 high, declared debugging only ·
+  scripter Opus 5.5 low · scripter-complex Opus 5 medium.
 - maxTurns: implementer* 100 (max 120), scripter* 80-100, explorer-max 60.
 - Light tasks (docs, HANDOFF, renames, one-line fixes) → scribe, given the target SECTIONS
   (heading, range), not whole files.
@@ -43,10 +43,9 @@ session only.
   directly, reported as `FIXED` with the hunk.
   2. Everything else → SendMessage to the SAME implementer, all in one message, cap of 3
   messages per agent. You fix it yourself only for one isolated deviation under ~20 lines.
-  3. implementer-max ONLY when the deviation is LOGIC and: (a) it already failed once via
-  SendMessage, (b) its context is >150k or the agent was closed by the hook, or (c) debugging
-  was declared at plan time.
-- Before any max you write one line in main: `escalation: <the logic deviation> · <why not
+  3. After 2 LOGIC deviations (failed SendMessage, >150k, closed) → implementer-complex;
+  -max: declared debugging.
+- Before escalating (-complex/-max), one line: `escalation: <logic deviation> · <why not
   SendMessage>` — the analyzer flags `max_without_sendmessage`.
 
 ## The brief
@@ -83,7 +82,7 @@ session only.
   → you ask for that script adapted, not a new one.
 - The scripter brief gives ≥2 before→after examples and the definition of done in numbers.
   The next implementer gets the script's path + only the leftover non-mechanical work. A
-  verifier failing after a SendMessage → implementer-max, not a second scripter.
+  verifier failing after a SendMessage → implementer-complex, not a second scripter.
 - Several briefs on the same target: the reusable verification script comes from design-lead
   or from brief 1; the following ones ONLY run it, with the "before" numbers from the plan.
 - Decision dossier: a brief that needs >300 lines of material before the first Edit → brief 0
@@ -107,7 +106,7 @@ session only.
 
 ## Caps
 - Agent cache expires at 5 min; SendMessage after audit ≈ rewriting context (80k ≈ $0.50
-  Opus), cheaper than a new agent (only past 150k, implementer-max's cap, or unrelated fix).
+  Opus), cheaper than a new agent (only past 150k, implementer-complex's cap, or unrelated fix).
   Auditor starts right after the report, no main text.
 - ≤2 re-sends to implementer per task (3 runs total); one implementer-complex or scripter
   run counts toward them.
@@ -126,7 +125,7 @@ session only.
   same file · a grep on each "unclear/risky" from the report.
 - In main, `git diff` ONLY with `--stat`; no `cat` on whole files.
 - Threshold: ≤150 lines changed AND ≤3 files AND no `.js/.ts/.mjs` file with new logic → you
-  read `git diff` directly, once; anything else → auditor. It reads the full diff and reports
+  read `git diff` directly, once; anything else → auditor (-complex: new JS/TS logic ≥2 files/re-audit). It reads the full diff and reports
   deviations in ≤1.5k; you read `git diff --stat` + the report + the flagged files.
 - The auditor dies with the delivery; on a re-audit for the same task, continue the same
   agent.

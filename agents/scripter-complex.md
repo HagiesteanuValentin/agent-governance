@@ -1,8 +1,8 @@
 ---
 name: scripter-complex
 description: The complex scripter (Opus 5 medium). Parsing, multi-file logic, a non-trivial
-  verifier, debugging allowed. Chosen at plan time by the orchestrator; `scripter` (Sonnet)
-  covers the simple cases. Escalation after failure: `implementer-max`, not a second scripter.
+  verifier, debugging allowed. Chosen at plan time by the orchestrator; `scripter` (Opus low)
+  covers the simple cases. Escalation after failure: `implementer-complex`, not a second scripter.
 model: opus
 effort: medium
 maxTurns: 100

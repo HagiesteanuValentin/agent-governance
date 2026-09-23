@@ -1,41 +1,40 @@
 #!/bin/sh
-# 🔴 effort live only via settings.json, reload-on-live unverified — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
+# 🔴 never write the user settings file — PATTERNS «Effort hook is per-session only»
 
 flag="$HOME/.claude/v17-effort-auto"
 [ -f "$flag" ] || exit 0
 
 mode="${1:-check}"
-settings="$HOME/.claude/settings.json"
-[ -f "$settings" ] || exit 0
+state_dir="${CLAUDE_JOB_DIR:-/tmp}"
 
 in=$(cat 2>/dev/null)
 
 # 🔴 PostToolUse fires in subagents too — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
-agent_id=$(printf '%s' "$in" | python3 -c "
-import json, sys
+meta=$(printf '%s' "$in" | python3 -c "
+import json, re, sys
 try:
-    print(json.load(sys.stdin).get('agent_id') or '')
+    d = json.load(sys.stdin)
 except Exception:
-    print('')
+    d = {}
+if not isinstance(d, dict):
+    d = {}
+sid = re.sub(r'[^A-Za-z0-9_.-]', '_', str(d.get('session_id') or ''))
+eff = (d.get('effort') or {}).get('level') if isinstance(d.get('effort'), dict) else ''
+src = re.sub(r'[^A-Za-z0-9_]', '', str(d.get('source') or ''))
+print('%s %s %s %s %s %s' % (sid or '-', d.get('tool_name') or '-', d.get('hook_event_name') or '-',
+                             eff or '-', 'A' if d.get('agent_id') else '-', src or '-'))
 " 2>/dev/null)
-[ -n "$agent_id" ] && exit 0
+set -- $meta
+h_sid="${1:--}"; h_tool="${2:--}"; h_event="${3:--}"; h_eff="${4:--}"; h_agent="${5:--}"; h_src="${6:--}"
+[ "$h_agent" = "-" ] || exit 0
+[ "$h_eff" = "-" ] && h_eff=""
 
 # 🔴 /polish and /refine hold medium across ExitPlanMode — PATTERNS «effort hold for /polish and /refine»
 if [ "$mode" != check ] && [ "$mode" != gate ]; then
-  meta=$(printf '%s' "$in" | python3 -c "
-import json, sys
-try:
-    d = json.load(sys.stdin)
-    print('%s %s %s' % (d.get('session_id') or '-', d.get('tool_name') or '-', d.get('hook_event_name') or '-'))
-except Exception:
-    print('- - -')
-" 2>/dev/null)
-  set -- $meta
-  h_sid="${1:--}"; h_tool="${2:--}"; h_event="${3:--}"
   if [ "$h_sid" = "-" ]; then
     h_sid=""
-    env_sid="${CLAUDE_CODE_SESSION_ID:-}"
-    hold="${CLAUDE_JOB_DIR:-/tmp}/effort-hold-$env_sid"
+    env_sid=$(printf '%s' "${CLAUDE_CODE_SESSION_ID:-}" | sed 's/[^A-Za-z0-9_.-]/_/g')
+    hold="$state_dir/effort-hold-$env_sid"
     if [ -n "$env_sid" ]; then
       if [ "$mode" = hold ]; then
         h_sid="$env_sid"
@@ -44,105 +43,53 @@ except Exception:
       fi
     fi
   else
-    hold="${CLAUDE_JOB_DIR:-/tmp}/effort-hold-$h_sid"
+    hold="$state_dir/effort-hold-$h_sid"
     if [ "$h_event" = SessionEnd ]; then
       rm -f "$hold" 2>/dev/null
     elif [ "$mode" = low ] && [ "$h_tool" = ExitPlanMode ] && [ -f "$hold" ]; then
       exit 0
     fi
   fi
+else
+  [ "$h_sid" = "-" ] && h_sid=""
 fi
 
 case "$mode" in
   hold)
     [ -n "$h_sid" ] || exit 0
-    mkdir -p "${CLAUDE_JOB_DIR:-/tmp}" 2>/dev/null
+    mkdir -p "$state_dir" 2>/dev/null
     : > "$hold" 2>/dev/null
     ;;
   low|medium)
-    rm -f "${CLAUDE_JOB_DIR:-/tmp}"/effort-phase-* 2>/dev/null  # 🔴 phase switch re-arms the once-per-session WARN — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
-    python3 - "$settings" "$mode" "${CLAUDE_JOB_DIR:-/tmp}" <<'PY' "$in" "${h_sid:-}" 2>/dev/null
-import json, os, sys, tempfile
-try:
-    settings_path, mode, state_dir, stdin_json = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-    # 🔴 gate target is per session, settings is shared by all sessions — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
-    try:
-        sid = json.loads(stdin_json).get("session_id") or ""
-    except Exception:
-        sid = ""
-    sid = sid or (sys.argv[5] if len(sys.argv) > 5 else "")
-    if sid:
-        try:
-            os.makedirs(state_dir, exist_ok=True)
-            with open(os.path.join(state_dir, "effort-target-%s" % sid), "w") as f:
-                f.write(mode)
-        except Exception:
-            pass
-    try:
-        old_effort = json.loads(stdin_json).get("effort", {}).get("level", "unknown")
-    except Exception:
-        old_effort = "unknown"
-    with open(settings_path) as f:
-        data = json.load(f)
-    data.setdefault("modelSettings", {}).setdefault("claude-fable-5-1", {})["effortLevel"] = mode
-    d = os.path.dirname(settings_path)
-    fd, tmp = tempfile.mkstemp(dir=d, prefix=".settings-", suffix=".tmp")
-    with os.fdopen(fd, "w") as f:
-        json.dump(data, f, indent=2)
-    os.replace(tmp, settings_path)
-    ctx = "effort: settings->%s (was %s)" % (mode, old_effort)
-    print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse",
-                                              "additionalContext": ctx}}))
-except Exception:
-    pass
-PY
+    [ -n "$h_sid" ] || exit 0
+    mkdir -p "$state_dir" 2>/dev/null
+    rm -f "$state_dir/effort-phase-$h_sid" 2>/dev/null  # 🔴 phase switch re-arms the once-per-session WARN — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
+    printf '%s\n' "$mode" > "$state_dir/effort-target-$h_sid" 2>/dev/null
+    if [ -n "$h_eff" ] && [ "$h_eff" != "$mode" ]; then
+      printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"Tu: /effort %s, apoi scrie go (effective=%s)"}}\n' "$mode" "$h_eff"
+    fi
     ;;
   check)
     # 🔴 low/medium fire on this same tool call — check must not race the write — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
-    tool_name=$(printf '%s' "$in" | python3 -c "
-import json, sys
-try:
-    print(json.load(sys.stdin).get('tool_name') or '')
-except Exception:
-    print('')
-" 2>/dev/null)
-    case "$tool_name" in
+    case "$h_tool" in
       ExitPlanMode|EnterPlanMode) exit 0 ;;
     esac
-    session_id=$(printf '%s' "$in" | python3 -c "
-import json, sys
-try:
-    print(json.load(sys.stdin).get('session_id', 'nosession'))
-except Exception:
-    print('nosession')
-" 2>/dev/null)
-    [ -n "$session_id" ] || session_id="nosession"
-    state_dir="${CLAUDE_JOB_DIR:-/tmp}"
-    mkdir -p "$state_dir" 2>/dev/null
-    state="$state_dir/effort-phase-$session_id"
+    [ -n "$h_sid" ] && [ -n "$h_eff" ] || exit 0
+    tgt="$state_dir/effort-target-$h_sid"
+    [ -f "$tgt" ] || exit 0
+    want=$(head -n1 "$tgt" 2>/dev/null)
+    state="$state_dir/effort-phase-$h_sid"
     [ -f "$state" ] && exit 0
-    python3 - "$settings" "$state" <<'PY' "$in" 2>/dev/null
-import json, sys
-try:
-    settings_path, state_path, stdin_json = sys.argv[1], sys.argv[2], sys.argv[3]
-    eff = json.loads(stdin_json).get("effort", {}).get("level", "unknown")
-    with open(settings_path) as f:
-        data = json.load(f)
-    want = data.get("modelSettings", {}).get("claude-fable-5-1", {}).get("effortLevel", "unknown")
-    if eff != want:
-        open(state_path, "w").close()
-        ctx = "WARN effort effective=%s settings=%s -> You: /effort %s" % (eff, want, want)
-        print(json.dumps({"hookSpecificOutput": {"hookEventName": "PostToolUse",
-                                                  "additionalContext": ctx}}))
-except Exception:
-    pass
-PY
+    if [ -n "$want" ] && [ "$h_eff" != "$want" ]; then
+      : > "$state" 2>/dev/null
+      printf '{"hookSpecificOutput":{"hookEventName":"PostToolUse","additionalContext":"WARN effort effective=%s target=%s -> Tu: /effort %s"}}\n' "$h_eff" "$want" "$want"
+    fi
     ;;
   gate)
-    python3 - "$settings" "${CLAUDE_JOB_DIR:-/tmp}" "${CLAUDE_EFFORT:-}" <<'PY' "$in" 2>/dev/null
-import json, os, sys
+    python3 - "$state_dir" "${CLAUDE_EFFORT:-}" <<'PY' "$in" 2>/dev/null
+import json, os, re, sys
 try:
-    settings_path, state_dir, env_effort, stdin_json = sys.argv[1:5]
+    state_dir, env_effort, stdin_json = sys.argv[1:4]
     data_in = json.loads(stdin_json)
     tool = data_in.get("tool_name") or ""
     # 🔴 the gate must not deny the tools that let the user answer — PATTERNS «Claude Code — limits verified in docs (2026-09-02)»
@@ -152,20 +99,16 @@ try:
     if not eff:
         sys.exit(0)
     want = ""
-    sid = data_in.get("session_id") or ""
+    sid = re.sub(r"[^A-Za-z0-9_.-]", "_", str(data_in.get("session_id") or ""))
     if sid:
         try:
             with open(os.path.join(state_dir, "effort-target-%s" % sid)) as f:
                 want = f.read().strip()
         except OSError:
             want = ""
-    if not want:
-        with open(settings_path) as f:
-            want = json.load(f).get("modelSettings", {}).get(
-                "claude-fable-5-1", {}).get("effortLevel", "")
     if not want or eff == want:
         sys.exit(0)
-    reason = ("STOP: effort effective=%s, settings=%s. Write ONE line to the user: "
+    reason = ("STOP: effort effective=%s, target=%s. Write ONE line to the user: "
               "«Tu: /effort %s, apoi scrie go» and end the turn. "
               "Do not retry tools." % (eff, want, want))
     print(json.dumps({"hookSpecificOutput": {"hookEventName": "PreToolUse",
@@ -176,6 +119,19 @@ except SystemExit:
 except Exception:
     pass
 PY
+    ;;
+  end)
+    [ -n "$h_sid" ] || exit 0
+    rm -f "$state_dir/effort-target-$h_sid" "$state_dir/effort-phase-$h_sid" "$state_dir/effort-hold-$h_sid" 2>/dev/null
+    ;;
+  start)
+    if [ -n "$h_eff" ] && [ "$h_eff" != medium ]; then
+      if [ "$h_src" = "-" ]; then
+        echo "Tu: /effort medium (sesiunea a pornit pe $h_eff)"
+      else
+        echo "Tu: /effort medium (sesiunea a pornit pe $h_eff, source=$h_src)"
+      fi
+    fi
     ;;
 esac
 exit 0

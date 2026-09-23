@@ -13,6 +13,10 @@
             "type": "command",
             "command": "$HOME/.claude/hooks/session-start.sh handoff",
             "statusMessage": "Reading HANDOFF.md"
+          },
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/effort-phase.sh start"
           }
         ]
       }
@@ -113,7 +117,7 @@
         ]
       },
       {
-        "_note": "main only: if the effective effort differs from the per-session target (or from settings), every tool is denied with an order to ask the user for /effort; ExitPlanMode/EnterPlanMode/AskUserQuestion are always allowed and an unknown effort never denies",
+        "_note": "main only: if the effective effort differs from the per-session target in /tmp (no target = no deny), every tool is denied with an order to ask the user for /effort; ExitPlanMode/EnterPlanMode/AskUserQuestion are always allowed and an unknown effort never denies",
         "matcher": ".*",
         "hooks": [
           {
@@ -156,7 +160,7 @@
           },
           {
             "type": "command",
-            "command": "$HOME/.claude/hooks/effort-phase.sh medium"
+            "command": "$HOME/.claude/hooks/effort-phase.sh end"
           }
         ]
       }
