@@ -329,3 +329,51 @@ Create the cell agents in `~/.claude/agents/` as copies with a different `effort
 Wait ~1–2 min for "New agent types are now available" before launching them. Launch all
 cells in one message with byte-identical prompts, so the comparison is apples-to-apples.
 Read costs from the Workers table of `tools/session_metrics.py --out-dir`.
+
+## r11-r13 - long-task attempt: themed HTML lead email in site_ac, Opus 5.5 low vs medium, auditor high vs medium (2026-09-23)
+
+Protocol: worktree site_ac, task = turn the plain-text lead email into themed HTML (rece/cald/neutru,
+matching the configurator's theme), keep text/plain fallback, add optional client email field, render
+6 static HTML variants offline via `scripts/render-emails.mjs`, keep D1-first insert and the no-JS
+303 fallback untouched. Cells see `npm run check` / `tsc` exit codes (must match baseline). Rubric
+(`rubrica.md`, blind evaluator, 10 items /20): 1 table layout/inline styles, 2 dark-mode contrast,
+3 absolute/no images, 4 server-validated theme whitelist, 5 recipient rules, 6 text/plain kept, 7
+no-JS fallback + callback flow intact, 8 single color source, 9 check/tsc exit codes + D1-first +
+resend.ts additive-only, 10 taste. r13/mapping.txt: A=medium, B=low.
+
+Table cells (from `metrics/cells.md`, Aggregate per cell): opus55-low 3 runs, 24 calls avg
+(20-29), 3 tool errors, 13 edits, 5 verify calls, ctx peak 59k (54-65k), 172s (141-196s), $0.8399
+(0.6815-0.9972); opus55-medium 3 runs, 44 calls avg (41-46), 4 tool errors, 17 edits, 10 verify
+calls, ctx peak 99k (86-112k), 394s (336-444s), $1.9617 (1.6230-2.2164).
+
+Sub-table auditor high vs medium (from `metrics-aud/cells.md`, rows r1-r6 only, r7 excluded as
+final delivery audit): auditor(high) 6 runs, 13 calls avg, 1 verify call, ctx peak 41k, 98s,
+$0.4730; auditor-medium 6 runs, 10 calls avg, 2 verify calls, ctx peak 38k, 70s, $0.4071.
+
+Confounds: same prompt x6; rounds partly parallel (r12 cells ran alongside r11 evaluators); r11
+blind broken by worktree path in check log (1 of 4 evaluators noticed); node_modules symlink in
+r11 patches (extraction artefact, ignored); evaluator model = cell model (symmetric); item 10
+taste; no tests in project; check baseline exit 1 / 8 errors.
+
+Verdict (hypotheses):
+- Task turned out SHORT: cells 2.3-7.4 min, 54-113k ctx, not the 30-60 min / 150k targeted.
+  Endpoint 180 lines, one new module ~150 lines. Not a long-task test.
+- Scores (high+medium)/2: r11 medium 19.0 vs low 18.5; r12 low 19.0 vs medium 18.5; r13 medium
+  19.0 vs low 17.5. Mean medium 18.83 vs low 18.33; deviations high-auditor: medium 2+2+3=7, low
+  3+5+4=12.
+- Email-compat trap did not separate: all 6 passed items 1-3 (tables/inline/no images). Knowledge
+  is in the model, not the effort.
+- The only real logic bug (emailOferta outside try -> 500 after INSERT, duplicate lead) came from
+  MEDIUM (r12), caught by both auditors.
+- Cost: low mean $0.84 / 172s; medium $1.96 / 394s (2.3x cost, 2.3x time) for +0.5/20.
+- Auditor high vs medium: same score in 3/6 pairs, high finds more deviations (mean 3.3 vs 2.5),
+  high alone caught the blind-leak in r11 log and the fixed-600px-width compat issue in r13;
+  medium docked item 4 twice for theme interpretation where high kept 2. Cost high $0.42 vs
+  medium $0.35 per audit. Hypothesis: medium is NOT better; high is more thorough for mechanics;
+  both catch logic.
+- All 6 cells derived the theme from `ramura` server-side (service->neutru), none from the site
+  `data-mode`; shared interpretation, not an effort effect.
+- Winner delivered: r11 medium patch -> site_ac branch `feat/email-tematic` (worktree
+  /home/vali/workflow/proiecte/site_ac-email), pending Vali's live test with Resend.
+- Decision on implementer-complex remains OPEN; next session: brainstorm a genuinely long task
+  (View Transitions on blueprint_restaurant_v2, multi-step configurator state, etc.).

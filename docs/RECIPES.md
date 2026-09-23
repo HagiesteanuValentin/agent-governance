@@ -167,6 +167,11 @@ Launch both cells (e.g. cell-opus55-low, cell-opus55-medium) in one message.
 Collect diffs: `git -C <worktree> diff master > rN/diff-<cell>.patch`; make blind copies
 A/B plus a mapping.txt kept out of the auditors' sight; cell reports saved as
 rN/raport-<cell>.md.
+Run `git add -N . ':!node_modules' ':!out'` before `git diff` (r11 leaked a node_modules
+symlink into the patch).
+Pipe the check/tsc/render log through `sed` replacing the worktree path and
+`cell-opus55-(low|medium)` with `CELL` before showing it to evaluators (r11 leaked the
+cell name to evaluators).
 Run 4 auditors (auditor and auditor-medium, each on A and B, same prompt, read-only);
 each writes its report with `cat >` to rN/audit-<A|B>-<high|medium>.md.
 Metrics: `python3 tools/cell_metrics.py --subagents-dir <session>/subagents --agent-prefix
