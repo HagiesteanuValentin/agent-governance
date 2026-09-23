@@ -174,6 +174,9 @@ Pipe the check/tsc/render log through `sed` replacing the worktree path and
 cell name to evaluators).
 Run 4 auditors (auditor and auditor-medium, each on A and B, same prompt, read-only);
 each writes its report with `cat >` to rN/audit-<A|B>-<high|medium>.md.
+`--dosar docs/dosar/<slug>` = directory copied to `<WT>/docs/dosar/<task>/` (`complex` here);
+the cell gets a dossier like the real implementer; the cell prompt never names the trap.
+Per-cell port `__PORT__` 4331/4332, substituted by main.
 Metrics: `python3 tools/cell_metrics.py --subagents-dir <session>/subagents --agent-prefix
 cell-opus55 --min-calls 2 --md --out-dir results` — no `--first-run`; map rows r1..r3 to
 rN..rN+2 by hand.

@@ -112,11 +112,12 @@ session only.
 - ≤2 re-sends to implementer per task (3 runs total); one implementer-complex or scripter
   run counts toward them.
 - SendMessage to a live agent is not a re-send; it's the first option for small deviations.
-- ≤3 explorer runs per task, can run parallel.
+- Explorers: no numeric cap — main launches as many as it needs, never reads solo; but
+  surgically: each with one precise question and its own area, never two on the same source.
 - An agent stopped by `maxTurns` = partial output; continue it ONCE via SendMessage (sub-agents
   docs: "message the subagent to continue from where it stopped"), then split the brief,
   don't relaunch it as is.
-- Past the cap (4th explorer, 4th run, past 6 live agents): don't decide alone — ask me with
+- Past the cap (4th run, past 6 live agents): don't decide alone — ask me with
   AskUserQuestion: how many agents, what model, why the cap isn't enough. The approval holds
   only for the current task.
 

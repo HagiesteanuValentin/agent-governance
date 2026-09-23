@@ -219,3 +219,6 @@ exists, `low` from the ExitPlanMode hook skips the target. Env sid (`$CLAUDE_COD
 inherited by sub-agents) serves ONLY `hold` and the step-5 release (manual `low` with the marker);
 other stdin-less calls never write a target. SessionEnd also clears. Leak: an abandoned /polish
 leaves the target on medium until `low </dev/null` or SessionEnd — a cost, not a STOP.
+
+## Autonomous-mode hook stops on agent hand-back
+The AUTONOMOUS MODE hook turns off on every agent hand-back (non-human message without the signal) — 09.23, to fix.

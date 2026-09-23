@@ -323,6 +323,43 @@ Status 2026-09-02: the switch was stopped temporarily on the afternoon of 09.02,
 after the hook and metrics fix. Cost of the switch = one ~52k rewrite at ExitPlanMode (~$0.8,
 under 4% of the session). Record 1609 complete. Verdict after 2 more sessions.
 
+## r14–r16 — long task: /comanda/ configurator in blueprint_pictura, Opus 5.5 low vs medium, cap 200k/280k
+Task `/comanda/` configurator in blueprint_pictura, BASE da90148, cell context caps warn 200k /
+deny 280k, maxTurns 150, Claude Code 2.1.280, blind evaluation with 4 auditors: auditor high +
+auditor-medium on A and B, rubric /20 in `metrics-local/experiments/complex/input/audit-comanda.md`;
+patches, reports and verdicts in `metrics-local/experiments/complex/r14..r16/`.
+
+| round | cell | api_calls | tool_errors | ctx_peak | s | $ | verify | score high | score medium |
+|---|---|---|---|---|---|---|---|---|---|
+| r14 | low | 33 | 4 | 116.8k | 324 | 2.02 | 21/21 | 17 | 17 |
+| r14 | medium | 70 | 6 | 184.6k | 724 | 4.63 | 39/39 | 19 | 18 |
+| r15 | low | 43 | 2 | 117.3k | 360 | 2.30 | 30/30 | 18 | 18 |
+| r15 | medium | 72 | 8 | 188.8k | 685 | 5.16 | 46/46 | 18 | 18 |
+| r16 | low | 42 | 5 | 116.1k | 368 | 2.23 | 30/30 | 18 | 17 |
+| r16 | medium | 74 | 3 | 178.9k | 693 | 4.89 | 39/39 | 18 | 19 |
+
+Mean: low 17.5/20, 39 calls, 117k ctx, 351 s, $2.18; medium 18.3/20, 72 calls, 184k ctx, 701 s,
+$4.89 (2.2× cost, 2.0× time, +0.8/20). Error rate per ctx bucket (tool_errors/calls): low
+0–50k 0.000, 50–100k 0.093, 100–150k 0.128; medium 0–50k 0.048, 50–100k 0.061, 100–150k 0.082,
+150–200k 0.109. Nobody hit deny 280k or maxTurns; each cell used its own port (4331 low /
+4332 medium, confirmed in reports). Still not "30–60 min": low ≈6 min, medium ≈12 min.
+
+Findings: all 6 cells put prices in `src/config/form-fields.ts` (the form-fields precedent
+quoted in the dossier) and recomputed server-side; none accepted the client price. Trap
+partially leaked (prompt "un singur loc" + PATTERNS 604 quote). The real miss, in all 6:
+`site.yaml` `comanda.randuri` „de la 1.800/3.200" (CMS, homepage, llms.txt) stays a second
+source; medium r14 and r15 derived the homepage from config (scope widened to 5 files,
+penalised as contradicting DECIS «pret e TEXT»). All 6 flagged the external cron retry
+without price. Auditor high vs medium: same ranking on 5/6 cells, ±1 point; high finds more
+mechanical/site-rule items (honeypot in hidden fieldset, PATTERNS pointer contradicted),
+medium more product-level ones. Incidents: 3 evaluators killed once by 429 session limit
+(relaunched after reset); autonomous-mode hook toggled off on every agent hand-back (bug,
+note in PATTERNS as one line).
+
+Conclusion line (main's call, Vali decides): medium buys +0.8/20 and wider scope for 2.2×
+cost; implementer-complex stays optional for cross-file logic, not default. Task still too
+short for a 30–60 min test; next candidate must add a real debugging loop.
+
 ## How to rerun
 
 Create the cell agents in `~/.claude/agents/` as copies with a different `effort`/`model`.
