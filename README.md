@@ -4,8 +4,11 @@ Governance for Claude Code agent sessions: policies, enforcement hooks, and offl
 telemetry. Cheap models do the work, the expensive model only plans and audits, and hooks
 stop verbose agents from flooding the orchestrator's context.
 
-Current version: **v1.8** (frozen) — the rules aren't changing anymore, it's now being
-tested on product sessions (≥3 from 2026-09-05T14:45 onward, until a verdict is reached).
+Current version: **v1.11** (2026-09-24) — Fable plans and gives the verdict, an
+`orchestrator` agent (Opus 5.5, medium) executes the briefs and launches
+implementer/auditor sub-agents; `/polish` and `/refine` now hand off their briefs to it.
+Intermediate versions (v1.8.1 analyzer fix, v1.8.2 effort gate, v1.10 model defaults, v1.11
+orchestrator) are tracked in `tools/versions.json` and the CHANGELOG, if present.
 v1.8.1 (2026-09-09) changes nothing in the governance itself: only the analyzer (`tools/session_metrics.py`) was fixed so it stops reporting waste that wasn't there (false `big_tool_result_main` on image reads, false `batchable_bash` on non-mutating chains).
 Phase-based effort is back (plan medium / implementation low; as of v1.8.2 a PreToolUse gate
 blocks tools until claude_code_king runs `/effort <target>` and types go, Claude Code
