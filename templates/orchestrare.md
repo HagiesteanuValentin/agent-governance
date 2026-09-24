@@ -34,8 +34,8 @@ session only.
 
 ## Flow
 1. Plan mode as today: explorers, advisor, briefs as `## Brief N — <title>` in the plan.
-   Before ExitPlanMode, paste the plan into chat (context + briefs, ≤25 lines): in auto mode
-   the approval screen doesn't appear, and exiting plan mode stops auto mode.
+   Before ExitPlanMode, paste the brief titles + order/parallelism into chat (≤10 lines): in
+   auto mode the approval screen doesn't appear, and exiting plan mode stops auto mode.
 2. After ExitPlanMode: extract each brief into `<scratchpad>/brief-N.md` (one `sed -n`), then
    launch ONE `orchestrator` Agent in background. Prompt ≤10 lines: plan path, brief paths,
    run-log path (`docs/dossier/run-<slug>.md`), order/parallelism declared at plan,
@@ -48,7 +48,9 @@ session only.
    flagged reports, with offset) + `git diff --stat` → verdict (see Audit).
 5. HAND-BACK → answer by SendMessage to the SAME orchestrator, ≤3 per task; past that →
    AskUserQuestion. You see a deviation → SendMessage the orchestrator, never a worker.
-   Its children are dead after a hand-back: a re-send there means a new agent (~40-50k).
+   Its children are dead after a hand-back: a re-send there means a new agent (~5k). A brief
+   that appears AFTER launch = a new orchestrator; SendMessage is only for hand-back on the
+   same brief (doesn't contradict the "ONE orchestrator" rule at point 2).
 6. OK → commit (below). You don't summarize the reports for me.
 
 ## The brief
@@ -56,8 +58,9 @@ session only.
   text items in the same file, with the same verification, go 8-10 together.
 - Split it when it passes ~6 files, mixes JS with CSS, or one item could break another —
   sequential briefs, audited between them. AT PLAN TIME.
-- One extra run costs ~40-50k tokens of bootstrap. One brief ≈ ≤150k context; the hook
-  closes it at 150k, blocks at 220k. Worker turns are not something to save.
+- One extra run costs ~5k tokens of bootstrap for an orchestrator, ~40-50k for a worker.
+  One brief ≈ ≤150k context; the hook closes it at 150k, blocks at 220k. Worker turns are
+  not something to save.
 - The BRIEF is self-contained (no conversation context, no skills, no delegating). It must
   contain: the goal in one sentence · the steps · the exact files with paths · the definition
   of done · how it's verified · what it's NOT allowed to do (commit/push/seed/real services).

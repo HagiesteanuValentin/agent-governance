@@ -206,7 +206,9 @@ unverified live as of 24.09.2026. Check which TTL actually applied by reading
 means the request fell back to 5m regardless of the frontmatter/settings value. There is no
 automatic cache warming for main while a sub-agent runs long; the keep-alive for main's own
 cache is the manual `SendMessage` PING described in DECIZII.md «v1.11 — Opus 5.5
-sub-orchestrator (24.09.2026)», not a config knob.
+sub-orchestrator (24.09.2026)», not a config knob. Since v1.12 the PING is not sent after
+every audit verdict but only when ≥40 min have passed since the last exchange with main — see
+DECIZII.md «v1.12 — corecții după primele sesiuni v1.11».
 
 ## Children of a sub-agent run synchronously
 The `Agent` tool called from inside a sub-agent blocks until the child finishes; the result

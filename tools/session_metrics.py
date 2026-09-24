@@ -8,6 +8,7 @@ Output: --json (machine-readable) and/or --md (summary + aggregate table). Stdli
 import argparse
 import collections
 import datetime
+import fnmatch
 import json
 import os
 import re
@@ -255,7 +256,9 @@ RECOMMENDATION = {
                                "reason (logic + failed SendMessage / dead context / declared "
                                "debugging).",
     "fable_launched_worker": "{detail} - from v1.11 main hands the briefs to one orchestrator "
-                             "agent; workers and auditors are launched by it.",
+                             "agent; workers and auditors are launched by it (exception: "
+                             "auditor-complex after an orchestrator, at most one per "
+                             "orchestrator).",
     "orchestrator_no_runlog": "{detail} - the orchestrator appends every report and audit "
                               "verdict to docs/dossier/run-<slug>.md before it hands back.",
     "agent_read_plan_whole": "{detail} - the agent gets its own brief file "
@@ -1083,7 +1086,8 @@ def parse_file(path, label, tool_names, tool_inputs, chain=None):
                     is_plan = isinstance(fp, str) and "/.claude/plans/" in fp
                     if is_plan and isinstance(ts, str):
                         doc["plan_edits"].append(ts)
-                    if (isinstance(body, str) and not is_plan
+                    is_brief = isinstance(fp, str) and fnmatch.fnmatch(os.path.basename(fp), "brief-*.md")
+                    if (isinstance(body, str) and not is_plan and not is_brief
                             and body.count("\n") + 1 > THRESHOLDS["fable_code_lines"]):
                         doc["code_writes"].append({"path": fp or "?",
                                                    "lines": body.count("\n") + 1})
@@ -1929,6 +1933,12 @@ V17_VERSION_PREFIX = "v1.7"
 ORCHESTRATOR_VERSION = (1, 11)
 ORCHESTRATOR_TYPE = "orchestrator"
 WORKER_PREFIXES = ("implementer", "scripter", "auditor")
+
+
+def audits_after_orch(orch_at, audits):
+    return len(audits) <= len(orch_at) and all(a > orch_at[0] for a in audits)
+
+
 RUNLOG_RE = re.compile(r"docs/(?:dosar|dossier)/run-[^\s/'\"]*\.md")
 RUNLOG_APPEND_RE = re.compile(r"(?:>>|\btee\s+(?:-\w*a\w*|--append)\s+(?:-\S+\s+)*)\s*['\"]?"
                               r"\S*docs/(?:dosar|dossier)/run-[^\s/'\"]*\.md")
@@ -2748,7 +2758,9 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
                               "brief \"%s\" ran %d× (cap %d)"
                               % (key, len(ws), THRESHOLDS["max_implementer_runs"]),
                               {"brief": key, "runs": len(ws)}, 0))
-    if by_type.get("explorer", 0) > THRESHOLDS["max_explorer_runs"]:
+    # 🔴 explorers: no numeric cap from v1.11 — DECIZII «v1.12 — corecții după primele sesiuni v1.11»
+    if (version_key(version_of(first_ts, versions)) < ORCHESTRATOR_VERSION
+            and by_type.get("explorer", 0) > THRESHOLDS["max_explorer_runs"]):
         flags.append(flag("too_many_runs", "main",
                           "explorer ran %d× (cap %d)"
                           % (by_type["explorer"], THRESHOLDS["max_explorer_runs"]),
@@ -2788,8 +2800,13 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
 
     version = version_of(first_ts, versions)
     if version_key(version) >= ORCHESTRATOR_VERSION:
-        direct = [l for l in main_doc["agent_launches"]
-                  if str(l["type"]).startswith(WORKER_PREFIXES)]
+        launches = main_doc["agent_launches"]
+        orch_at = [i for i, l in enumerate(launches) if l["type"] == ORCHESTRATOR_TYPE]
+        audits = [i for i, l in enumerate(launches) if l["type"] == "auditor-complex"]
+        audits_ok = bool(orch_at) and audits_after_orch(orch_at, audits)
+        direct = [l for l in launches
+                  if str(l["type"]).startswith(WORKER_PREFIXES)
+                  and not (audits_ok and l["type"] == "auditor-complex")]
         if direct:
             kinds = collections.Counter(l["type"] for l in direct)
             flags.append(flag("fable_launched_worker", "main",

@@ -79,8 +79,11 @@
     },
     {
       "name": "v1.11",
-      "from": "2026-09-24T08:40",
-      "_todo": "set 'from' to the LOCAL time of the live install (YYYY-MM-DDTHH:MM); an empty 'from' is skipped"
+      "from": "2026-09-24T08:40"
+    },
+    {
+      "name": "v1.12",
+      "from": "2026-09-24T12:55"
     }
   ]
 }

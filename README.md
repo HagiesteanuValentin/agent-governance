@@ -4,7 +4,7 @@ Governance for Claude Code agent sessions: policies, enforcement hooks, and offl
 telemetry. Cheap models do the work, the expensive model only plans and audits, and hooks
 stop verbose agents from flooding the orchestrator's context.
 
-Current version: **v1.11** (2026-09-24) — Fable plans and gives the verdict, an
+Current version: **v1.12** (2026-09-24) — Fable plans and gives the verdict, an
 `orchestrator` agent (Opus 5.5, medium) executes the briefs and launches
 implementer/auditor sub-agents; `/polish` and `/refine` now hand off their briefs to it.
 Intermediate versions (v1.8.1 analyzer fix, v1.8.2 effort gate, v1.10 model defaults, v1.11

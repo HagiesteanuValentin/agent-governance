@@ -51,7 +51,7 @@ commits.
 4. After DEVIATIONS, in order: mechanical (≤20 lines/file, ≤3 files, no new logic) → the
    auditor fixes them (`FIXED` + hunk) · everything else → ONE SendMessage to the SAME
    worker, all deviations in one message · re-audit by continuing the SAME auditor.
-5. Append the brief's block to the run-log (format below), then PING main.
+5. Append the brief's block to the run-log (format below), then PING main if due (see below).
 
 ## Scripter
 - Scripter briefs: dry-run → 1 file → all files → idempotency re-run; a line is added to
@@ -95,7 +95,11 @@ by SendMessage to you; your children are dead by then, so any re-send after a ha
 new agent.
 
 ## PING (keeps main's cache warm)
-After EVERY audit verdict on a brief, SendMessage to `main`, ≤3 lines, exactly:
+🔴 PING only when ≥40 min since the last exchange with main — DECIZII «v1.12» / PATTERNS «Cache TTL in sub-agents (v1.11)».
+The first Bash of the run and every run-log append include `date +%H:%M`; before a PING, compare
+the current time to the latest of: start, last PING, last message received from main; under
+40 min → no PING. After an audit verdict where a PING is due, SendMessage to `main`, ≤3 lines,
+exactly:
 `PING brief N: <verdict> · <next step> · <HH:MM>`
 Never include the words MOD AUTONOM or AUTONOMOUS MODE in a ping: they trigger the autonomous-mode hook in main.
 No questions in a ping, nothing that needs a decision.
