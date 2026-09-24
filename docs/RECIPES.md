@@ -205,8 +205,9 @@ Hand-back is STRICT — the orchestrator stops (report + run-log) on: logic devi
 ambiguous brief / missing file / plan contradicted by code · any cap (3 runs/brief, 6 live
 agents, 150k own context) · any question for the user.
 After each brief's audit verdict, the orchestrator sends `main` a `SendMessage` PING
-(≤3 lines: `PING brief N: <verdict> · <next step> · <time>`) to keep Fable's cache warm
-between turns — no autonomous-mode trigger words in it.
+(≤3 lines: `PING brief N: <verdict> · <next step> · <time>`) only when ≥40 min have passed
+since the last exchange with main, to keep Fable's cache warm between turns — no
+autonomous-mode trigger words in it.
 Fable, on notification: reads the run-log SUMMARY (`Read` with `limit 150`, once; the annex
 only for flagged reports, with `offset`) plus `git diff --stat`, then verdicts OK (commit
 itself) or HAND-BACK (`SendMessage` to the same orchestrator, ≤3 per task). Fable never

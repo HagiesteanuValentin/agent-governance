@@ -8,7 +8,8 @@ Current version: **v1.12** (2026-09-24) — Fable plans and gives the verdict, a
 `orchestrator` agent (Opus 5.5, medium) executes the briefs and launches
 implementer/auditor sub-agents; `/polish` and `/refine` now hand off their briefs to it.
 Intermediate versions (v1.8.1 analyzer fix, v1.8.2 effort gate, v1.10 model defaults, v1.11
-orchestrator) are tracked in `tools/versions.json` and the CHANGELOG, if present.
+orchestrator, v1.12 analyzer false flags + PING ≥40 min) are tracked in `tools/versions.json`
+and the CHANGELOG, if present.
 v1.8.1 (2026-09-09) changes nothing in the governance itself: only the analyzer (`tools/session_metrics.py`) was fixed so it stops reporting waste that wasn't there (false `big_tool_result_main` on image reads, false `batchable_bash` on non-mutating chains).
 Phase-based effort is back (plan medium / implementation low; as of v1.8.2 a PreToolUse gate
 blocks tools until claude_code_king runs `/effort <target>` and types go, Claude Code
@@ -398,8 +399,10 @@ that launches implementer/auditor agents per brief instead of Fable doing it tur
 Fable keeps plan mode, advisor, and the final verdict + commit, read from the orchestrator's
 run-log summary. Hand-back is strict: the orchestrator stops on any unresolved logic
 deviation, a second failed check, or a hit cap, rather than deciding alone. A `SendMessage`
-PING after each brief's audit keeps Fable's (main's) cache warm while it waits. See
-`docs/RECIPES.md` "Task with orchestrator (v1.11)" and `docs/DECIZII.md` "v1.11".
+PING fires only when ≥40 min have passed since the last exchange with main (main sits on a
+1h TTL; a PING costs main a turn with ~150k cache_read, ~$1.35 across 9 PINGs on the aerom
+24.09 session). See `docs/RECIPES.md` "Task with orchestrator (v1.11)" and `docs/DECIZII.md`
+"v1.12".
 
 ## Measured results
 
