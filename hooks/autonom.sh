@@ -45,6 +45,11 @@ if MODE == "prompt":
             or (isinstance(origin, dict) and origin.get("kind") == "task-notification")
             or d.get("turnOrigin") == "task_notification"):
         sys.exit(0)
+    # 🔴 agent-message/PING are not operator prompts — docs/PATTERNS.md «Autonomous-mode hook stops on agent hand-back»
+    if ((isinstance(origin, dict) and origin.get("kind") == "peer")
+            or d.get("turnOrigin") == "peer"
+            or prompt.lstrip().startswith(("Another Claude session sent a message:", "<agent-message"))):
+        sys.exit(0)
     if SEMNAL.search(prompt) or SEMNAL_STRICT.search(prompt):
         try:
             os.makedirs(MARKER_DIR, exist_ok=True)

@@ -1,7 +1,7 @@
 Refine on target: $ARGUMENTS
 Format: /refine <page | section> [dev-url]. No arguments → ask for the target.
 
-You (the orchestrator) do NOT read the target's code and do NOT propose items off the top of
+You (main) do NOT read the target's code and do NOT propose items off the top of
 your head. The flow, in order:
 
 0. Router. Print exactly one line:
@@ -19,9 +19,10 @@ your head. The flow, in order:
    If the target does not name the page ("this page", "here") → `AskUserQuestion` immediately,
    before any agent.
 
-2. Two agents in parallel, launched in the SAME message. The files are disjoint (explorer:
-   the dossier; scripter: the script, the screenshots, the measurements), neither depends on
-   the other's result, only the scripter runs a browser. On the first result notification
+2. Two agents in parallel, launched in the SAME message: `explorer` and one `orchestrator`
+   for brief 0. The files are disjoint (explorer: the dossier; scripter: the script, the
+   screenshots, the measurements), neither depends on the other's result, only the scripter
+   runs a browser. On the first result notification
    write one line, no action; on the second move to step 3.
 
    2a. `explorer` — brief:
@@ -41,7 +42,10 @@ your head. The flow, in order:
        Forbidden: commit, push, seed, calls to real services, editing any other file, copying
        whole file contents into the dossier (paths and ranges only).
 
-   2b. `scripter` (Sonnet, high) — brief:
+   2b. You do not launch the worker. Write `<scratchpad>/brief-0.md` (below) and launch ONE
+       `orchestrator` in background with: the brief-0 path, run-log `docs/dosar/run-<slug>.md`,
+       "a single brief", the prohibitions; no plan path (the plan comes at step 3).
+       Worker named in brief-0: `scripter` (Opus 5.5 low). Brief-0:
        Goal: write and run `scripts/verify-<slug>.mjs`, which produces the three screenshots
        and `docs/refine/<slug>.measurements.md`. If a script from /polish already exists for
        this slug, adapt it instead of writing a new one.
@@ -56,7 +60,8 @@ your head. The flow, in order:
        very tall mobile page is clipped to the requested target, not to the whole page.
        Flags: `--crop "<selector>" <breakpoint>` for one extra crop, `--has "<selector>"` for
        the presence/absence checks used by the ADD/REMOVE acceptances. Idempotent: running it
-       twice gives the same numbers.
+       twice gives the same numbers. Measurement script, not a transformation: no
+       dry-run/SCRIPTS.md.
        The measurements (≤4,000 characters), per section and per breakpoint: box (top,
        height) · padding and gap · font-size, line-height, weight · colors + contrast ratio ·
        image dimensions · offset from the container · empty areas over 120px · the number of
@@ -80,8 +85,8 @@ your head. The flow, in order:
    `READ BEYOND DOSSIER`. Forbidden for it: browser, scripts, `Edit`, extra screenshots,
    commit/push, DECISIONS in full.
    It may ask for ONE extra crop with `CROP NEEDED: <selector> <breakpoint>` → you
-   `SendMessage` the scripter to produce it → you `SendMessage` the refiner with the path.
-   Once only.
+   `SendMessage` the brief-0 `orchestrator` to have it produced → you `SendMessage` the refiner with the path.
+   Once only. Resuming the `orchestrator` = a new scripter; it counts in its 3-run cap.
 
 4. Adversarial review (you). First `wc -c` on the plan — the refiner has no Bash and cannot
    check its own ceiling; the plan is ≤10,000 characters. Then read the plan ONCE. Check, in
@@ -103,11 +108,14 @@ your head. The flow, in order:
    Effort: after the operator's approval, run `bash ~/.claude/hooks/effort-phase.sh low </dev/null`
    (ignore its JSON line; the WARN comes on this same result), then print «You: /effort low»
    on its own line and wait for the reply before the first brief.
-   /polish step 5: the item numbers + the plan path + the script as the verifier (the "after"
-   numbers). The implementer reads its own acceptance criteria from the plan; you do not copy
-   them in and you do not read the plan again. The refiner dies after the review; it is not
-   relaunched.
+   /polish step 5: you WRITE `<scratchpad>/brief-N.md` from the approved items (the item
+   numbers + the plan path + the script as the verifier, the "after" numbers) and launch ONE
+   new `orchestrator` with the plan `docs/refine/<slug>.md`, the briefs, the run-log, the
+   declared parallelism (max 3), the prohibitions; you never launch the worker. Audit, PING,
+   HAND-BACK as in /polish step 5. The implementer reads its own acceptance criteria from the
+   plan; you do not copy them in and you do not read the plan again. The refiner dies after
+   the review; it is not relaunched.
 
-Ceilings per /refine: 1 refiner · 1 explorer + 1 scripter · at most 2 `SendMessage` to the
-refiner (review + crop) · at most 3 live agents for the skill. `docs/refine/` does not enter
+Ceilings per /refine: 1 refiner · 1 explorer + 1 `orchestrator` (brief 0) · at most 2 `SendMessage` to the
+refiner (review + crop) · at most 3 live agents for the skill on main (the `orchestrator` counts its own children). `docs/refine/` does not enter
 a commit, like `docs/dosar/`. Final report as usual.

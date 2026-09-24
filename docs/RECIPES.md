@@ -189,6 +189,9 @@ After ExitPlanMode, Fable extracts each `## Brief N` from the plan into
 `<scratchpad>/brief-N.md` (sed), then launches ONE `orchestrator` agent (background), prompt
 ≤10 lines: path to the plan, paths to the briefs, path to the run-log, the ordering/
 parallelism declared at plan time, and prohibitions.
+/polish and /refine: step 2b and step 5 hand their briefs to an orchestrator (brief-0 for the
+measurement script, brief-N written by main from the approved items); main never launches the
+worker.
 The orchestrator (Opus 5.5 medium, own context) for each brief launches implementer*/
 scripter* (synchronous), then auditor* on the diff, up to 2 `SendMessage` resends, and
 applies mechanical auditor fixes itself. It writes `docs/dosar/run-<slug>.md`: a SUMMARY

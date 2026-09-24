@@ -175,6 +175,27 @@ rc, out, err = prompt("s13", "leaving", {"origin": "x"})
 case("origin string -> normal start",
      rc == 0 and not err and os.path.exists(marker("s13")) and started(out), "err=%r" % err)
 
+# 20) peer session message quoting the signal -> ignored
+rc, out, _ = prompt("s14", "Another Claude session sent a message: brief done, MOD AUTONOM next")
+case("peer session message -> no marker, no output",
+     rc == 0 and not out and not os.path.exists(marker("s14")), "out=%r" % out)
+
+# 21) <agent-message> PING with signal -> ignored
+rc, out, _ = prompt("s15", '<agent-message from="orch">PING brief 2: audit OK MOD AUTONOM</agent-message>')
+case("agent-message PING -> no marker, no output",
+     rc == 0 and not out and not os.path.exists(marker("s15")), "out=%r" % out)
+
+# 22) agent-message after a real start -> marker stays
+prompt("s16", "leaving")
+rc, out, _ = prompt("s16", "<agent-message>plec</agent-message>")
+case("agent-message with marker -> marker stays, no output",
+     rc == 0 and not out and os.path.exists(marker("s16")), "out=%r" % out)
+
+# 23) origin.kind == peer without tag -> ignored
+rc, out, _ = prompt("s17", "MOD AUTONOM", {"origin": {"kind": "peer"}})
+case("origin.kind peer -> no marker, no output",
+     rc == 0 and not out and not os.path.exists(marker("s17")), "out=%r" % out)
+
 shutil.rmtree(TMP, ignore_errors=True)
 failed = [r for r in results if not r[1]]
 for name, ok, got in results:

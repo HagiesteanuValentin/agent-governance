@@ -2,7 +2,7 @@ Polish the target: $ARGUMENTS
 Format: /polish <component | section | site> [dev-url] [lead=opus|expert]. No arguments →
 ask for the target.
 
-You (the orchestrator) do NOT read the target's code and do NOT propose items off the top of
+You (main) do NOT read the target's code and do NOT propose items off the top of
 your head. The flow, in order:
 
 1. Preparation (no agents). Plan path: `docs/polish/<target-slug>.md`. If the file already
@@ -52,7 +52,7 @@ your head. The flow, in order:
    only run it.
    Any item that proposes a new technique on an existing asset (cutout from a mask, blend,
    image retouching, filter) gets a 5-minute PROOF on the real file, with the result in the
-   item; otherwise the item is marked "feasibility unproven" and the orchestrator treats it
+   item; otherwise the item is marked "feasibility unproven" and main treats it
    as a question, not as an item.
    LONG ROUTE — 2a, then 2b ∥ 2c, then 2d; no text from you between them:
    2a. `explorer` → writes `docs/polish/<slug>.dossier.md` (≤3,000 characters): the target's
@@ -60,19 +60,24 @@ your head. The flow, in order:
        CLAUDE.md / DECISIONS / PATTERNS / RECIPES a `file:from-to`, the path of tokens/theme,
        URL, breakpoints, the screenshot recipe (the range from RECIPES). Paths and ranges
        only, zero copied content. Reports the path + 3 lines.
-   2b. `implementer` → writes `scripts/verify-<slug>.mjs` (the "Task with several briefs" rule
-       from CLAUDE.md), runs it, writes `docs/polish/<slug>.measurements.md` (≤3,000: numbers
-       at each width — positions, dimensions, contrasts, overflow — and the paths of the
-       three `-small.png` screenshots). Takes the selectors from the dossier. Does not
+   2b. You do not launch the worker. Write `<scratchpad>/brief-0.md`: the worker is `scripter`
+       (Opus 5.5 low); it writes `scripts/verify-<slug>.mjs` (the "Task with several briefs"
+       rule from CLAUDE.md), runs it, writes `docs/polish/<slug>.measurements.md` (≤3,000:
+       numbers at each width — positions, dimensions, contrasts, overflow — and the paths of
+       the three `-small.png` screenshots). Takes the selectors from the dossier. Does not
        propose items. No URL → just the script with the screenshot part commented out and a
-       "no live" line in the measurements.
+       "no live" line in the measurements. Plus the goal, files, done, verification, forbidden,
+       and the line "measurement script, not a transformation: no dry-run/SCRIPTS.md,
+       idempotent = same numbers twice". Launch ONE `orchestrator` in background with: the
+       brief-0 path, run-log `docs/dosar/run-<slug>.md`, "a single brief", the prohibitions.
+       No plan path — the plan does not exist yet.
    2c. ONLY when the lead is the expert: `design-lead-expert`, Phase A, launched in the SAME
-       message as 2b. Brief: the goal, the target, the dossier path, the path of
+       message as the 2b `orchestrator`. Brief: the goal, the target, the dossier path, the path of
        `docs/polish/<slug>.concepts.md`, the plan path, the reason from `Lead:`, breakpoints.
        No measurements, no code paths, no copied sections — they are in the dossier. The
        exception to "one agent at a time" is declared here: the files are disjoint
-       (implementer: `scripts/verify-<slug>.mjs`, `measurements.md`, screenshots; expert:
-       `.concepts.md`), only the implementer runs a browser, neither depends on the other's
+       (scripter: `scripts/verify-<slug>.mjs`, `measurements.md`, screenshots; expert:
+       `.concepts.md`), only the scripter runs a browser, neither depends on the other's
        result. On the first result notification write one line, no action; on the second move
        to 2d, in the same message.
    2d. `SendMessage` to the expert, on the agentId from launch 2c, ≤5 lines: "Phase B", the
@@ -82,14 +87,14 @@ your head. The flow, in order:
        When the lead is `design-lead` (opus): 2a → 2b → then the design lead, in series, a
        single phase, no concepts; brief: the goal, the target, the paths of the two files, the
        plan path, the reason from `Lead:`, breakpoints.
-       No URL: the implementer delivers the script with the screenshot part commented out and
+       No URL: the scripter delivers the script with the screenshot part commented out and
        "no live" in the measurements; Phase B runs without screenshots.
 3. Adversarial review (you). Read the plan file ONCE. Against:
    DECISIONS (rejected items reintroduced? ceilings?), the JS/CSS budget, the scope the
    operator asked for, the dimensions checklist (a dimension marked "OK" without evidence →
    new item or question). For each item: KEEP / CUT (one-line reason, move it to "Rejected") /
    MERGE / ADD (same format, with acceptance). Rewrite vague items with measurable
-   acceptance. Edit the file directly with Edit, change "State: v2 orchestrator".
+   acceptance. Edit the file directly with Edit, change "State: v2 main".
    Do not launch a second design-lead for this.
    The aesthetic guard is required by the design-lead's format, you do not add it: verify
    that every numeric acceptance has a guard in words; missing → ask for it in one
@@ -110,7 +115,7 @@ your head. The flow, in order:
    visible element (button, card, menu, section spacing…), one line per element in plain
    language with the item numbers in brackets, MUST/SHOULD/COULD as group headings, no
    technical terms, at most 15 lines — plus its CUT/ADDED BY YOU line and the plan path.
-   After its summary add ONE line of your own: "Cut/added by the orchestrator: P<n> (reason) /
+   After its summary add ONE line of your own: "Cut/added by main: P<n> (reason) /
    none".
    Wait for: approve all / cut / add. Their changes go into the file before step 5 (ask an
    `explorer` with the item number to apply a change if you need to check the item first;
@@ -124,8 +129,12 @@ your head. The flow, in order:
    on its own line and wait for the reply before the first brief.
    (ceiling on files and risk, not on count: CSS items in the same file go 8–10 at a time;
    ≤6 files; JS separate from CSS; MUST first). The verification script comes from the
-   design-lead (short route) or from implementer 2b (long route); every brief runs it,
+   design-lead (short route) or from brief 0 (long route); every brief runs it,
    none redo the screenshots.
+   After go, WRITE each brief to `<scratchpad>/brief-N.md` from the approved items (the plan
+   has no `## Brief N`; you write them, not extract them). Launch ONE new `orchestrator` (the
+   2b one is dead) with: the plan path, the brief paths, run-log `docs/dosar/run-<slug>.md`,
+   the declared parallelism, the prohibitions. You never launch the worker yourself.
    The prohibitions: as in CLAUDE.md ("The relevant prohibitions"). The brief gives: the plan
    path + the item numbers (the implementer reads its own acceptance criteria from the plan;
    you do not copy them in, you do not read the plan) + the verification (build, screenshots
@@ -133,7 +142,7 @@ your head. The flow, in order:
    PARALLEL briefs (max 3) are allowed when the files are disjoint (e.g. assets/images vs
    CSS, shared tokens/config included), none depends on another's result, at most one runs a
    build/browser (or each has its own port and `--out`); the build is done by the last brief
-   or by the orchestrator. Declared at plan time, with the file list per brief. A worktree
+   or by the `orchestrator`. Declared at plan time, with the file list per brief. A worktree
    only when the lists cannot be guaranteed disjoint (it costs the dependencies + the merge,
    audited by you).
    For texture/material targets (subjective ones): brief 1 is a PROOF PAGE with 2–3 variants
@@ -144,8 +153,9 @@ your head. The flow, in order:
    multiple masks / `mix-blend-mode`: the verification script measures the render time at 390
    with the CPU throttled 4× (Playwright CDP `Emulation.setCPUThrottlingRate`), before/after;
    default threshold: paint under 100ms (the operator can change it at plan time).
-   Audit after each brief, as in CLAUDE.md ("Audit": 3 commands directly, `auditor` only above
-   the threshold). An item delivered and audited →
+   The `orchestrator` audits each brief. You read the run-log SUMMARY + `git diff --stat`,
+   verdict as in orchestrare.md «Audit»; PING → one line; HAND-BACK → `SendMessage` to the
+   same `orchestrator` (≤3). An item delivered and audited →
    mark it in the plan `✔ <date>`.
 6. Live verification (the operator). After the last brief, tell them, per element and in the
    same plain style as step 4, what changed and where to look. What they report as incomplete is NOT redesigned: reopen the item or add
@@ -158,7 +168,7 @@ your head. The flow, in order:
    the operator asks for new concepts.
 
 Ceilings per /polish: 1 design lead (`design-lead` or `design-lead-expert`); the long route
-= explorer + implementer + the chosen lead (the expert in two phases, one launch, at most 3
+= explorer + `orchestrator` (brief 0) + the chosen lead (the expert in two phases, one launch, at most 3
 `SendMessage`), not counted in the 3 implementation briefs; ≤2 agents in parallel on the long
 route; ≤2 explorers total; ≤3 implementation briefs without a new OK from the operator. Final
 report as usual.

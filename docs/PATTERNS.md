@@ -250,3 +250,6 @@ UserPromptSubmit also fires on the `<task-notification>` that re-invokes main af
 Without a filter, every hand-back without the signal stopped AUTONOMOUS MODE, and a report quoting the regex started it.
 In the transcript the notification has `origin.kind: "task-notification"` / `turnOrigin: "task_notification"`; stdin is undocumented.
 Fix (text-based): the prompt hook exits untouched when the prompt starts with `<task-notification>` or those fields exist — fixed 09.23.
+The peer channel (`<agent-message>` / "Another Claude session sent a message:", PING, SubagentHandback relays) also fires UserPromptSubmit.
+The hook ignores both forms only as a prefix (a human quoting the tag mid-text still counts), plus `origin.kind`/`turnOrigin` == `peer`.
+Tests 20-23 in `hooks/test-autonom.sh` (peer text, PING, marker kept, origin peer) — fixed 09.24.
