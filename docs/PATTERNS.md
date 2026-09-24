@@ -196,6 +196,24 @@ Sub-agents only ever write a 5m cache, so any pause over 300 s costs a full cont
 the previous one still had over 30k cached, under an hour before); `cache_churn_main` is per
 session (share of cache writes over the whole run) — one does not tell you the other.
 
+## Cache TTL in sub-agents (v1.11)
+Default sub-agent cache is 5m (see "Cache TTL 5m for sub-agents" above). `experimental:
+cacheTtl: 1h` in an agent's frontmatter (v2.1.248+) or `subagentPromptCacheTtl: "1h"` in
+settings.json (v2.1.242+, applies to ALL sub-agents) can extend it — but the docs say the
+1h frontmatter value is ignored "while your Claude subscription is using usage credits",
+unverified live as of 24.09.2026. Check which TTL actually applied by reading
+`cache_creation.ephemeral_1h_input_tokens` in the usage block of the session jsonl: zero
+means the request fell back to 5m regardless of the frontmatter/settings value. There is no
+automatic cache warming for main while a sub-agent runs long; the keep-alive for main's own
+cache is the manual `SendMessage` PING described in DECIZII.md «v1.11 — Opus 5.5
+sub-orchestrator (24.09.2026)», not a config knob.
+
+## Children of a sub-agent run synchronously
+The `Agent` tool called from inside a sub-agent blocks until the child finishes; the result
+comes back as a normal tool result, not as a `<task-notification>` (those only reach main).
+`AskUserQuestion` is blocked inside a sub-agent, so a question for the human has to go
+back up as a hand-back.
+
 ## Image blocks in the analyzer
 A `tool_result` with an `image` block has no `text` key, so `text_of` falls back to
 `json.dumps(block)` and counts the whole base64 payload (a 300 KB PNG shows up as 400k

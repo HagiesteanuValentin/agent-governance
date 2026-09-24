@@ -15,8 +15,9 @@ ANY_TYPE = False
 PER_TYPE = False
 # 🔴 per-type thresholds only with --praguri-tip, default stays 150k/220k — docs/DECIZII.md «context-agent — scope main and per-type thresholds»
 TYPE_LIMITS = {"implementer-sonnet": (100000, 150000),
-               "scripter": (100000, 150000)}
-AGENT_PREFIXES = ("implementer", "scripter")
+               "scripter": (100000, 150000),
+               "orchestrator": (120000, 170000)}
+AGENT_PREFIXES = ("implementer", "scripter", "orchestrator")
 PLAN_DIR = "/.claude/plans/"
 SAFE_SUBAGENTS = ("scribe", "auditor")
 

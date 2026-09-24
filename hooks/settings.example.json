@@ -97,7 +97,7 @@
         ]
       },
       {
-        "_note": "implementer*/scripter* sub-agents only, measured on the worker transcript <dir(transcript_path)>/<session_id>/subagents/agent-<agent_id>.jsonl: warns once at 150000 tokens of context, denies every tool except Bash at 220000, and nudges once on the 3rd build/test/verifica-* Bash call; per-type thresholds are opt-in via --praguri-tip; triggers logged in /tmp/claude-hooks/context-agent.jsonl",
+        "_note": "implementer*/scripter*/orchestrator sub-agents only, measured on the worker transcript <dir(transcript_path)>/<session_id>/subagents/agent-<agent_id>.jsonl: warns once at 150000 tokens of context, denies every tool except Bash at 220000, and nudges once on the 3rd build/test/verifica-* Bash call; per-type thresholds are opt-in via --praguri-tip; triggers logged in /tmp/claude-hooks/context-agent.jsonl",
         "matcher": "*",
         "hooks": [
           {

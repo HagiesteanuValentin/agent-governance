@@ -23,11 +23,11 @@ lines marked "scope+" are not applied — list them in one line for the user at 
 live-agent cap and against the 3-explorer budget. Over either -> AskUserQuestion.
 
 ## Main in the implementation phase
-Main never reads `git diff` directly — the auditor reads every diff. Advisor is MANDATORY
-(not optional) when: a brief gets its 2nd DEVIATIONS report in a row · a worker's report has
-"unclear/risky" touching logic · the verifier fails again after a SendMessage round · any
-escalation to implementer-complex/-max. SendMessage the advisor the question plus the file paths; main
-does not decide alone. Every other rule in `orchestrare.md` still holds.
+The `orchestrator` agent executes; main never reads `git diff` directly and launches no
+worker. Advisor is MANDATORY when an orchestrator HAND-BACK is: logic DEVIATIONS left after a
+SendMessage · "unclear/risky" touching logic · the verifier failing again · an escalation to
+implementer-complex/-max. SendMessage the advisor the question plus the run-log path, then
+answer the SAME orchestrator. Every other rule in `orchestrare.md` still holds.
 
 ## Parallelism
 HARD CAP: at most 6 live agents at once, any type (was 4) — the user's call, 02.09: main's

@@ -150,7 +150,10 @@ FLAG_TEXT = {
     "tool_results_read": "worker read a tool-results/ file instead of re-running a narrower command",
     "late_first_edit": "worker read its way to a decision before writing anything",
     "main_read_before_first_agent": "main gathered the facts itself before the first agent",
-    "max_without_sendmessage": "implementer-max launched without a SendMessage first",
+    "max_without_sendmessage": ("implementer-max, or implementer-complex on a brief already "
+                                "run, launched without a SendMessage first"),
+    "fable_launched_worker": "main launched an implementer/scripter/auditor itself (v1.11+)",
+    "orchestrator_no_runlog": "orchestrator ended without writing a docs/dossier/run-*.md run-log",
     "agent_read_plan_whole": "worker read the whole plan file instead of its brief",
     "edit_via_bash": "worker edited source files through Bash instead of Edit/Write",
     "advisor_mandatory_missed": "two auditor reports with ABATERI in a row and no advisor "
@@ -173,6 +176,8 @@ SEVERITY_BASE = {
     "late_first_edit": "high",
     "main_read_before_first_agent": "high",
     "max_without_sendmessage": "high",
+    "fable_launched_worker": "high",
+    "orchestrator_no_runlog": "high",
     "advisor_mandatory_missed": "high",
     "no_low_phase": "high",
     "advisor_trigger_b_missed": "medium",
@@ -249,6 +254,10 @@ RECOMMENDATION = {
                                "implementer via SendMessage; implementer-max needs a written "
                                "reason (logic + failed SendMessage / dead context / declared "
                                "debugging).",
+    "fable_launched_worker": "{detail} - from v1.11 main hands the briefs to one orchestrator "
+                             "agent; workers and auditors are launched by it.",
+    "orchestrator_no_runlog": "{detail} - the orchestrator appends every report and audit "
+                              "verdict to docs/dossier/run-<slug>.md before it hands back.",
     "agent_read_plan_whole": "{detail} - the agent gets its own brief file "
                              "(scratchpad/brief-N.md), not the whole plan.",
     "edit_via_bash": "{detail} - code edits go through Edit/Write; Bash heredocs bypass the "
@@ -747,10 +756,11 @@ def session_files(jsonl_path, chain=None):
         subdir = os.path.join(main_path[:-len(".jsonl")], "subagents")
         if not os.path.isdir(subdir):
             continue
-        for name in sorted(os.listdir(subdir)):
-            if not name.endswith(".jsonl"):
-                continue
-            path = os.path.join(subdir, name)
+        found = []
+        for root, dirs, files in os.walk(subdir):
+            dirs.sort()
+            found.extend((n, os.path.join(root, n)) for n in files if n.endswith(".jsonl"))
+        for name, path in sorted(found):
             try:
                 size = os.path.getsize(path)
             except OSError:
@@ -1115,10 +1125,10 @@ def parse_file(path, label, tool_names, tool_inputs, chain=None):
                     if aid:
                         live_agents.add(aid.group(1))
                         doc["agent_ids"].setdefault(tuid, aid.group(1))
-                if (label is None and isinstance(tuid, str)
-                        and tuid in doc["agent_call_ids"]
+                if (isinstance(tuid, str) and tuid in doc["agent_call_ids"]
                         and MAX_TURNS_RE.search(body[:4000])):
-                    doc["max_turns_hit"] = True
+                    if label is None:
+                        doc["max_turns_hit"] = True
                     doc["max_turns_ids"].add(tuid)
                 doc["results"].append({
                     "tool_use_id": b.get("tool_use_id"),
@@ -1916,6 +1926,16 @@ CHANGES_RE = re.compile(r"^\s*(?:CHANGES|SCHIMB\w*)\s*:", re.I)
 # matches the Romanian wording of agent reports in the author's transcripts
 IMPROVE_RE = re.compile(r"^\s*(?:IMPROVEMENTS|[IÎ]MBUN\w*)\s*:", re.I)
 V17_VERSION_PREFIX = "v1.7"
+ORCHESTRATOR_VERSION = (1, 11)
+ORCHESTRATOR_TYPE = "orchestrator"
+WORKER_PREFIXES = ("implementer", "scripter", "auditor")
+RUNLOG_RE = re.compile(r"docs/(?:dosar|dossier)/run-[^\s/'\"]*\.md")
+RUNLOG_APPEND_RE = re.compile(r"(?:>>|\btee\s+(?:-\w*a\w*|--append)\s+(?:-\S+\s+)*)\s*['\"]?"
+                              r"\S*docs/(?:dosar|dossier)/run-[^\s/'\"]*\.md")
+
+
+def version_key(name):
+    return tuple(int(x) for x in re.findall(r"\d+", str(name or "")))
 
 
 def median(values):
@@ -2443,6 +2463,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
     used = set()
     workers = []
     seq = collections.Counter()
+    orch_max_ids = set()
 
     def add_worker(wtype, description, brief_chars, launch_model, entry, launch_id=None,
                    launch_at=None, brief_debugging=False):
@@ -2492,7 +2513,8 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
             "verify_with_fix": vfixed,
             "peak_ctx": max(wctx) if wctx else 0,
             "ctx_at_end": wctx[-1] if wctx else 0,
-            "max_turns_hit": bool(launch_id and launch_id in main_doc["max_turns_ids"])
+            "max_turns_hit": bool(launch_id and (launch_id in main_doc["max_turns_ids"]
+                                                 or launch_id in orch_max_ids))
                               or saturated,
             "transcript": path,
         }
@@ -2512,12 +2534,25 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
                                   launch.get("debugging"))
         if doc is not None:
             worker_scopes.append((w["scope"], doc, rows))
-    for aid, entry in sorted(by_agent_id.items()):
-        if aid in used:
-            continue
+    orch_docs = [d for sc, d, _r in worker_scopes if sc.startswith(ORCHESTRATOR_TYPE)]
+    orch_launch = {l["tool_use_id"]: (l, d["agent_results"].get(l["tool_use_id"]) or {})
+                   for d in orch_docs for l in d["agent_launches"]}
+    orch_max_ids.update(t for d in orch_docs for t in d["max_turns_ids"])
+    rest = [(aid, e) for aid, e in sorted(by_agent_id.items()) if aid not in used]
+    plain = [x for x in rest if x[1][3].get("toolUseId") not in orch_launch]
+    children = sorted((x for x in rest if x[1][3].get("toolUseId") in orch_launch),
+                      key=lambda x: (orch_launch[x[1][3]["toolUseId"]][0].get("at")
+                                     or (x[1][2] or {}).get("first_ts") or "", x[0]))
+    for aid, entry in plain + children:
         path, label, doc, meta = entry
-        w, doc2, rows = add_worker(meta.get("agentType") or label or "agent",
-                                   meta.get("description") or "", 0, None, entry)
+        ol, ores = orch_launch.get(meta.get("toolUseId"), (None, {}))
+        if ol:
+            w, doc2, rows = add_worker(ol["type"], ol["description"], ol["brief_chars"],
+                                       ores.get("resolvedModel"), entry, ol["tool_use_id"],
+                                       ol.get("at"), ol.get("debugging"))
+        else:
+            w, doc2, rows = add_worker(meta.get("agentType") or label or "agent",
+                                       meta.get("description") or "", 0, None, entry)
         worker_scopes.append((w["scope"], doc2, rows))
 
     # ------------------------------------------------ timing / iterations / context
@@ -2674,11 +2709,20 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
                               % (gap, tok(cur["cache_creation"]), usd(cost)),
                               {"kind": "resume", "gap_s": round(gap, 1), "at": cur["at"],
                                "tokens": cur["cache_creation"], "usd": round(cost, 4)}, 0))
-    sm_ts = sorted(t for t in main_doc["sendmessage_ts"] if isinstance(t, str))
+    sm_ts = sorted(t for d in [main_doc] + orch_docs for t in d["sendmessage_ts"]
+                   if isinstance(t, str))
     audit_ends = sorted(w["ended"] for w in workers
                         if w["type"] == "auditor" and w["ended"])
+    brief_seen = set()
     for w in workers:
-        if w["type"] != "implementer-max" or w.get("brief_debugging"):
+        key = brief_key(w["description"]) or w["scope"]
+        rerun = key in brief_seen
+        if w["type"].startswith("implementer"):
+            brief_seen.add(key)
+        if w.get("brief_debugging"):
+            continue
+        if not (w["type"] == "implementer-max"
+                or (w["type"] == "implementer-complex" and rerun)):
             continue
         at = w.get("launched_at") or w.get("started")
         if not at:
@@ -2743,6 +2787,34 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
                           {"max_concurrent": max_concurrent}, 0))
 
     version = version_of(first_ts, versions)
+    if version_key(version) >= ORCHESTRATOR_VERSION:
+        direct = [l for l in main_doc["agent_launches"]
+                  if str(l["type"]).startswith(WORKER_PREFIXES)]
+        if direct:
+            kinds = collections.Counter(l["type"] for l in direct)
+            flags.append(flag("fable_launched_worker", "main",
+                              "main launched %s" % ", ".join(
+                                  "%s×%d" % kv for kv in sorted(kinds.items())),
+                              {"launches": dict(kinds)}, 0))
+    for w in workers:
+        wd = docs_by_scope.get(w["scope"])
+        if not w["type"].startswith(ORCHESTRATOR_TYPE) or not wd or wd[0] is None:
+            continue
+        wrote = False
+        for c in wd[0]["calls"]:
+            for name, tid in zip(c["tool_names"], c["tool_ids"]):
+                inp = tool_inputs.get(tid) if tid else None
+                if not isinstance(inp, dict):
+                    continue
+                text = (inp.get("command") if name == "Bash"
+                        else inp.get("file_path") if name in ("Write", "Edit", "MultiEdit")
+                        else None)
+                pat = RUNLOG_APPEND_RE if name == "Bash" else RUNLOG_RE
+                if isinstance(text, str) and pat.search(text):
+                    wrote = True
+        if not wrote:
+            flags.append(flag("orchestrator_no_runlog", w["scope"],
+                              "%s wrote no docs/dossier/run-*.md" % w["scope"], None, 0))
     v17, v17_flags = v17_block(main_doc, workers,
                                {sc: d for sc, d, _r in worker_scopes},
                                tool_inputs, pricing, version, flags,
@@ -3462,6 +3534,8 @@ WASTE_FAMILIES = {
     "agent_read_plan_whole": "reads",
     "edit_via_bash": "agent overhead",
     "max_without_sendmessage": "discipline",
+    "fable_launched_worker": "discipline",
+    "orchestrator_no_runlog": "discipline",
     "long_agent_report": "agent overhead",
     "agent_reread_own_write": "agent overhead",
     "agent_ctx_high": "agent overhead",

@@ -151,6 +151,18 @@ got11, _ = decide("check", {"session_id": "s11", "transcript_path": tp("s11"),
                             "tool_name": "Agent", "tool_input": {}})
 case("6 live + autonomous marker -> allow", got11 == "allow", got11)
 
+# 10c) check fired inside the orchestrator sub-agent (agent_id + agent_type in payload)
+def orch_check(sid, n):
+    make(sid, [A(i, "implementer") for i in range(1, n + 1)])
+    return decide("check", {"session_id": sid, "transcript_path": tp(sid),
+                            "agent_id": "orch1", "agent_type": "orchestrator",
+                            "tool_name": "Agent", "tool_input": {}})
+got12, body12 = orch_check("s12", 6)
+case("orchestrator sub-agent, 6 live -> ask", got12 == "ask" and "6 live agents" in body12,
+     "%s %s" % (got12, body12))
+got13, _ = orch_check("s13", 3)
+case("orchestrator sub-agent, 3 live -> allow", got13 == "allow", got13)
+
 # 10) session isolation: cap reached in s2 doesn't affect s1
 got10, _ = decide("check", {"session_id": "s1", "transcript_path": tp("s1"),
                             "tool_name": "Agent", "tool_input": {}})

@@ -388,6 +388,16 @@ a prompt does not activate it by accident.
 Tests: `bash hooks/test-autonom.sh` (23 cases, EN/RO), also runnable against the live copy
 with `HOOK=~/.claude/hooks/autonom.sh`.
 
+### Orchestrator (v1.11)
+
+After ExitPlanMode, execution moves to a background `orchestrator` agent (Opus 5.5 medium)
+that launches implementer/auditor agents per brief instead of Fable doing it turn by turn.
+Fable keeps plan mode, advisor, and the final verdict + commit, read from the orchestrator's
+run-log summary. Hand-back is strict: the orchestrator stops on any unresolved logic
+deviation, a second failed check, or a hit cap, rather than deciding alone. A `SendMessage`
+PING after each brief's audit keeps Fable's (main's) cache warm while it waits. See
+`docs/RECIPES.md` "Task with orchestrator (v1.11)" and `docs/DECIZII.md` "v1.11".
+
 ## Measured results
 
 From `metrics/baseline-2026-08.md`, regenerated 2026-08-30 over 51 kept sessions

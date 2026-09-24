@@ -142,6 +142,24 @@ case("implementer-sonnet 160k without --praguri-tip -> context 150k", [],
      payload(s_son2, "Edit", {"file_path": "/x/y.ts"},
              "a-%s-son2" % RUN, "implementer-sonnet"), "context", "150k")
 
+# orchestrator: per-type 120k/170k; Bash (run-log append) stays allowed past deny
+s_orw = "%s-orw" % RUN
+sub_fixture(s_orw, "a-%s-orw" % RUN, 125000)
+case("orchestrator 125k with --praguri-tip -> context 120k", ["--praguri-tip"],
+     payload(s_orw, "Agent", {"subagent_type": "implementer"},
+             "a-%s-orw" % RUN, "orchestrator"), "context", "120k")
+s_ord = "%s-ord" % RUN
+sub_fixture(s_ord, "a-%s-ord" % RUN, 175000)
+case("orchestrator 175k Agent -> deny 170k", ["--praguri-tip"],
+     payload(s_ord, "Agent", {"subagent_type": "implementer"},
+             "a-%s-ord" % RUN, "orchestrator"), "deny", "170k")
+case("orchestrator 175k Bash >> run-log -> not denied (warn once)", ["--praguri-tip"],
+     payload(s_ord, "Bash", {"command": "cat r.md >> docs/dossier/run-x.md"},
+             "a-%s-ord" % RUN, "orchestrator"), "context", "120k")
+case("orchestrator 175k Bash >> run-log again -> allow", ["--praguri-tip"],
+     payload(s_ord, "Bash", {"command": "cat r.md >> docs/dossier/run-x.md"},
+             "a-%s-ord" % RUN, "orchestrator"), "allow")
+
 # 11-12. cell-* only with --any-type
 s_cell = "%s-cell" % RUN
 sub_fixture(s_cell, "a-%s-cell" % RUN, 230000)

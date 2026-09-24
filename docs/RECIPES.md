@@ -184,6 +184,33 @@ Teardown: `MAMA=<project> bash scripts/cell-teardown.sh complex rN --yes`.
 Trap rule: pick a trap the verifier cannot check directly (r8-r10's verifier leaked the
 answer for a checkable trap).
 
+## Task with orchestrator (v1.11)
+After ExitPlanMode, Fable extracts each `## Brief N` from the plan into
+`<scratchpad>/brief-N.md` (sed), then launches ONE `orchestrator` agent (background), prompt
+≤10 lines: path to the plan, paths to the briefs, path to the run-log, the ordering/
+parallelism declared at plan time, and prohibitions.
+The orchestrator (Opus 5.5 medium, own context) for each brief launches implementer*/
+scripter* (synchronous), then auditor* on the diff, up to 2 `SendMessage` resends, and
+applies mechanical auditor fixes itself. It writes `docs/dosar/run-<slug>.md`: a SUMMARY
+(≤150 lines, per brief: agent, verdict, deviations, decision; `git diff --stat`; unverified
+items; `HAND-BACK: <reason>`) followed by an ANNEX with the full reports. Written with Bash
+`>>` (append), never rewritten with Write. Final report ≤2k chars = a pointer to the run-log
+plus 10 lines. A launch refused by a hook (agenti-vii ask, classifier) is a hand-back, not a
+retry.
+Hand-back is STRICT — the orchestrator stops (report + run-log) on: logic deviations left after
+1 `SendMessage` · an "unclear/risky" item touching logic · a verifier failing a 2nd time ·
+ambiguous brief / missing file / plan contradicted by code · any cap (3 runs/brief, 6 live
+agents, 150k own context) · any question for the user.
+After each brief's audit verdict, the orchestrator sends `main` a `SendMessage` PING
+(≤3 lines: `PING brief N: <verdict> · <next step> · <time>`) to keep Fable's cache warm
+between turns — no autonomous-mode trigger words in it.
+Fable, on notification: reads the run-log SUMMARY (`Read` with `limit 150`, once; the annex
+only for flagged reports, with `offset`) plus `git diff --stat`, then verdicts OK (commit
+itself) or HAND-BACK (`SendMessage` to the same orchestrator, ≤3 per task). Fable never
+launches implementer*/scripter*/auditor* directly during this flow and does not edit code.
+When JS/TS/astro logic changed, Fable launches a final `auditor-complex` on the whole diff.
+On a PING, Fable answers with at most one line, zero tool calls, zero decisions.
+
 ## Sync offline_telemetry_script
 Manual; the public export script does not cover it:
 copy `tools/session_metrics.py` over `session_metrics.py` in the offline_telemetry_script checkout,
