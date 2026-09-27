@@ -108,6 +108,69 @@ try:
             want = ""
     if not want or eff == want:
         sys.exit(0)
+    # 🔴 a user /effort becomes the target (not in plan mode) — DECIZII «v1.13 — /effort al utilizatorului e țintă»
+    tp = data_in.get("transcript_path") or ""
+    if sid and tp and data_in.get("permission_mode") != "plan":
+        from datetime import datetime
+        tgt = os.path.join(state_dir, "effort-target-%s" % sid)
+        def ts(e):
+            try:
+                return datetime.fromisoformat(str(e.get("timestamp")).replace("Z", "+00:00")).timestamp()
+            except Exception:
+                return None
+        def text(e):
+            c = (e.get("message") or {}).get("content")
+            if isinstance(c, list):
+                c = "".join(b.get("text") or "" for b in c if isinstance(b, dict) and b.get("type") == "text")
+            return c if isinstance(c, str) else ""
+        def lines_rev(path, bs=65536):
+            with open(path, "rb") as f:
+                f.seek(0, 2)
+                pos, rest = f.tell(), b""
+                while pos > 0:
+                    step = min(bs, pos)
+                    pos -= step
+                    f.seek(pos)
+                    parts = (f.read(step) + rest).split(b"\n")
+                    rest = parts.pop(0)
+                    for ln in reversed(parts):
+                        yield ln
+                if rest:
+                    yield rest
+        def user_set():
+            ok_parents, nxt_ok = set(), False
+            for ln in lines_rev(tp):
+                if not ln.strip():
+                    continue
+                try:
+                    e = json.loads(ln)
+                except Exception:
+                    continue
+                if not isinstance(e, dict):
+                    continue
+                t = ts(e)
+                if t is not None and t < since:
+                    return False
+                if e.get("type") != "user" or e.get("isSidechain"):
+                    continue
+                s = text(e).lstrip()
+                if s.startswith("<command-name>/effort<") and t is not None and t > since \
+                        and (nxt_ok or e.get("uuid") in ok_parents):
+                    return True
+                m = re.match(r"<local-command-stdout>Set effort level to (\w+)", s)
+                nxt_ok = bool(m and m.group(1) == eff)
+                if nxt_ok and e.get("parentUuid"):
+                    ok_parents.add(e.get("parentUuid"))
+            return False
+        try:
+            since = os.path.getmtime(tgt)
+            adopt = user_set()
+        except Exception:
+            adopt = False
+        if adopt:
+            with open(tgt, "w") as f:
+                f.write(eff + "\n")
+            sys.exit(0)
     reason = ("STOP: effort effective=%s, target=%s. Write ONE line to the user: "
               "«Tu: /effort %s, apoi scrie go» and end the turn. "
               "Do not retry tools." % (eff, want, want))

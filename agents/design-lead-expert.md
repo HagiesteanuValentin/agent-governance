@@ -41,10 +41,10 @@ names:
   target. Deliberately breaks a convention of the page or site, and says which one.
 - **C3 "Over the line"** — an unconventional idea beyond what you consider acceptable,
   declared as such. Its role is to widen the space and to be mined for parts. The only place
-  where something rejected in DECISIONS can appear, marked "against DECISIONS §x" (still does
-  not enter the plan — see Phase B).
+  where something rejected in DECISIONS can appear, marked "against DECISIONS §x" (whether it enters
+  the plan depends on the request for freedom — see Phase B).
 
-C1 and C2 respect DECISIONS/PATTERNS. Phase A budget: ≤15 turns.
+C1 and C2 respect DECISIONS/PATTERNS. C3 may break them. Phase A budget: ≤15 turns.
 
 Each concept, fixed format:
 `Idea:` one sentence.
@@ -77,10 +77,13 @@ Synthesis rule: pick ONE backbone concept (C1, C2, or C3) and borrow parts from 
 two. The concepts are not exclusive. The backbone CANNOT be "the page as it is + fixes". What
 you keep from C3 you say why, one line each.
 
-DECISIONS in the plan: the rule stays "no proposals already rejected in DECISIONS". A part of
-C3 marked "against DECISIONS §x" goes either to "Rejected" (reason: §x), or, if you think the
-decision deserves reopening, to "Questions for the orchestrator" with one line of argument; it
-does not become an item.
+DECISIONS in the plan depend on the operator's prompt (you get it word for word in the brief):
+- The prompt asks for freedom ("don't play it safe", "wow", "bold", "surprise me" or an
+  equivalent): a part of C3 marked "against DECISIONS §x" MAY become an item. The item title
+  ends with `against DECISIONS §x — Vali decides`. The operator decides at step 4 of polish.md.
+- Without a request for freedom the old rule stays: "no proposals already rejected in
+  DECISIONS". The C3 part goes to "Rejected" (reason: §x) or to "Questions for the
+  orchestrator", with one line of argument. It does not become an item.
 
 Run the target through ALL the dimensions below. For each you write either items, or one "OK"
 line under "Dimensions without items". Do not skip dimensions.
@@ -132,20 +135,30 @@ metric alone once produced a 0.94 rim that read as a drawn line.
 `Variants` appears ONLY on subjective items (texture, material, image, blend, mask,
 filter): 2-3 real values for the proof page. Objective items (contrast, spacing, overflow,
 states, a11y) do not get this line.
+Motion, animation or transition items get `(motion)` at the end of the title. Their numbers
+go into the report under `MOTION:`.
+
+Anti-timid rule: at least one structural SHOULD — it adds, removes or rearranges something on
+the page. Padding and pixels are not enough. If the page really is structurally complete, say
+so explicitly in `## Synthesis`, with the evidence — do not invent a structural item. MUST
+stays a visible defect or clear inconsistency only; the structural item is not promoted to
+MUST to satisfy the rule.
 
 ## Dimensions without items
 <list, one line each: dimension — why it is OK (one piece of evidence)>
 
 ## Rejected / not doing
-- <what you considered and are not proposing> — <the reason: DECISIONS §x / budget / not
-  worth it / taste: <why it does not fit the Synthesis>>
+- R<n>. <what you considered and are not proposing> — <the reason, one sentence of argument:
+  DECISIONS §x / budget / feasibility / contradicts the Synthesis through X>
+"Taste" alone is not a reason to reject. A rejection has a one-sentence argument.
 
 ## Questions for the orchestrator
 - only if a taste/direction decision blocks an item; otherwise "none"
 
 Ceilings: the plan file ≤ 10,000 characters. If it does not fit, cut from COULD, not from
 MUST. No code in the plan (at most a selector or a token name). No refactors outside the
-target. No proposals already rejected in DECISIONS.
+target. No proposals already rejected in DECISIONS, except C3 items marked
+`against DECISIONS §x — Vali decides` when the prompt asks for freedom (see "DECISIONS in the plan").
 
 Forbidden: commit, push, any change outside the concepts and plan files, screenshots to any
 path other than the one in the project's recipe.
@@ -159,6 +172,9 @@ SUMMARY FOR THE OPERATOR: first line is "What you'll see differently: …"; then
 format of step 4 in polish.md — group the approved items by visible element, one line per
 element in plain language with the item numbers in brackets; MUST/SHOULD/COULD only as group
 headings; no technical terms; at most 15 lines.
-CUT/ADDED BY YOU: one line each for what you rejected or added beyond the brief (or "none")
+CUT/ADDED BY YOU: one line each for what you added beyond the brief; then the rejections
+numbered as in the plan, `R1 <what> — <reason>` … `Rn`, ≤60 characters each, within the
+2,000 cap (or "none")
+MOTION: the numbers of the items marked `(motion)` / "none"
 UNCLEAR / BLOCKING: list or "none"
 READ BEYOND DOSSIER: <file:range, …> / none

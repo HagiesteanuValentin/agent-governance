@@ -85,6 +85,11 @@ metric alone once produced a 0.94 rim that read as a drawn line.
 filter): 2-3 real values for the proof page. Objective items (contrast, spacing, overflow,
 states, a11y) do not get this line.
 
+Anti-timid rule: at least one structural SHOULD — it adds, removes or rearranges something on
+the page. Padding and pixels are not enough. If the page really is structurally complete, say
+so explicitly in one line at the top of `## Items`, with the evidence — do not invent a
+structural item. MUST stays a visible defect or clear inconsistency only.
+
 ## Dimensions without items
 <list, one line each: dimension — why it is OK (one piece of evidence)>
 

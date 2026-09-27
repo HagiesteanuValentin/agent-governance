@@ -43,3 +43,4 @@ the per-session target into /tmp and warns on mismatch. Main, first line after E
 plan mode. Reason: `DECIZII «v1.8 — efort pe faze reluat»`.
 In /polish and /refine the command itself runs the hook at step 0 (medium) and 5 (low); same
 «You: /effort, then type go».
+A user `/effort` outside plan mode becomes the target until the next ExitPlanMode.

@@ -38,6 +38,8 @@ your head. The flow, in order:
    If the target does not name the page ("this page", "here", a component without a page) →
    ask for the page with AskUserQuestion IMMEDIATELY, before any agent.
 2. Design lead. Two routes, per the choice from step 1. Either way: a single design lead.
+   Every brief to a design lead starts with the operator's prompt word for word, no
+   paraphrase — the expert decides from it whether there is a request for freedom.
    SHORT ROUTE — a single run of the `design-lead` agent. Brief: the goal in one sentence, the
    target, the paths, the plan path, the sections from the sources (headings),
    the URL, breakpoints. The design-lead does not have the Agent tool and does not delegate.
@@ -72,7 +74,7 @@ your head. The flow, in order:
        brief-0 path, run-log `docs/dosar/run-<slug>.md`, "a single brief", the prohibitions.
        No plan path — the plan does not exist yet.
    2c. ONLY when the lead is the expert: `design-lead-expert`, Phase A, launched in the SAME
-       message as the 2b `orchestrator`. Brief: the goal, the target, the dossier path, the path of
+       message as the 2b `orchestrator`. Brief: the operator's prompt word for word, the goal, the target, the dossier path, the path of
        `docs/polish/<slug>.concepts.md`, the plan path, the reason from `Lead:`, breakpoints.
        No measurements, no code paths, no copied sections — they are in the dossier. The
        exception to "one agent at a time" is declared here: the files are disjoint
@@ -92,14 +94,17 @@ your head. The flow, in order:
 3. Adversarial review (you). Read the plan file ONCE. Against:
    DECISIONS (rejected items reintroduced? ceilings?), the JS/CSS budget, the scope the
    operator asked for, the dimensions checklist (a dimension marked "OK" without evidence →
-   new item or question). For each item: KEEP / CUT (one-line reason, move it to "Rejected") /
+   new item or question).
+   Exception: when the operator's prompt asks for freedom ("don't play it safe", "wow"), an
+   item marked `against DECISIONS §x — Vali decides` is NOT cut for DECISIONS; Vali decides at step 4.
+   For each item: KEEP / CUT (one-line reason, move it to "Rejected") /
    MERGE / ADD (same format, with acceptance). Rewrite vague items with measurable
    acceptance. Edit the file directly with Edit, change "State: v2 main".
    Do not launch a second design-lead for this.
    The aesthetic guard is required by the design-lead's format, you do not add it: verify
    that every numeric acceptance has a guard in words; missing → ask for it in one
    SendMessage to the live design-lead.
-   Plan from `design-lead-expert`: the review is ONLY against DECISIONS / budget / the
+   Plan from `design-lead-expert`: the review is ONLY against DECISIONS (with the exception above) / budget / the
    operator's scope / missing dimensions — you do not rewrite taste items. Plus four
    objective checks (not taste): a `## Synthesis` section exists; the backbone concept is not
    "the page as it is + fixes"; at least one MUST has `From:` = the backbone concept; every
@@ -115,6 +120,8 @@ your head. The flow, in order:
    visible element (button, card, menu, section spacing…), one line per element in plain
    language with the item numbers in brackets, MUST/SHOULD/COULD as group headings, no
    technical terms, at most 15 lines — plus its CUT/ADDED BY YOU line and the plan path.
+   Plan from the expert: also copy verbatim the `R1…Rn` rejections list from the report. Vali
+   revives a rejection by writing its number ("R3"); you send it to the live expert as a new item (`SendMessage`, counts toward the ceiling below).
    After its summary add ONE line of your own: "Cut/added by main: P<n> (reason) /
    none".
    Wait for: approve all / cut / add. Their changes go into the file before step 5 (ask an
@@ -132,7 +139,9 @@ your head. The flow, in order:
    design-lead (short route) or from brief 0 (long route); every brief runs it,
    none redo the screenshots.
    After go, WRITE each brief to `<scratchpad>/brief-N.md` from the approved items (the plan
-   has no `## Brief N`; you write them, not extract them). Launch ONE new `orchestrator` (the
+   has no `## Brief N`; you write them, not extract them). A brief with items from the report's
+   `MOTION:` line (marked `(motion)`) → write `implementer-complex` as the worker in brief-N.md;
+   take the mark from the report, do not read the plan. Launch ONE new `orchestrator` (the
    2b one is dead) with: the plan path, the brief paths, run-log `docs/dosar/run-<slug>.md`,
    the declared parallelism, the prohibitions. You never launch the worker yourself.
    The prohibitions: as in CLAUDE.md ("The relevant prohibitions"). The brief gives: the plan
