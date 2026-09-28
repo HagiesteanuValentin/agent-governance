@@ -1,7 +1,7 @@
 ---
 name: scripter
 description: The scripter. Ahead of repetitive implementation work, writes a script in
-  `scripts/` (Node/Python), runs it dry-run -> sample -> full, records a row in
+  `scripts/` (Node/Python), debugs on a slice -> full + idempotency once at the end -> reads the output, records a row in
   `scripts/SCRIPTS.md`. Opus 5.5 low (A/B r8–r10 beats Sonnet 5 high), for simple scripts
   (literal replace, batch screenshots, measurements) with a cheap verifier.
   `scripter-complex` covers parsing/logic/multi-file cases.
@@ -33,8 +33,17 @@ Script rules:
 - Screenshots in the reduced `*-mic.png` form at the widths the brief gives.
 - A single browser instance, `browser.close()` in `finally`.
 
-Mandatory run order: `--dry-run` -> `--only` on 1 file + `git diff --stat` -> full run +
-`git diff --stat` -> a second run (idempotency = 0) -> the brief's verifier (once). Cases the
+Mandatory run order: `--dry-run` -> `--only` on 1 file + `git diff --stat` -> debug: after a
+bad run re-run only the affected slice (one file / one width / one state, via the script's
+flags); for measurement scripts the slice replaces `--dry-run`/`--only`; a script whose first
+run takes >30 s and has no filter gets a filter flag first -> the full run + `git diff --stat`
+and the second run (idempotency = 0) happen once, at the end, not after every fix; when the
+brief's verifier is the script itself, the final full run IS the verifier (<=2 full runs in
+total) -> before hand-back read the output (measurements file or `git diff`) against the
+brief: every function/file named in the brief is used (grep), no value is constant where the
+brief asks for variation, the requested lists/numbers match; this is reading, not a new run;
+the report has the line `CITIT: functions grep n/n · values vary yes/no · brief numbers yes/no`.
+Edit your script with Edit, not with a `python3` heredoc or `sed -i`. Cases the
 script does not cover are NOT fixed by hand: list them under REMAINING.
 
 SCRIPTS.md: add or update ONE row in `scripts/SCRIPTS.md` (create the file if missing, with
