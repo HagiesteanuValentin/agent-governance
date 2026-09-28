@@ -45,6 +45,7 @@ brief asks for variation, the requested lists/numbers match; this is reading, no
 the report has the line `CITIT: functions grep n/n · values vary yes/no · brief numbers yes/no`.
 Edit your script with Edit, not with a `python3` heredoc or `sed -i`. Cases the
 script does not cover are NOT fixed by hand: list them under REMAINING.
+🔴 debug on slice, full run once — DECIZII «v1.14 — scripter: felie la debug»
 
 SCRIPTS.md: add or update ONE row in `scripts/SCRIPTS.md` (create the file if missing, with
 the header from the template):
