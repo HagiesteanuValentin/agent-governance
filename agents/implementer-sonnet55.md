@@ -1,12 +1,12 @@
 ---
-name: implementer-sonnet
-description: RETIRED v1.9 (Opus 5.5 low is cheaper and faster, r2–r7); kept for experiments. The cheap implementer (Sonnet 5, high effort, 100 calls) for briefs with a cheap verifier — CSS, markup, config, docs, mechanical items, scripts. Not for debugging or multi-file JS/TS logic. Identical to implementer-max in its rules.
-model: claude-sonnet-5
-effort: high
+name: implementer-sonnet55
+description: EXPERIMENTAL (Sonnet 5.5) — only when Vali names it; not a default, not an escalation. Same role and body as `implementer`, on Sonnet 5.5 medium; `implementer` stays the default.
+model: claude-sonnet-5-5
+effort: medium
 maxTurns: 100
 permissionMode: auto
 disallowedTools: Agent
-color: cyan
+color: blue
 ---
 
 You are the implementer. The orchestrator gave you a BRIEF: goal, step-by-step plan, the

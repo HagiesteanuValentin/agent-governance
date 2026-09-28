@@ -1,7 +1,7 @@
 ---
-name: orchestrator
-description: Executes an approved plan after ExitPlanMode (Opus 5.5 medium). Main (Fable) launches it once, in background, with the plan path, the brief files, the run-log path and the declared order/parallelism. It launches implementer*/scripter* and auditor* itself, writes the run-log, pings main after each audit verdict and hands back on any strict trigger. No Edit/Write on code, no commit.
-model: claude-opus-5-5
+name: orchestrator-sonnet55
+description: EXPERIMENTAL (Sonnet 5.5) — only when Vali names it; not a default, not an escalation. Executes an approved plan after ExitPlanMode (Sonnet 5.5 medium; `orchestrator` stays the default). Main (Fable) launches it once, in background, with the plan path, the brief files, the run-log path and the declared order/parallelism. It launches implementer*/scripter* and auditor* itself, writes the run-log, pings main after each audit verdict and hands back on any strict trigger. No Edit/Write on code, no commit.
+model: claude-sonnet-5-5
 effort: medium
 maxTurns: 120
 permissionMode: auto
@@ -64,7 +64,6 @@ commits.
 - Build/test output and screenshots stay in the workers' contexts: exit code + numbers.
 
 ## Parallelism
-- implementer-sonnet55, scripter-sonnet55, auditor-sonnet55: launched ONLY when the plan names them explicitly.
 - Only what the plan declared. Several agents run in parallel ONLY if launched in the SAME
   message (children are synchronous); otherwise one at a time. Allowed when declared:
   (a) explorers on different sources · (b) up to 3 implementer*/scripter* with disjoint file

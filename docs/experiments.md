@@ -414,3 +414,24 @@ Verdict (hypotheses):
   /home/vali/workflow/proiecte/site_ac-email), pending Vali's live test with Resend.
 - Decision on implementer-complex remains OPEN; next session: brainstorm a genuinely long task
   (View Transitions on blueprint_restaurant_v2, multi-step configurator state, etc.).
+
+## 2026-09-28 — Sonnet 5.5 (28.09) — protocol
+
+Cells: `cell-sonnet55-{low,medium,high}` vs `cell-opus55-low`, on the real task given by Vali,
+same prompt, ≥3 runs per cell. Metrics: cost, duration, calls, deviations in the blind audit,
+/rate.
+
+Confounds: explicit model ID in the report (not just the alias), because the `sonnet` alias can
+move to another model between runs.
+
+The short explorer test repeats the protocol in lines 7-21 above, with `explorer-sonnet55`
+instead of Sonnet 5 medium/high/Opus 5 low.
+
+`auditor-sonnet55`: blind re-audit of old diffs with already known deviations, taken from
+existing run-logs (not new diffs), to check whether it finds the same deviations.
+
+`orchestrator-sonnet55` is last in the protocol. Measured: wrong hand-backs and unnecessary
+re-sends, not just cost. Savings are ~$0.85 per session; the orchestrator cost ~9% of the total
+across 29 sessions (24-28.09).
+
+Confound: `-sonnet55` agents are set to `medium` in frontmatter, but the model defaults to `high`.

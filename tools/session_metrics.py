@@ -2801,7 +2801,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
     version = version_of(first_ts, versions)
     if version_key(version) >= ORCHESTRATOR_VERSION:
         launches = main_doc["agent_launches"]
-        orch_at = [i for i, l in enumerate(launches) if l["type"] == ORCHESTRATOR_TYPE]
+        orch_at = [i for i, l in enumerate(launches) if l["type"] in (ORCHESTRATOR_TYPE, "orchestrator-sonnet55")]
         audits = [i for i, l in enumerate(launches) if l["type"] == "auditor-complex"]
         audits_ok = bool(orch_at) and audits_after_orch(orch_at, audits)
         direct = [l for l in launches

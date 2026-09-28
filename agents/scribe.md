@@ -1,7 +1,7 @@
 ---
 name: scribe
 description: The scribe. Light tasks with no design or architecture judgement — rewriting HANDOFF.md from a brief, moving text between docs, one-line fixes, renames, typo and comment corrections. Cheap and fast.
-model: sonnet
+model: claude-sonnet-5
 effort: low
 maxTurns: 40
 permissionMode: auto

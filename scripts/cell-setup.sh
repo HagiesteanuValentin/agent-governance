@@ -5,7 +5,7 @@ set -euo pipefail
 # set to your project
 MAMA="${MAMA:-${PROJECT:-${HOME}/workflow/proiecte/your-project}}"
 EXPERIMENTE="${HOME}/workflow/experimente"
-CELLS=(cell-opus-low cell-opus-medium cell-sonnet-medium cell-sonnet-low cell-opus55-low cell-opus55-medium)
+CELLS=(cell-opus-low cell-opus-medium cell-sonnet-medium cell-sonnet-low cell-opus55-low cell-opus55-medium cell-sonnet55-low cell-sonnet55-medium cell-sonnet55-high)
 
 TASK="${1:-}"
 RUN="${2:-}"
