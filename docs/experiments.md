@@ -450,3 +450,13 @@ Sonnet 5 low: tokens 18.4k/18.3k/18.9k, 5/5/4 tool calls, 21s/20s/17s.
 Sonnet 5.5 low: tokens 13.9k/13.5k/14.0k, 5/3/3 tool calls, 21s/14s/16s.
 
 Decision (2026-09-30, Vali's OK): scribe moved to `claude-sonnet-5-5` low; `scribe-sonnet55` deleted.
+
+## 2026-09-30 — configurator QR, implementer-sonnet55 vs implementer (n=1)
+
+Task: QR configurator (blueprint_prezentare phase 3, placeholder). Arm A = implementer-sonnet55 medium, arm B = implementer Opus 5.5 low; both passed the orchestrator's audit.
+Blind audit (auditor-complex): B 4/5, A 3/5 (A: overlay lags the photo by up to 8px on scroll 4.15-4.55; its verification scripts had a false positive).
+Implementer cost A $0.70 vs B $1.91; whole arm ~$2.40 vs ~$3.80; 20.5 vs 23.5 min.
+Sonnet 5.5 flags: sterile_verification (12 runs, 1 fix), edit_via_bash.
+Confounds: n=1, effort medium (A) vs low (B), orchestrators ran in parallel.
+Conclusion: Sonnet 5.5 for simple tasks (CSS, markup, config, docs); Opus low for logic.
+Run-logs: `docs/dosar/run-configurator-{A,B}.md`.
