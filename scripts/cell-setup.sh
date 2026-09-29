@@ -5,7 +5,9 @@ set -euo pipefail
 # set to your project
 MAMA="${MAMA:-${PROJECT:-${HOME}/workflow/proiecte/your-project}}"
 EXPERIMENTE="${HOME}/workflow/experimente"
-CELLS=(cell-opus-low cell-opus-medium cell-sonnet-medium cell-sonnet-low cell-opus55-low cell-opus55-medium cell-sonnet55-low cell-sonnet55-medium cell-sonnet55-high)
+DEFAULT_CELLS="cell-opus-low cell-opus-medium cell-sonnet-medium cell-sonnet-low cell-opus55-low cell-opus55-medium cell-sonnet55-low cell-sonnet55-medium cell-sonnet55-high"
+read -r -a CELLS <<<"${CELLS:-$DEFAULT_CELLS}"
+CHECK="${CHECK:-npm run check}"
 
 TASK="${1:-}"
 RUN="${2:-}"
@@ -13,6 +15,10 @@ DOSAR=""
 
 if [[ -z "$TASK" || -z "$RUN" ]]; then
   echo "Usage: cell-setup.sh <task> <run> [--dosar DIR]" >&2
+  exit 1
+fi
+if [[ "$TASK" == */* ]]; then
+  echo "TASK must not contain '/': $TASK" >&2
   exit 1
 fi
 shift 2 || true
@@ -76,9 +82,9 @@ done
 
 # --- baseline: npm run check in the first worktree ---
 BASELINE_FILE="$(cd "$(dirname "$0")" && pwd)/cell-baseline-${TASK}.txt"
-echo "Running 'npm run check' in $FIRST_WT ..."
+echo "Running '$CHECK' in $FIRST_WT ..."
 set +e
-CHECK_OUT="$(cd "$FIRST_WT" && npm run check 2>&1)"
+CHECK_OUT="$(cd "$FIRST_WT" && bash -c "$CHECK" 2>&1)"
 CHECK_EXIT=$?
 set -e
 

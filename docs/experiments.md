@@ -460,3 +460,33 @@ Sonnet 5.5 flags: sterile_verification (12 runs, 1 fix), edit_via_bash.
 Confounds: n=1, effort medium (A) vs low (B), orchestrators ran in parallel.
 Conclusion: Sonnet 5.5 for simple tasks (CSS, markup, config, docs); Opus low for logic.
 Run-logs: `docs/dosar/run-configurator-{A,B}.md`.
+
+## bench-s55 simplu (30.09)
+
+3 real tasks from promo-site (C: ContactForm labels; A: /parteneri page; B: partner header + placeholders) × 3 cells × 3 runs = 27. Blind auditor (`auditor`, Opus 5.5 medium), one audit per unique diff (C: 9 diffs identical by md5 → 1 audit). Model verified in jsonl: sonnet55-* = claude-sonnet-5-5, opus55-low = claude-opus-5-5. Values: median (min–max) over 3 runs; "False-done" = a "done" report contradicted by verify; "Builds" = total over 3 runs.
+
+| Cell | Task | Audit score | Cost $ | Duration s | Turns | Deviations | False-done | Builds |
+|---|---|---|---|---|---|---|---|---|
+| sonnet55-medium | C | 4 (4–4) | 0.07 (0.06–0.09) | 24 (21–33) | 6 (5–9) | 0 (0–0) | 0/3 | 3 |
+| sonnet55-medium | A | 4 (3–4) | 0.15 (0.13–0.16) | 73 (70–77) | 8 (7–10) | 2 (2–3) | 2/3 | 3 |
+| sonnet55-medium | B | 4 (4–4) | 0.15 (0.14–0.18) | 47 (43–59) | 9 (7–13) | 2 (2–3) | 0/3 | 3 |
+| sonnet55-low | C | 4 (4–4) | 0.07 (0.05–0.07) | 18 (18–20) | 5 (5–5) | 0 (0–0) | 0/3 | 3 |
+| sonnet55-low | A | 3 (3–5) | 0.14 (0.13–0.15) | 72 (71–79) | 8 (8–10) | 2 (1–3) | 2/3 | 3 |
+| sonnet55-low | B | 4 (4–4) | 0.14 (0.13–0.15) | 49 (48–53) | 9 (9–10) | 3 (1–3) | 0/3 | 4 |
+| opus55-low | C | 4 (4–4) | 0.13 (0.12–0.13) | 26 (25–27) | 5 (5–6) | 0 (0–0) | 0/3 | 3 |
+| opus55-low | A | 3 (3–4) | 0.33 (0.28–0.35) | 105 (95–108) | 13 (9–13) | 3 (2–3) | 2/3 | 4 |
+| opus55-low | B | 5 (4–5) | 0.27 (0.25–0.39) | 73 (55–82) | 12 (8–15) | 0 (0–1) | 1/3 | 3 |
+
+- Scope creep (files outside the brief): 0 in all 27.
+- Existing comments deleted: sonnet55-medium 3 (A 1, B 2), sonnet55-low 4 (B 4), opus55-low 0.
+- False-done on A: same cause in all cells, the duplicated title suffix ("| Vulcan Edge | Vulcan Edge"), verified by substring grep. B opus run 1/3 = false claim about a deleted comment, verify 20/20.
+- Total cost of 9 runs: sonnet55-medium $1.13 · sonnet55-low $1.04 · opus55-low $2.25.
+
+Confounds:
+- Tasks replayed from the repo history: the model may have seen the reference code.
+- Opus auditor on Sonnet and Opus diffs; scores vary between auditors on the same deviation (A: duplicated suffix scored 3 or 4).
+- Different effort: Sonnet medium/low vs Opus low.
+- Brief A has an impossible criterion ("no /pachete", global nav); not penalized.
+- n=3 per cell; C does not discriminate (identical diff in all 9).
+
+Role proposal (decision stays with Vali): the plan's criterion requires median Sonnet score ≥ Opus low on all 3 tasks, 0 scope creep, 0 false-done. On B Sonnet has 4 vs 5, and on A false-done is 2/3 (same as Opus). The criterion is not met, so `implementer-sonnet55` stays experimental. Sonnet costs ~half and is ~1.5× faster at comparable quality on A and C.
