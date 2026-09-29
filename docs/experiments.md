@@ -435,3 +435,18 @@ re-sends, not just cost. Savings are ~$0.85 per session; the orchestrator cost ~
 across 29 sessions (24-28.09).
 
 Confound: `-sonnet55` agents are set to `medium` in frontmatter, but the model defaults to `high`.
+
+### Q1 explorer results
+
+Sonnet 5: errors 2/1/2, tokens 25.7k/29.1k/29.5k, 37s/44s/51s.
+Sonnet 5.5 medium: errors 0/0/0, tokens 27.7k/25.5k/28.2k, 37s/34s/30s.
+Q2 was skipped.
+
+### scribe results
+
+HANDOFF rewrite test on `/tmp` copies. Quality tied 6/6 (all facts kept, nothing invented, rest
+untouched).
+Sonnet 5 low: tokens 18.4k/18.3k/18.9k, 5/5/4 tool calls, 21s/20s/17s.
+Sonnet 5.5 low: tokens 13.9k/13.5k/14.0k, 5/3/3 tool calls, 21s/14s/16s.
+
+Decision (2026-09-30, Vali's OK): scribe moved to `claude-sonnet-5-5` low; `scribe-sonnet55` deleted.

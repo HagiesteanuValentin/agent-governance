@@ -1,7 +1,7 @@
 ---
 name: explorer
 description: The explorer. Searches and reads the codebase or docs when the orchestrator needs a fact that is not in the sources of truth (HANDOFF, PATTERNS, DECISIONS, RECIPES, INFRA). Read-only, zero changes. Use it INSTEAD of the built-in Explore/Plan/general-purpose agents, which would inherit the orchestrator's expensive model.
-model: claude-sonnet-5
+model: claude-sonnet-5-5
 effort: medium
 maxTurns: 40
 permissionMode: plan
