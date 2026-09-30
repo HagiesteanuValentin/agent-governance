@@ -561,3 +561,105 @@ Confounds:
 - `metrics.py` output_tokens is small (106–735); cost may be slightly underestimated, cache dominates.
 
 Decision: new EXPERIMENTAL role `scripter-simple` (Sonnet 5.5 medium). `scripter` stays the default. To validate: the cap of 2 full runs for Sonnet.
+
+## bench-scripter v2 (30.09)
+
+Goal: repeat bench-scripter with 5 runs per arm per task (30 cells), Opus 5.5 low (`o55-low`) vs Sonnet 5.5 medium (`s55-medium`), the real-role thresholds and a cap of 4 full runs, and a blind audit by two auditors. Tasks T1, T2, T3 are the 3 measurement scripts from bench-scripter.
+
+### Setup (differences from v1 and from the real workflow)
+
+- 5 runs per arm (v1: 3). Cell definitions `cell-scripter-o55-low-v2` and `cell-scripter-s55-medium-v2`: hook `context-agent.sh` at `--warn 100000 --deny 150000`, cap 4 full runs (v1: 2).
+- Main launches the cells (in the real workflow the orchestrator does), with a fixed prompt: paths only, port from `CELL.env`.
+- No repair round after the audit (the real workflow has one).
+- Added to every brief: port and the line "Do not use pkill/killall; stop only the process you started, by PID." The cap of 4 is not in the brief; it comes from the cell body.
+- The hook warns at the 3rd verifier run for both arms.
+- `full_runs` = `node <task script>` invocations with only the whitelisted flags `--url`, `--port`, `--has`, `--crop` (or none); any other flag = partial run. Counted by `metrics.py`.
+- Audit: 6 blind auditors (per task one `auditor` Opus 5.5 medium and one `auditor-sonnet55`), cells anonymized by `anon.sh` (letters A-J, mapping kept outside the audited directory). Rubric: `corect`, `robust`, `lizibil` 1-5, verdict OK / ABATERI (n), `inacceptabil` yes/no. Below, `c/r/l` = corect/robust/lizibil.
+
+### Per task x arm (source: `docs/dosar/bench-scripter-v2-metrics.md`)
+
+| T | arm | verify PASS | median dur_s | median cost $ | median verify calls | median full_runs | max peak_ctx | sum cost $ |
+|---|---|---|---|---|---|---|---|---|
+| T1 | o55-low | 3/5 | 451 | 1.12 | 6 | 4 | 75457 | 5.26 |
+| T1 | s55-medium | 5/5 | 652 | 0.56 | 9 | 7 | 93616 | 2.86 |
+| T2 | o55-low | 5/5 | 189 | 0.43 | 3 | 0 | 44526 | 2.14 |
+| T2 | s55-medium | 5/5 | 276 | 0.26 | 4 | 1 | 43867 | 1.46 |
+| T3 | o55-low | 5/5 | 365 | 0.60 | 3 | 2 | 54035 | 2.81 |
+| T3 | s55-medium | 4/5 | 390 | 0.38 | 2 | 2 | 69843 | 1.86 |
+
+Median corect per task (n=5 per cell group):
+
+| T | o55-low, Opus-aud | s55-medium, Opus-aud | o55-low, Sonnet-aud | s55-medium, Sonnet-aud |
+|---|---|---|---|---|
+| T1 | 3 | 4 | 3 | 5 |
+| T2 | 4 | 4 | 4 | 5 |
+| T3 | 4 | 3 | 4 | 3 |
+
+### Per cell (30 cells, blind grades decoded through the mapping)
+
+`verify` = verify.sh result; `calls` = verifier runs in the cell; `dur_s` = duration. Auditor cells: `c/r/l verdict inacceptabil` (Opus-aud = `auditor`, Son-aud = `auditor-sonnet55`).
+
+| T | cell | verify | calls | full_runs | dur_s | cost $ | Opus-aud | Son-aud |
+|---|---|---|---|---|---|---|---|---|
+| T1 | o55-low-1 | PASS | 6 | 4 | 451 | 1.12 | 3/3/4 ABATERI (2) nu | 3/3/3 ABATERI (2) da |
+| T1 | o55-low-2 | FAIL | 8 | 7 | 457 | 0.67 | 3/3/3 ABATERI (2) nu | 3/3/4 ABATERI (2) da |
+| T1 | o55-low-3 | PASS | 4 | 4 | 434 | 0.84 | 2/3/3 ABATERI (3) nu | 3/4/3 ABATERI (2) da |
+| T1 | o55-low-4 | FAIL | 7 | 4 | 927 | 1.45 | 4/3/4 ABATERI (1) nu | 4/3/4 ABATERI (1) da |
+| T1 | o55-low-5 | PASS | 5 | 4 | 451 | 1.19 | 5/4/4 OK nu | 5/4/4 OK nu |
+| T1 | s55-medium-1 | PASS | 9 | 5 | 722 | 0.68 | 4/5/4 OK nu | 5/5/4 OK nu |
+| T1 | s55-medium-2 | PASS | 9 | 7 | 652 | 0.86 | 4/5/4 ABATERI (1) nu | 4/4/4 ABATERI (1) nu |
+| T1 | s55-medium-3 | PASS | 6 | 8 | 683 | 0.43 | 4/5/4 ABATERI (1) nu | 5/4/4 OK nu |
+| T1 | s55-medium-4 | PASS | 6 | 2 | 283 | 0.33 | 4/4/3 OK nu | 4/4/4 ABATERI (1) nu |
+| T1 | s55-medium-5 | PASS | 9 | 7 | 606 | 0.56 | 4/4/3 OK nu | 5/4/4 OK nu |
+| T2 | o55-low-1 | PASS | 4 | 2 | 179 | 0.43 | 3/3/4 ABATERI (1) nu | 3/3/4 ABATERI (1) nu |
+| T2 | o55-low-2 | PASS | 7 | 0 | 275 | 0.52 | 4/5/4 OK nu | 4/5/4 ABATERI (1) nu |
+| T2 | o55-low-3 | PASS | 2 | 0 | 165 | 0.36 | 5/5/4 OK nu | 5/5/4 OK nu |
+| T2 | o55-low-4 | PASS | 3 | 0 | 189 | 0.44 | 4/4/4 OK nu | 4/3/4 ABATERI (1) nu |
+| T2 | o55-low-5 | PASS | 3 | 0 | 232 | 0.38 | 5/4/4 OK nu | 5/3/4 OK nu |
+| T2 | s55-medium-1 | PASS | 4 | 0 | 276 | 0.27 | 5/5/3 OK nu | 5/5/4 OK nu |
+| T2 | s55-medium-2 | PASS | 2 | 0 | 178 | 0.18 | 5/4/4 OK nu | 5/3/4 OK nu |
+| T2 | s55-medium-3 | PASS | 5 | 1 | 195 | 0.21 | 4/3/4 ABATERI (1) nu | 3/4/4 ABATERI (1) nu |
+| T2 | s55-medium-4 | PASS | 5 | 6 | 480 | 0.26 | 4/5/4 OK nu | 5/4/4 OK nu |
+| T2 | s55-medium-5 | PASS | 2 | 2 | 2425 (real 644) | 0.54 | 3/3/3 ABATERI (1) nu | 3/3/3 ABATERI (1) nu |
+| T3 | o55-low-1 | PASS | 8 | 2 | 365 | 0.60 | 4/2/4 ABATERI (1) nu | 4/3/4 OK nu |
+| T3 | o55-low-2 | PASS | 3 | 4 | 432 | 0.65 | 2/2/4 ABATERI (2) da | 3/3/4 ABATERI (1) nu |
+| T3 | o55-low-3 | PASS | 3 | 2 | 236 | 0.40 | 4/2/4 ABATERI (2) nu | 5/4/4 OK nu |
+| T3 | o55-low-4 | PASS | 2 | 2 | 236 | 0.46 | 2/2/3 ABATERI (2) da | 2/3/4 ABATERI (2) da |
+| T3 | o55-low-5 | PASS | 6 | 4 | 385 | 0.69 | 4/2/4 ABATERI (2) nu | 5/4/4 OK nu |
+| T3 | s55-medium-1 | FAIL | 5 | 2 | 527 | 0.38 | 2/4/3 ABATERI (2) da | 2/4/3 ABATERI (2) da |
+| T3 | s55-medium-2 | PASS | 2 | 2 | 360 | 0.32 | 3/2/3 ABATERI (2) nu | 3/4/3 ABATERI (1) nu |
+| T3 | s55-medium-3 | PASS | 5 | 4 | 790 | 0.41 | 4/4/3 OK nu | 3/3/3 ABATERI (1) nu |
+| T3 | s55-medium-4 | PASS | 2 | 2 | 390 | 0.43 | 5/4/3 OK nu | 3/4/3 ABATERI (1) nu |
+| T3 | s55-medium-5 | PASS | 2 | 2 | 266 | 0.32 | 3/4/3 ABATERI (1) nu | 3/4/3 ABATERI (1) nu |
+
+FAIL details verbatim: T1 o55-low-2 "docs/refine/studii-caz.measurements.md prezent, ≤4000 caractere" (4045 caractere); T1 o55-low-4 same criterion (4189 caractere); T3 s55-medium-1 "fișiere noi/modificate doar în căile permise" (scripts/SCRIPTS.md).
+
+### Agreement between auditors
+
+- Over 30 cells: same `corect` in 19, within 1 point in 29; same verdict text (OK / ABATERI (n)) in 18; same `inacceptabil` in 25.
+- `inacceptabil = da`: Opus-aud 3 cells (T3 o55-low-2, T3 o55-low-4, T3 s55-medium-1; none on T1/T2); Son-aud on T1 o55-low-1,2,3,4, T3 o55-low-4, T3 s55-medium-1.
+- On T1 the Son-aud reasons for `inacceptabil` are the 4000 limit (counted in bytes, o55-low-1..4: 4115, 4109, 4039, 4240). The brief asks for characters. verify.sh (characters) fails only o55-low-2 (4045) and o55-low-4 (4189); the Son-aud `da` on o55-low-1 and o55-low-3 is contradicted by verify PASS.
+- T3: both auditors mark T3 o55-low-4 (A) and s55-medium-1 (D) inacceptabil; D wrote `scripts/SCRIPTS.md` (forbidden in the brief), same as the verify FAIL.
+
+### Decision rule (written before the run), applied verbatim
+
+- Median corect Sonnet medium >= Opus on all 3 tasks and > on >= 2, at BOTH auditors: NO. Opus-aud: T1 4>3, T2 4=4, T3 3<4. Son-aud: T1 5>3, T2 5>4, T3 3<4. T3 fails at both.
+- verify PASS over 15 cells >= Opus, counted raw: YES. Sonnet 14/15 (5+5+4), Opus 13/15 (3+5+5). No FAIL reclassified.
+- Split auditors: no split on the outcome, both say NO on the quality criterion.
+- Conclusion of the rule: Sonnet medium does not win quality (the quality point fails at T3: median `corect` 3 vs 4 at both auditors). The role decision (scripter-simple as default for measurement scripts? cap 2 -> 4 in scripter.md?) stays open for Vali.
+- Cap (reported, not a fail criterion): cells with `full_runs` <= 4: o55-low 14/15, s55-medium 10/15 (see limits: full_runs is approximate).
+- Duration, cost, `peak_context` (benchmark, not fail criterion): median cost lower for s55-medium on all 3 tasks (0.56/0.26/0.38 vs 1.12/0.43/0.60), median duration higher (652/276/390 vs 451/189/365 s); max `peak_context` 93616 (T1 s55-medium-2), no cell above 150k.
+- If Opus passes T1 >= 4/5 with cap 4, that would suggest cap 2 was the cause: NO, Opus passes T1 3/5 (the 2 FAILs are the 4000-character limit), so no indication.
+
+### Limits
+
+- The Son-aud on T1 counted bytes, not characters; any "inacceptabil" on the limit is checked against verify.sh (see above).
+- T2 s55-medium-5: `dur_s` 2425 in the table, real duration 644 s (report delivered at 643-644 s, then a notification from a forgotten background wait). The median for T2 s55-medium is 276 either way.
+- T2 s55-medium-4: one run broken by a shared /tmp with another cell.
+- `full_runs` in the table differs from the cells' self-reports (T2 s55-medium-4 table 6 / cell 5; T1 o55-low-4 table 4 / cell 5; T1 s55-medium-5 table 7 / cell "over 4"): a flag outside the whitelist makes a run "partial", and failed or broken runs are still counted.
+- The blind audits were static (scripts not run). The `auditor-sonnet55` on T2 and T3 finished in about 25-30 s (source: task notifications seen by main, 23.3 s and 29.9 s).
+- The Brief 3 criterion `grep 'localhost:44'` also matches the 44NN replacement made by `anon.sh`; accepted, real ports are 0.
+- `full_runs` is approximate: `script_runs` in metrics.py also counts text inside heredocs (T2 s55-medium-3 has full_runs=1, real 0), misses `bash -c "node ..."`, and counts a `for ... do node ...` loop once. The flag whitelist lacks `--json`, so on T2 complete runs with `--json` (both arms) count as partial and full_runs is underestimated. The cap is reported, not a fail criterion.
+- The blind auditors did not have `stdout.out` for the lettered cells: anon.sh ran before verify.sh (required order, verify rewrites the outputs) and `stdout.out` only appears at verify. Only `ref-out` had it; `audit-prompt.md` promises it for the lettered cells too. Grades were given from the script + the delivered measurements file.
+- `dur_s` = first to last transcript timestamp; a background process keeping the agent open inflates it (case T2 s55-medium-5, noted above). A data limit, not a calculation bug.
+- `metrics.py` gives medians only; ranges come from the per-cell table. T1 o55-low-4 (927 s) includes a real 500 s run (timeout), not an artifact.

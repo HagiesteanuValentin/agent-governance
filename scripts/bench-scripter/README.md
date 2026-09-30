@@ -19,10 +19,25 @@ Celule în `~/workflow/experimente/bench-scripter/<T>/<cell>-<run>`; rezultatul 
 
 ## Folosire
 ```
-./setup.sh <T1..T3> <run> [--ref]      # CELLS="..." pentru alte nume; port unic 4400+n în CELL.env
+./setup.sh <T1..T3> <run|1-5> [--ref]  # CELLS="..." pentru alte nume; port unic 4400+n în CELL.env
 ./verify.sh <T1..T3> <cell-run|cale>   # oprește ce e pe port, pornește dev, rulează scriptul de 2×, scrie <cell>.json
-./cleanup.sh [--dry-run]               # șterge doar celulele și .verify-* din bench-scripter/; păstrează <cell>.json
+./cleanup.sh [--dry-run]               # șterge doar celulele și .verify-* din rădăcină; păstrează <cell>.json
+./anon.sh <T1..T3> [--force]           # pregătește auditul orb (vezi mai jos)
 ```
+
+## v2: rădăcină, brațe, rulări
+- Toate scripturile citesc `BENCH_ROOT` (implicit `~/workflow/experimente/bench-scripter`, rădăcina v1). v2: `BENCH_ROOT=~/workflow/experimente/bench-scripter-v2`.
+- `setup.sh`: brațele din `CELLS` (implicit `cell-scripter-o55-low cell-scripter-s55-medium`), director `<braț>-<n>`; `<run>` = `N` sau `N-M` (ex. `1-5`). Creează și `ref-1` + `base-1` dacă lipsesc. `CELLS=base` cu `<run>` = `1` = doar ref + base.
+- Brief-urile au în plus rândul „Nu folosi pkill/killall…”. Plafonul de 4 rulări vine din corpul celulei, nu din brief.
+
+## Metrici (`metrics.py`)
+`--subagents-dir` se poate da de mai multe ori (celulele v1 stau în 2 sesiuni). `--results-root` implicit `BENCH_ROOT`; se numără doar transcripturile cu „Director de lucru” sub rădăcina asta. `--arms "o55-low s55-medium"` filtrează brațele.
+- `full_runs` = invocări `node <scriptul task-ului>` doar cu flag-urile `--url --port --has --crop` (sau fără flag). Orice alt flag → `partial_runs`. `node --check` și grep pe script nu se numără.
+- `peak_context` = maximul pe tur din input + cache_read + cache_creation.
+
+## Audit orb (`anon.sh`, `audit-prompt.md`)
+`anon.sh <T>` copiază din fiecare celulă scriptul + ieșirile (fișierele netrackuite + `stdout.out` din `.verify-*/run1`) în `$BENCH_ROOT/audit/<T>/<literă>/`, în ordine amestecată. Referința (fără script) merge în `audit/<T>/ref-out/`, brief-ul în `audit/<T>/BRIEF.md`. Maparea literă → celulă: `$BENCH_ROOT/audit-mapping-<T>.json`, în afara directorului dat auditorului. În copii: `localhost:44xx` → `44NN`, căile celulei → `<CELL>`, brațul și numele modelelor → `<arm>`/`<model>`. Refuză să rescrie un audit existent fără `--force`.
+`audit-prompt.md` = prompt-ul auditorului (înlocuiești `<T>` și `<BENCH_ROOT>`).
 `verify.sh` rulează: T1 `--url http://localhost:PORT`, T2 `--port PORT`, T3 `--url http://localhost:PORT/`. Deci pornirea serverului de către scriptul T1 (fără `--url`) nu e verificată — rămâne la audit.
 
 ## Criterii (`checks.py`)

@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 # Usage: verify.sh <T1..T3> <cell-dir|cell-name> — see scripts/bench-scripter/README.md
 set -uo pipefail
-EXPERIMENTE="${EXPERIMENTE:-${HOME}/workflow/experimente}"
-PREFIX="${PREFIX:-bench-scripter}"
+BENCH_ROOT="${BENCH_ROOT:-${HOME}/workflow/experimente/bench-scripter}"
 RUN_TIMEOUT="${RUN_TIMEOUT:-600}"
 TASK="${1:?task T1..T3}"; CELL="${2:?cell}"
-[[ -d "$CELL" ]] || CELL="$EXPERIMENTE/$PREFIX/$TASK/$CELL"
+[[ -d "$CELL" ]] || CELL="$BENCH_ROOT/$TASK/$CELL"
 WT="$(cd "$CELL" && pwd)" || exit 2
 NAME="$(basename "$WT")"
 PORT="$(sed -n 's/^PORT=//p' "$WT/CELL.env")"

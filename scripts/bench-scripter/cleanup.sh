@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # Usage: cleanup.sh [--dry-run] — see scripts/bench-scripter/README.md
 set -uo pipefail
-EXPERIMENTE="${EXPERIMENTE:-${HOME}/workflow/experimente}"
-DIR="$EXPERIMENTE/bench-scripter"
+DIR="${BENCH_ROOT:-${HOME}/workflow/experimente/bench-scripter}"
 [[ -d "$DIR" ]] || { echo "Nothing to delete ($DIR missing)"; exit 0; }
 for P in "$DIR"/T*/*/ "$DIR"/T*/.verify-*/; do
   [[ -e "$P" ]] || continue

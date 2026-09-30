@@ -13,8 +13,42 @@ ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 from session_metrics import cost_of, load_pricing, rates_for  # noqa: E402
 
-CELL_RE = re.compile(r"Director de lucru: (\S*/bench-scripter)/(T\d+)/cell-scripter-(s55-medium|s55-high|o55-low)-(\d+)")
+DEFAULT_ROOT = os.environ.get("BENCH_ROOT") or os.path.expanduser("~/workflow/experimente/bench-scripter")
+DEFAULT_ARMS = "o55-low s55-medium s55-high"
 VERIFY_RE = re.compile(r"node (\./)?scripts/")
+TASK_SCRIPT = {"T1": "scripts/verify-studii-caz.mjs", "T2": "scripts/verifica-produs.mjs",
+               "T3": "scripts/verifica-index-miscare.mjs"}
+FULL_FLAGS = {"--url", "--port", "--has", "--crop"}
+SEG_SPLIT = re.compile(r"&&|\|\||[;|\n&]")
+
+
+def cell_re(arms):
+    alt = "|".join(re.escape(a) for a in sorted(arms, key=len, reverse=True))
+    return re.compile(r"Director de lucru: (\S*)/(T\d+)/cell-scripter-(%s)-(\d+)" % alt)
+
+
+def script_runs(cmd, script):
+    full = partial = 0
+    name = os.path.basename(script)
+    for seg in SEG_SPLIT.split(cmd):
+        toks = seg.split()
+        for i, t in enumerate(toks):
+            if os.path.basename(t) != "node":
+                continue
+            rest = toks[i + 1:]
+            node_flags = []
+            while rest and rest[0].startswith("-"):
+                node_flags.append(rest.pop(0))
+            if not rest or os.path.basename(rest[0].strip("'\"")) != name:
+                continue
+            if "--check" in node_flags or "-c" in node_flags:
+                continue
+            flags = [a.split("=", 1)[0] for a in rest[1:] if a.startswith("-") and not a[1:2].isdigit()]
+            if all(f in FULL_FLAGS for f in flags):
+                full += 1
+            else:
+                partial += 1
+    return full, partial
 
 
 def ts(s):
@@ -28,7 +62,7 @@ def first_user_text(rec):
     return "\n".join(b.get("text", "") for b in c or [] if isinstance(b, dict))
 
 
-def parse(path, pricing, results_root):
+def parse(path, pricing, results_root, cre):
     recs = []
     with open(path, encoding="utf-8") as fh:
         for line in fh:
@@ -37,8 +71,8 @@ def parse(path, pricing, results_root):
             except ValueError:
                 pass
     first = next((r for r in recs if r.get("type") == "user"), None)
-    m = CELL_RE.search(first_user_text(first)) if first else None
-    if not m:
+    m = cre.search(first_user_text(first)) if first else None
+    if not m or os.path.normpath(os.path.expanduser(m.group(1).lstrip("`'\""))) != os.path.normpath(results_root):
         return None
     T, arm, run = m.group(2), m.group(3), int(m.group(4))
     model, times, usage, tool_ids = None, [], {}, {}
@@ -59,13 +93,14 @@ def parse(path, pricing, results_root):
                 tool_ids[b["id"]] = b
     tools = list(tool_ids.values())
     tok = {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0}
-    cost = 0.0
+    cost, peak = 0.0, 0
     for mdl, u in usage.values():
         c = {"input": u.get("input_tokens") or 0, "output": u.get("output_tokens") or 0,
              "cache_read": u.get("cache_read_input_tokens") or 0,
              "cache_creation": u.get("cache_creation_input_tokens") or 0}
         for k in tok:
             tok[k] += c[k]
+        peak = max(peak, c["input"] + c["cache_read"] + c["cache_creation"])
         cost += cost_of(c, rates_for(pricing, mdl))
     vp, reason = None, None
     jp = os.path.join(results_root, T, "cell-scripter-%s-%d.json" % (arm, run))
@@ -74,12 +109,18 @@ def parse(path, pricing, results_root):
             v = json.load(fh)
         vp = bool(v.get("pass"))
         reason = next((c.get("criteriu") for c in v.get("criterii", []) if not c.get("pass")), None)
+    full = partial = 0
+    for b in tools:
+        if b.get("name") == "Bash":
+            f, p = script_runs(str(b.get("input", {}).get("command", "")), TASK_SCRIPT[T])
+            full, partial = full + f, partial + p
     return {
         "T": T, "arm": arm, "run": run, "model": model,
         "duration_s": round(max(times) - min(times)) if times else 0,
         "tool_calls": len(tools),
         "verify_calls": sum(1 for b in tools if b.get("name") == "Bash"
                             and VERIFY_RE.search(str(b.get("input", {}).get("command", "")))),
+        "full_runs": full, "partial_runs": partial, "peak_context": peak,
         "edits": sum(1 for b in tools if b.get("name") in ("Edit", "Write")),
         "input_tokens": tok["input"], "output_tokens": tok["output"],
         "cache_read_tokens": tok["cache_read"], "cache_creation_tokens": tok["cache_creation"],
@@ -93,16 +134,18 @@ def row(cells):
 
 
 def render(rows):
-    h1 = ["T", "arm", "run", "model", "dur_s", "tools", "verify", "edits", "in", "out",
-          "cache_r", "cache_w", "cost", "pass", "fail_reason"]
+    h1 = ["T", "arm", "run", "model", "dur_s", "tools", "verify", "full_runs", "partial",
+          "peak_ctx", "edits", "in", "out", "cache_r", "cache_w", "cost", "pass", "fail_reason"]
     out = ["# bench-scripter metrics", "", row(h1), row(["---"] * len(h1))]
     for r in rows:
         out.append(row([r["T"], r["arm"], r["run"], r["model"], r["duration_s"], r["tool_calls"],
-                        r["verify_calls"], r["edits"], r["input_tokens"], r["output_tokens"],
+                        r["verify_calls"], r["full_runs"], r["partial_runs"], r["peak_context"],
+                        r["edits"], r["input_tokens"], r["output_tokens"],
                         r["cache_read_tokens"], r["cache_creation_tokens"], "%.2f" % r["cost_usd"],
                         {True: "PASS", False: "FAIL", None: "?"}[r["verify_pass"]],
                         r["fail_reason"] or ""]))
-    h2 = ["T", "arm", "n", "med dur_s", "med cost", "med verify", "sum cost", "PASS"]
+    h2 = ["T", "arm", "n", "med dur_s", "med cost", "med verify", "med full_runs",
+          "max peak_ctx", "sum cost", "PASS"]
     out += ["", "## T x arm", "", row(h2), row(["---"] * len(h2))]
     groups = {}
     for r in rows:
@@ -111,6 +154,8 @@ def render(rows):
         out.append(row([T, arm, len(g), statistics.median(x["duration_s"] for x in g),
                         "%.2f" % statistics.median(x["cost_usd"] for x in g),
                         statistics.median(x["verify_calls"] for x in g),
+                        statistics.median(x["full_runs"] for x in g),
+                        max(x["peak_context"] for x in g),
                         "%.2f" % sum(x["cost_usd"] for x in g),
                         "%d/%d" % (sum(1 for x in g if x["verify_pass"]), len(g))]))
     return "\n".join(out) + "\n"
@@ -118,15 +163,18 @@ def render(rows):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--subagents-dir", required=True)
-    ap.add_argument("--results-root", required=True)
+    ap.add_argument("--subagents-dir", required=True, action="append")
+    ap.add_argument("--results-root", default=DEFAULT_ROOT)
+    ap.add_argument("--arms", default=DEFAULT_ARMS)
     ap.add_argument("--pricing", default=os.path.join(ROOT, "tools", "pricing.json"))
     ap.add_argument("--out-dir", required=True)
     ap.add_argument("--expected", type=int, default=0)
     a = ap.parse_args()
     pricing = load_pricing(a.pricing)
-    rows = [r for p in sorted(glob.glob(os.path.join(a.subagents_dir, "agent-*.jsonl")))
-            for r in [parse(p, pricing, a.results_root)] if r]
+    cre = cell_re(a.arms.split())
+    root = os.path.expanduser(a.results_root)
+    paths = sorted(p for d in a.subagents_dir for p in glob.glob(os.path.join(d, "agent-*.jsonl")))
+    rows = [r for p in paths for r in [parse(p, pricing, root, cre)] if r]
     rows.sort(key=lambda r: (int(r["T"][1:]), r["arm"], r["run"]))
     os.makedirs(a.out_dir, exist_ok=True)
     with open(os.path.join(a.out_dir, "metrics.json"), "w", encoding="utf-8") as fh:
