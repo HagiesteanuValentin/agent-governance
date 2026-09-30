@@ -1,0 +1,72 @@
+task=T3 run=3 worktree=/home/vali/workflow/experimente/bench-simple/T3/cell-sonnet55-medium-3
+exit=1
+--- output ---
+npm notice run demo-constructii@0.2.0 check
+npm notice run astro check
+02:58:06 [vite] Re-optimizing dependencies because vite config has changed
+02:58:06 [content] Syncing content
+02:58:06 [WARN] [glob-loader] The base directory "/home/vali/workflow/experimente/bench-simple/T3/cell-sonnet55-medium-3/src/content/testimoniale/" does not exist.
+02:58:06 [WARN] [glob-loader] The base directory "/home/vali/workflow/experimente/bench-simple/T3/cell-sonnet55-medium-3/src/content/zone/" does not exist.
+02:58:06 [WARN] [glob-loader] The base directory "/home/vali/workflow/experimente/bench-simple/T3/cell-sonnet55-medium-3/src/content/echipa/" does not exist.
+02:58:06 [content] Synced content
+02:58:06 [types] Generated 146ms
+02:58:06 [check] Getting diagnostics for Astro files in /home/vali/workflow/experimente/bench-simple/T3/cell-sonnet55-medium-3...
+[96msrc/components/BandaGarantie.astro[0m:[93m11[0m:[93m91[0m - [91merror[0m[90m ts(2551): [0mProperty 'garantie' does not exist on type '{ readonly siteId: "meridian-climatic-demo"; readonly url: "https://termclima.ro"; readonly noindex: false; readonly demo: { badgeUrl: string; footerUrl: string; } | null; readonly firma: { readonly nume: "TermClima SRL"; ... 13 more ...; readonly programStructurat: { ...; }; }; ... 14 more ...; readonly turnstileSi...'. Did you mean 'garantii'?
+
+[7m11[0m         Garanție în scris: {siteConfig.garantie.structuraAni} ani structură · {siteConfig.garantie.finisajeAni} ani finisaje.
+[7m  [0m [91m                                                                                          ~~~~~~~~[0m
+[96msrc/components/BandaGarantie.astro[0m:[93m11[0m:[93m40[0m - [91merror[0m[90m ts(2551): [0mProperty 'garantie' does not exist on type '{ readonly siteId: "meridian-climatic-demo"; readonly url: "https://termclima.ro"; readonly noindex: false; readonly demo: { badgeUrl: string; footerUrl: string; } | null; readonly firma: { readonly nume: "TermClima SRL"; ... 13 more ...; readonly programStructurat: { ...; }; }; ... 14 more ...; readonly turnstileSi...'. Did you mean 'garantii'?
+
+[7m11[0m         Garanție în scris: {siteConfig.garantie.structuraAni} ani structură · {siteConfig.garantie.finisajeAni} ani finisaje.
+[7m  [0m [91m                                       ~~~~~~~~[0m
+
+[96msrc/components/BaraSticky.astro[0m:[93m9[0m:[93m11[0m - [93mwarning[0m[90m ts(6196): [0m'Props' is declared but never used.
+
+[7m9[0m interface Props {
+[7m [0m [93m          ~~~~~[0m
+
+[96msrc/components/BeforeAfter.astro[0m:[93m10[0m:[93m11[0m - [93mwarning[0m[90m ts(6196): [0m'Props' is declared but never used.
+
+[7m10[0m interface Props {
+[7m  [0m [93m          ~~~~~[0m
+
+[96msrc/components/FAQ.astro[0m:[93m15[0m:[93m11[0m - [93mwarning[0m[90m ts(6196): [0m'Props' is declared but never used.
+
+[7m15[0m interface Props {
+[7m  [0m [93m          ~~~~~[0m
+
+[96msrc/components/Proces.astro[0m:[93m23[0m:[93m11[0m - [93mwarning[0m[90m ts(6196): [0m'Props' is declared but never used.
+
+[7m23[0m interface Props {
+[7m  [0m [93m          ~~~~~[0m
+
+[96msrc/pages/garantie-contract/[...pagina].astro[0m:[93m75[0m:[93m27[0m - [91merror[0m[90m ts(2551): [0mProperty 'garantie' does not exist on type '{ readonly siteId: "meridian-climatic-demo"; readonly url: "https://termclima.ro"; readonly noindex: false; readonly demo: { badgeUrl: string; footerUrl: string; } | null; readonly firma: { readonly nume: "TermClima SRL"; ... 13 more ...; readonly programStructurat: { ...; }; }; ... 14 more ...; readonly turnstileSi...'. Did you mean 'garantii'?
+
+[7m75[0m           <dd>{siteConfig.garantie.finisajeAni} ani</dd>
+[7m  [0m [91m                          ~~~~~~~~[0m
+[96msrc/pages/garantie-contract/[...pagina].astro[0m:[93m71[0m:[93m27[0m - [91merror[0m[90m ts(2551): [0mProperty 'garantie' does not exist on type '{ readonly siteId: "meridian-climatic-demo"; readonly url: "https://termclima.ro"; readonly noindex: false; readonly demo: { badgeUrl: string; footerUrl: string; } | null; readonly firma: { readonly nume: "TermClima SRL"; ... 13 more ...; readonly programStructurat: { ...; }; }; ... 14 more ...; readonly turnstileSi...'. Did you mean 'garantii'?
+
+[7m71[0m           <dd>{siteConfig.garantie.structuraAni} ani</dd>
+[7m  [0m [91m                          ~~~~~~~~[0m
+[96msrc/pages/garantie-contract/[...pagina].astro[0m:[93m25[0m:[93m105[0m - [91merror[0m[90m ts(2551): [0mProperty 'garantie' does not exist on type '{ readonly siteId: "meridian-climatic-demo"; readonly url: "https://termclima.ro"; readonly noindex: false; readonly demo: { badgeUrl: string; footerUrl: string; } | null; readonly firma: { readonly nume: "TermClima SRL"; ... 13 more ...; readonly programStructurat: { ...; }; }; ... 14 more ...; readonly turnstileSi...'. Did you mean 'garantii'?
+
+[7m25[0m     descriere: `Ce acoperă cei ${siteConfig.garantie.structuraAni} ani pentru structură și ${siteConfig.garantie.finisajeAni} ani pentru finisaje, ce nu acoperă, și procedura de sesizare cu termene de răspuns.`,
+[7m  [0m [91m                                                                                                        ~~~~~~~~[0m
+[96msrc/pages/garantie-contract/[...pagina].astro[0m:[93m25[0m:[93m45[0m - [91merror[0m[90m ts(2551): [0mProperty 'garantie' does not exist on type '{ readonly siteId: "meridian-climatic-demo"; readonly url: "https://termclima.ro"; readonly noindex: false; readonly demo: { badgeUrl: string; footerUrl: string; } | null; readonly firma: { readonly nume: "TermClima SRL"; ... 13 more ...; readonly programStructurat: { ...; }; }; ... 14 more ...; readonly turnstileSi...'. Did you mean 'garantii'?
+
+[7m25[0m     descriere: `Ce acoperă cei ${siteConfig.garantie.structuraAni} ani pentru structură și ${siteConfig.garantie.finisajeAni} ani pentru finisaje, ce nu acoperă, și procedura de sesizare cu termene de răspuns.`,
+[7m  [0m [91m                                            ~~~~~~~~[0m
+
+[96msrc/scripts/configurator.ts[0m:[93m663[0m:[93m22[0m - [91merror[0m[90m ts(18047): [0m'form' is possibly 'null'.
+
+[7m663[0m     for (const el of form.querySelectorAll('[aria-invalid]')) el.removeAttribute('aria-invalid');
+[7m   [0m [91m                     ~~~~[0m
+[96msrc/scripts/configurator.ts[0m:[93m191[0m:[93m16[0m - [91merror[0m[90m ts(18047): [0m'form' is possibly 'null'.
+
+[7m191[0m     const el = form.elements.namedItem(nume);
+[7m   [0m [91m               ~~~~[0m
+
+Result (68 files): 
+- 8 errors
+- 0 warnings
+- 4 hints

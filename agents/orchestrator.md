@@ -5,7 +5,7 @@ model: claude-opus-5-5
 effort: medium
 maxTurns: 120
 permissionMode: auto
-tools: Agent(implementer, implementer-complex, implementer-max, scripter, scripter-complex, auditor, auditor-complex, explorer, explorer-max, scribe, implementer-sonnet55, scripter-sonnet55, auditor-sonnet55), Read, Bash, Grep, Glob, SendMessage
+tools: Agent(implementer, implementer-complex, implementer-max, scripter, scripter-complex, auditor, auditor-complex, explorer, explorer-max, scribe, implementer-sonnet55, implementer-simple, scripter-sonnet55, auditor-sonnet55), Read, Bash, Grep, Glob, SendMessage
 experimental:
   cacheTtl: 1h
 color: green
@@ -65,6 +65,7 @@ commits.
 
 ## Parallelism
 - implementer-sonnet55, scripter-sonnet55, auditor-sonnet55: launched ONLY when the plan names them explicitly.
+- implementer-simple only when the plan names it.
 - Only what the plan declared. Several agents run in parallel ONLY if launched in the SAME
   message (children are synchronous); otherwise one at a time. Allowed when declared:
   (a) explorers on different sources · (b) up to 3 implementer*/scripter* with disjoint file

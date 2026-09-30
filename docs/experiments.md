@@ -490,3 +490,35 @@ Confounds:
 - n=3 per cell; C does not discriminate (identical diff in all 9).
 
 Role proposal (decision stays with Vali): the plan's criterion requires median Sonnet score ≥ Opus low on all 3 tasks, 0 scope creep, 0 false-done. On B Sonnet has 4 vs 5, and on A false-done is 2/3 (same as Opus). The criterion is not met, so `implementer-sonnet55` stays experimental. Sonnet costs ~half and is ~1.5× faster at comparable quality on A and C.
+
+## bench-simple (30.09)
+
+Setup: 4 tasks replayed from git × `cell-sonnet55-medium` vs `cell-opus55-low` × 3 runs = 24. T1 SEO (site_ac 4efdb02), T2 CSS (blueprint_pictura 2c7ad6a), T3 18 FAQ `.md` (site_ac b1a1dcf), T4 layout (blueprint_prezentare a1c6197). Folders without git history (`git archive`). Blind audit, one Opus 5.5 medium auditor per task. Same cell body in both arms.
+
+| Task | Arm | Audit score median (min–max) | Verify | Cost $ (sum of 3 runs) | Duration s (sum of 3 runs) |
+|---|---|---|---|---|---|
+| T1 | opus55-low | 4 (4–4) | 3/3 PASS | 0.42 | 99 |
+| T1 | sonnet55-medium | 5 (5–5) | 3/3 PASS | 0.20 | 62 |
+| T2 | opus55-low | 5 (4–5) | 3/3 PASS | 0.45 | 107 |
+| T2 | sonnet55-medium | 5 (5–5) | 3/3 PASS | 0.26 | 97 |
+| T3 | opus55-low | 5 (4–5) | 3 false FAIL (real PASS) | 0.41 | 92 |
+| T3 | sonnet55-medium | 3 (3–5) | 3 false FAIL; 2 of them also a real FAIL | 0.18 | 61 |
+| T4 | opus55-low | 5 (5–5) | 3/3 PASS | 0.66 | 140 |
+| T4 | sonnet55-medium | 3 (2–5) | 2 PASS, 1 FAIL (false on selector, real defect) | 0.31 | 95 |
+
+Totals (Opus / Sonnet):
+- Comments deleted or rewritten: 0 / 0.
+- Runs with scope creep: 4 / 1 (Sonnet: minor, T3, removed `**` from "aparatului").
+- False "done": 0 / 2 (3 if T3 Sonnet run 1 counts: report says "verified, correct" with a missing rewrite).
+- Cost: $1.94 / $0.96. Duration: 438 s / 315 s.
+
+Verdict: the criterion (median Sonnet ≥ Opus on every task + 0 deleted comments + 0 scope creep) is NOT met. T3 3 vs 5, T4 3 vs 5, minor scope creep on T3.
+
+Niche: Sonnet equal or better on T1–T2 (exact values in the brief, 1–2 files; many files only for identical replacement) and on the mechanical part of T3. It yields when it must decide alone: the phrase to find in T3, the missing rule in T4. So the `implementer-simple` role is limited to this niche (see `agents/implementer-simple.md`).
+
+Confounds:
+- Verify had 2 false FAILs (T3 "other provider" 6/6, which the brief does not ask for; T4 selector `footer` vs `.footer`); auditors corrected the scores.
+- site_ac build unstable with 2 cells in parallel; after wave 1, max 1 live site_ac cell.
+- The new line "comments are not touched" in both cells breaks comparability with bench-s55.
+- One auditor per task; n=3.
+- Unreconciled cost difference: Opus $1.98 (Brief 3 preparation) vs $1.94 (results table).

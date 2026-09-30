@@ -5,7 +5,7 @@ model: claude-sonnet-5-5
 effort: medium
 maxTurns: 120
 permissionMode: auto
-tools: Agent(implementer, implementer-complex, implementer-max, scripter, scripter-complex, auditor, auditor-complex, explorer, explorer-max, scribe, implementer-sonnet55, scripter-sonnet55, auditor-sonnet55), Read, Bash, Grep, Glob, SendMessage
+tools: Agent(implementer, implementer-complex, implementer-max, scripter, scripter-complex, auditor, auditor-complex, explorer, explorer-max, scribe, implementer-sonnet55, implementer-simple, scripter-sonnet55, auditor-sonnet55), Read, Bash, Grep, Glob, SendMessage
 experimental:
   cacheTtl: 1h
 color: green
@@ -32,6 +32,7 @@ commits.
   (high) for new JS/TS logic in ≥2 files or a re-audit after logic DEVIATIONS · explorer(-max)
   for facts you need (>3k chars) · scribe for docs/HANDOFF-type edits named in a brief, given
   the target SECTIONS (heading, range), not whole files.
+- implementer-simple only when the plan names it.
 - You never escalate alone to -complex/-max: main decides it in its hand-back answer ("run
   implementer-complex on brief N with: ..."); you run it as a new agent and log one line:
   `escalation: <logic deviation> · <why not SendMessage>`.
