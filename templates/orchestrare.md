@@ -17,6 +17,7 @@ session only.
   cross-file logic) · implementer-max (high, declared debugging only) · scripter (low) ·
   scripter-complex (Opus 5 medium) · auditor (medium; -complex high) · scribe.
   implementer-sonnet only when I name it.
+  implementer-simple (Sonnet 5.5 medium, experimental): at plan time, only a brief with exact values, 1-2 files or identical replacement, full verify.
 - Main launches directly: explorer(-max) (Sonnet 5 medium, read-only; max: report ≤6k,
   tables), advisor, the final auditor-complex; design-lead and design-lead-expert only through /polish,
   refiner(-complex) only through /refine — nothing else without my OK.
