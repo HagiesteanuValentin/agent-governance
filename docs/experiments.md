@@ -522,3 +522,42 @@ Confounds:
 - The new line "comments are not touched" in both cells breaks comparability with bench-s55.
 - One auditor per task; n=3.
 - Unreconciled cost difference: Opus $1.98 (Brief 3 preparation) vs $1.94 (results table).
+
+## bench-scripter (30.09)
+
+Setup: 3 arms × 3 tasks × 3 runs = 27. Arms: `cell-scripter-o55-low` (`claude-opus-5-5`, low), `cell-scripter-s55-medium` and `cell-scripter-s55-high` (`claude-sonnet-5-5`, medium / high). Body identical to `scripter.md`. Prompt = cell path + brief path. Tasks (measurement scripts replayed from git, see `scripts/bench-scripter/README.md`): T1 studii-caz (promo-site, BASE c41e0f7), T2 produs (blueprint_prezentare, e3e41cb), T3 index-miscare (blueprint_prezentare, e3e41cb). Blind audit: one Opus 5.5 medium auditor per task, scores correct/robust/readable 1-5.
+
+| Task | Arm | Median dur s | Median cost $ | Median verify calls | Sum cost $ | Verify PASS | Median audit "correct" |
+|---|---|---|---|---|---|---|---|
+| T1 | o55-low | 297 | 0.62 | 4 | 1.79 | 0/3 | 2 |
+| T1 | s55-medium | 645 | 0.53 | 8 | 1.63 | 2/3 (+1 false FAIL) | 4 |
+| T1 | s55-high | 859 | 0.89 | 11 | 2.94 | 3/3 | 4 |
+| T2 | o55-low | 139 | 0.38 | 3 | 1.15 | 3/3 | 3 |
+| T2 | s55-medium | 228 | 0.21 | 4 | 0.70 | 3/3 | 3 |
+| T2 | s55-high | 388 | 0.37 | 3 | 1.10 | 2/3 (+1 false FAIL) | 4 |
+| T3 | o55-low | 195 | 0.42 | 3 | 1.60 | 3/3 | 2 |
+| T3 | s55-medium | 546 | 0.46 | 6 | 2.03 | 3/3 | 4 |
+| T3 | s55-high | 768 | 0.67 | 6 | 2.01 | 3/3 | 4 |
+
+Audit summary (letters decoded per arm):
+- T1: best = s55-high-3 (5/4/4, detects dead server) and s55-medium-3 (5/4/4, a false FAIL). Unacceptable = o55-low-1 and o55-low-2 (md 5619 / 4700 chars, incomplete); o55-low-3 borderline (md 4331 > 4000).
+- T2: best = s55-medium-1 and s55-high-2. Unacceptable = s55-medium-3 (dev JS unmarked, misleading figure), o55-low-2 ("content h" wrong), s55-high-1 (hardcoded port, not `CELL.env`).
+- T3: best = s55-high-3 and s55-medium-2. Unacceptable = o55-low-2 and o55-low-1 (fixed port, wrong selector, inverted field); o55-low-3 borderline (does not start the server, env PORT instead of `CELL.env`).
+
+Plan criterion (median audit ≥ Opus, 0 false "done", verify PASS 3/3, shorter duration):
+- Quality: YES for Sonnet, especially high (median 4/4/4 vs Opus 2/3/2).
+- Duration: NO. Sonnet is 1.6–3.9× slower per task (medium 1.6–2.8×, high 2.8–3.9×).
+- Cost: medium is cheaper on T1 and T2 (sum $4.36 vs Opus $4.54 over all tasks); high costs more (sum $6.05).
+- Verify PASS 3/3 on every task: no arm (Opus 0/3·3/3·3/3, medium 2/3·3/3·3/3, high 3/3·2/3·3/3); both Sonnet misses are false FAILs.
+- 0 false "done": not counted by the audit (Opus reported its T1 FAIL itself).
+
+Confounds:
+- Sonnet exceeded the "≤2 full runs" cap on T1 (4–5 runs) and went past the 4000 limit; Opus kept the cap and failed 3/3 on T1. T1 quality is tied to this.
+- s55-high T1 r1 ran `pkill -f "astro dev"`; it may have stopped wave-1 servers (4406/4408/4426 kept answering).
+- T1 brief has port from `CELL.env` (deviation from verbatim); T2/T3 briefs rebuilt from transcript; T2 root = current dir; T3 explicit `--url`.
+- T3 BASE = e3e41cb (not 1fbd216 as in the plan). T3 ref reconstructed from transcript.
+- One auditor per task; n=3; rolling waves of ≤6 cells, ≤2 T1 at once.
+- Cell prompt = paths, not the brief text inline.
+- `metrics.py` output_tokens is small (106–735); cost may be slightly underestimated, cache dominates.
+
+Decision: new EXPERIMENTAL role `scripter-simple` (Sonnet 5.5 medium). `scripter` stays the default. To validate: the cap of 2 full runs for Sonnet.

@@ -551,7 +551,7 @@ session data never leaves the machine.
 
 ```
 agents/     the agent definitions (explorer, implementer, implementer-complex, implementer-max,
-            implementer-sonnet, scripter, scripter-complex, scribe, auditor, auditor-complex, design-lead,
+            implementer-sonnet, scripter, scripter-simple, scripter-complex, scribe, auditor, auditor-complex, design-lead,
             design-lead-expert, refiner, refiner-complex) — model, effort, maxTurns, allowed
             tools, fixed report format
 commands/   slash commands (polish, refine, rate) — mirrors ~/.claude/commands/

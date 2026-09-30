@@ -280,7 +280,7 @@ def report_limit_for(agent_type):
 def severity_of(code, scope, wasted):
     """Escalation moves a code up one step at most; a worker reading its own target does not."""
     sev = SEVERITY_BASE.get(code, "low")
-    if code == "full_read_big_file" and scope.split("#")[0] in ("implementer", "implementer-complex", "implementer-max", "implementer-sonnet", "scripter", "scripter-complex"):
+    if code == "full_read_big_file" and scope.split("#")[0] in ("implementer", "implementer-complex", "implementer-max", "implementer-sonnet", "implementer-simple", "implementer-sonnet55", "scripter", "scripter-complex", "scripter-simple", "scripter-sonnet55"):
         return "low"
     if sev == "high":
         return "high"
@@ -2175,7 +2175,7 @@ def v17_block(main_doc, workers, docs_by_scope, tool_inputs, pricing, version,
             reruns += 1
         seen_briefs.add(key)
     audits = [(w, (docs_by_scope.get(w["scope"]) or {}).get("final_text") or "")
-              for w in workers if w["type"] == "auditor"]
+              for w in workers if w["type"] in ("auditor", "auditor-sonnet55")]
     abateri_total, audit_ok = 0, 0
     for _w, txt in audits:
         found = [int(x) for x in ABATERI_RE.findall(txt)]
@@ -2591,7 +2591,9 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
         "slash_names": main_doc["slash"],
         "agent_runs_by_type": dict(sorted(by_type.items())),
         "implementer_runs": by_type.get("implementer", 0) + by_type.get("implementer-complex", 0) + by_type.get("implementer-max", 0) + by_type.get("implementer-sonnet", 0)
-                            + by_type.get("scripter", 0) + by_type.get("scripter-complex", 0),
+                            + by_type.get("implementer-simple", 0) + by_type.get("implementer-sonnet55", 0)
+                            + by_type.get("scripter", 0) + by_type.get("scripter-complex", 0)
+                            + by_type.get("scripter-simple", 0) + by_type.get("scripter-sonnet55", 0),
         "sendmessage_continuations": main_doc["sendmessages"],
     }
     calls = main_calls
@@ -2722,7 +2724,7 @@ def analyze(jsonl_path, pricing, ctx_warn=None, agents_dir=None,
     sm_ts = sorted(t for d in [main_doc] + orch_docs for t in d["sendmessage_ts"]
                    if isinstance(t, str))
     audit_ends = sorted(w["ended"] for w in workers
-                        if w["type"] == "auditor" and w["ended"])
+                        if w["type"] in ("auditor", "auditor-sonnet55") and w["ended"])
     brief_seen = set()
     for w in workers:
         key = brief_key(w["description"]) or w["scope"]

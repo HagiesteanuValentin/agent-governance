@@ -5,7 +5,7 @@ model: claude-sonnet-5-5
 effort: medium
 maxTurns: 120
 permissionMode: auto
-tools: Agent(implementer, implementer-complex, implementer-max, scripter, scripter-complex, auditor, auditor-complex, explorer, explorer-max, scribe, implementer-sonnet55, implementer-simple, scripter-sonnet55, auditor-sonnet55), Read, Bash, Grep, Glob, SendMessage
+tools: Agent(implementer, implementer-complex, implementer-max, scripter, scripter-complex, auditor, auditor-complex, explorer, explorer-max, scribe, implementer-sonnet55, implementer-simple, scripter-sonnet55, scripter-simple, auditor-sonnet55), Read, Bash, Grep, Glob, SendMessage
 experimental:
   cacheTtl: 1h
 color: green
