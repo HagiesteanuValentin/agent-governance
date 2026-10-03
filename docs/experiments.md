@@ -663,3 +663,59 @@ FAIL details verbatim: T1 o55-low-2 "docs/refine/studii-caz.measurements.md prez
 - The blind auditors did not have `stdout.out` for the lettered cells: anon.sh ran before verify.sh (required order, verify rewrites the outputs) and `stdout.out` only appears at verify. Only `ref-out` had it; `audit-prompt.md` promises it for the lettered cells too. Grades were given from the script + the delivered measurements file.
 - `dur_s` = first to last transcript timestamp; a background process keeping the agent open inflates it (case T2 s55-medium-5, noted above). A data limit, not a calculation bug.
 - `metrics.py` gives medians only; ranges come from the per-cell table. T1 o55-low-4 (927 s) includes a real 500 s run (timeout), not an artifact.
+
+## bench-scripter v2 rerun (03.10)
+
+Identical rerun of "bench-scripter v2 (30.09)" as a test of the claim "Opus 5.5 was weakened". Same cells, briefs, harness (`99f673a`) and prompt; new root `~/workflow/experimente/bench-scripter-v2-r2`. Sonnet 5.5 medium = environment witness. 30/30 cells, no relaunch.
+
+### Setup
+
+- Same 30 cells (3 tasks x 2 arms x 5 runs), `o55-low` vs `s55-medium`, harness at `99f673a`.
+- Fresh root `~/workflow/experimente/bench-scripter-v2-r2`.
+- Blind audit: 6 auditors on the new series + the same 6 (new agents) on an anonymous copy of the old series (`audit-b`), 12 in total. No auditor transcript contains `experiments.md` or `audit-mapping`.
+
+### Per task x arm (30.09 -> 03.10)
+
+| T | arm | verify PASS 30.09 → 03.10 | median cost $ | median dur_s | median full_runs | sum cost $ |
+|---|---|---|---|---|---|---|
+| T1 | o55-low | 3/5 → 4/5 | 1.12 → 0.73 | 451 → 389 | 4 → 3 | 5.26 → 3.87 |
+| T1 | s55-medium | 5/5 → 4/5 | 0.56 → 0.46 | 652 → 631 | 7 → 4 | 2.86 → 2.59 |
+| T2 | o55-low | 5/5 → 5/5 | 0.43 → 0.40 | 189 → 147 | 0 → 2 | 2.14 → 2.03 |
+| T2 | s55-medium | 5/5 → 5/5 | 0.26 → 0.20 | 276 → 160 | 1 → 0 | 1.46 → 1.00 |
+| T3 | o55-low | 5/5 → 5/5 | 0.60 → 0.50 | 365 → 246 | 2 → 2 | 2.81 → 2.65 |
+| T3 | s55-medium | 4/5 → 3/5 | 0.38 → 0.38 | 390 → 551 | 2 → 4 | 1.86 → 2.49 |
+
+Totals: verify PASS o55-low 13/15 → 14/15, s55-medium 14/15 → 12/15; cost o55-low 10.21 → 8.55 $, s55-medium 6.18 → 6.08 $; `full_runs` ≤4: o55-low 14/15 → 14/15, s55-medium 10/15 → 12/15 (old count, approximate).
+
+FAIL 03.10 verbatim: T1 o55-low-4 "≤4000 caractere" (4694); T1 s55-medium-2 "md are cele 3 pagini + hover — lipsă: ['hover']"; T3 s55-medium-4 and s55-medium-5 "fișiere noi/modificate doar în căile permise — scripts/SCRIPTS.md".
+
+### Blind audit and calibration
+
+Calibration (today's grades on the old cells vs the grades from 30.09): Opus-aud identical 23/30, within ±1 30/30, mean shift +0.03; Son-aud identical 14/30, within ±1 30/30, mean shift −0.07. Threshold written beforehand: ≥27/30 within ±1 → stable.
+
+Mean `corect` over 15 cells (old cells graded today → new cells graded today): Opus-aud o55-low 3.67 → 3.67, s55-medium 3.87 → 3.53; Son-aud o55-low 3.73 → 4.13, s55-medium 3.87 → 3.87. (Grades from 30.09: 3.60 / 3.87 / 3.87 / 3.87.)
+
+Median `corect` today, old → new:
+- Opus-aud o55-low: T1 3→3, T2 4→5, T3 4→3; s55-medium: T1 4→4, T2 4→4, T3 4→3.
+- Son-aud o55-low: T1 4→4, T2 4→5, T3 4→4; s55-medium: T1 4→5, T2 5→3, T3 4→4.
+
+### Reading guide applied / Verdict
+
+- "Clear Opus drop" needs Opus PASS ≤9/15 with Sonnet ≥12/15 (NO: 14/15), OR mean `corect` Opus −1 at both auditors (NO: 0.00 and +0.40), OR median cost +50% on ≥2 tasks only at Opus (NO: cost fell on all 3).
+- "Environment, not model": NO, Sonnet does not reach the thresholds.
+- Verdict: no large drop visible for Opus 5.5 low on these tasks; all Opus figures are equal to or better than on 30.09.
+
+### Confounds
+
+- Claude Code 2.1.288 (30.09: 2.1.285).
+- `~/.claude/settings.json` modified 03.10 14:57, no old copy.
+- Blueprint `node_modules` with newer `.cache`/`.vite`; ports allocated differently.
+- `ref-out` new vs old: `diff -r` without PNG = identical at T1, T2, T3.
+
+### Limits
+
+- n=5 per task; the PASS threshold catches a moderate drop only in ~15% of cases.
+- T1 depends on the 4000-character limit (on 30.09 Opus failed it at 45 and 189 over).
+- Only measurement scripts at effort low, not plans or debugging.
+- Sonnet auditors took 21–37 s per report (Opus 41–75 s). Duration is not a criterion.
+- Data: `docs/dosar/bench-scripter-v2-r2/` (`metrics.{md,json}`, `corect-scores.txt`); full audit reports saved for only 5 of 12, the rest in transcripts.
