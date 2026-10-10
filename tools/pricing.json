@@ -59,6 +59,14 @@
       "cache_write_5m": 5.0,
       "cache_write": 8.0,
       "api_cache_read": 0.2
+    },
+    "claude-haiku-5-5": {
+      "_source": "🔴 Haiku 5.5 price ≤100K prompt — DECIZII «bench-haiku (10.10)»",
+      "input": 0.1,
+      "output": 0.5,
+      "cache_read": 0.01,
+      "cache_write_5m": 0.125,
+      "cache_write": 0.2
     }
   }
 }

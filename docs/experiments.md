@@ -719,3 +719,46 @@ Median `corect` today, old → new:
 - Only measurement scripts at effort low, not plans or debugging.
 - Sonnet auditors took 21–37 s per report (Opus 41–75 s). Duration is not a criterion.
 - Data: `docs/dosar/bench-scripter-v2-r2/` (`metrics.{md,json}`, `corect-scores.txt`); full audit reports saved for only 5 of 12, the rest in transcripts.
+
+## bench-haiku (10.10)
+
+Question: can Haiku 5.5 (`claude-haiku-5-5`, released 07.10.2026; 0.10/0.50 $ per MTok in/out vs Sonnet 5.5 2/10) replace Sonnet 5.5 in the roles scribe (now Sonnet 5.5 low), explorer and explorer-max (Sonnet 5.5 medium)?
+
+### Setup
+
+- Arms: `s55` = the role's current configuration, rerun (baseline) · `h55-medium` · `h55-high`. Cell body = the live role body, verbatim; only model/effort differ. Explicit IDs: `claude-sonnet-5-5`, `claude-haiku-5-5`.
+- 3 real tasks per role (briefs recovered from subagent transcripts of the last 3 weeks; scribe on git state rebuilt from the commit before the original run; explorer on the live repo state), 3 runs per arm → 81 cells. Launched by a Sonnet cell-runner, one cell at a time per task, 3 tasks in parallel, arms interleaved.
+- Quality: blind audit (`anon.sh`: letters A–I, arms/models masked), one Opus 5.5 medium auditor per task. Explorer: reference of essential facts written BEFORE the run (implementer-complex, grep-verified) → "corect" = coverage of essential facts, false facts, false NOT FOUND, character limit. Scribe: diff + mechanical checks (`checks.py`, hard checks from the completion definition) + auditor on conformity / false "done". Scores corect/util 1–5, verdict acceptable/unacceptable.
+- Decision rule (written before the run): a Haiku arm "wins" a role only if median "corect" ≥ baseline on every task, no extra unacceptable, zero extra false facts (explorer); only then cost. Cost = benchmark, not criterion.
+- Harness: `scripts/bench-haiku/` (README with command order); cost via `tools/session_metrics` (Haiku 5.5 pricing added to `tools/pricing.json`).
+
+### Aggregate per role (median "corect" per task T1/T2/T3 · unacceptable out of 9 · false facts out of 9 · median cost per cell · median duration)
+
+| role | arm | corect T1/T2/T3 | unacc. | false | cost $ | dur s | verify hard |
+|---|---|---|---|---|---|---|---|
+| explorer | s55-medium (baseline) | 5/4/4 | 1 | 2 | 0.04–0.10 | 19–26 | — |
+| explorer | h55-medium | 4/3/4 | 0 | 1 | 0.005–0.007 | 28–31 | — |
+| explorer | h55-high | 4/4/4 | 0 | 0 | 0.005–0.009 | 48–55 | — |
+| explorer-max | s55-medium (baseline) | 5/4/5 | 0 | 3 | 0.12–0.22 | 31–63 | — |
+| explorer-max | h55-medium | 3/5/4 | 0 | 2 | 0.008–0.019 | 52–127 | — |
+| explorer-max | h55-high | 4/4/4 | 0 | 2 | 0.012–0.017 | 83–142 | — |
+| scribe | s55-low (baseline) | 4/5/3 | 0 | — | 0.06–0.10 | 19–28 | 9/9 |
+| scribe | h55-medium | 5/3/4 | 2 | — | 0.004–0.010 | 27–73 | 7/9 |
+| scribe | h55-high | 5/3/4 | 1 | — | 0.004–0.010 | 37–98 | 8/9 |
+
+Full table (min–max, turns, tokens, peak context): `docs/dosar/bench-haiku/summary.md`.
+
+### Conclusion against the decision rule
+
+- explorer: `h55-high` has corect 4/4/4 vs 5/4/4. On the strict criterion "≥ baseline on every task" it fails only on T1, by one point. On unacceptable (0 vs 1) and false facts (0 vs 2) it beats the baseline; cost ~10× lower; duration ~2× higher. Proposed decision: CANDIDATE for explorer, to be confirmed by Vali. `h55-medium` no (T2 3<4).
+- explorer-max: no Haiku arm passes (T1 and T3 below 5). Stays Sonnet 5.5 medium. Note: 5–6 of 6 Haiku cells per task cut themselves at 2000 characters, invoking the report rule from CLAUDE.md although the brief allowed 6000 → lower coverage; Sonnet exceeded the 6000 limit in 2 cells on T1 and 3 on T3. Confound to note, not to fix.
+- scribe: no Haiku arm passes (T2: 3 vs 5; unacceptable 1–2 vs 0; verify hard 7–8/9 vs 9/9). Stays Sonnet 5.5 low. Per task, Haiku beat the baseline on T1 (5 vs 4) and T3 (4 vs 3). T2 (a requirement to add a row to a file that is referenced but absent from the repo) is where Haiku invented values ("tool errors 0") or skipped the requirement.
+- Total cell cost: Sonnet ≈ 3.1 $ on 27 cells, Haiku ≈ 0.5 $ on 54 cells (medians × 3 from summary.md; per-cell cost via tools/session_metrics).
+
+### Confounds / limits
+
+- Haiku 5.5 tokenizer ≈ +30 % tokens; Haiku peak context 1.5–2× Sonnet on the same tasks; no cell reached the 150k hook.
+- Explorer references were written by Opus on the repo state of 10.10; all arms ran on the same state.
+- Auditors had ±1 uncertainty on partial coverage of multi-part facts.
+- Runners launched cells one at a time, but Agent started async; duration comes from the jsonl (`collect.py`), not the runner's clock.
+- n=3 per cell; scribe-T2 and explorer-T1 have high dispersion.
