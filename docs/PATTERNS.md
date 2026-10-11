@@ -259,3 +259,9 @@ Tests 20-23 in `hooks/test-autonom.sh` (peer text, PING, marker kept, origin pee
 ## raport-lung: cap by substring
 The 6000 cap is chosen when `agent_type` contains `explorer-max` (substring, not prefix): bench cells are named `cell-explorer-max-*`.
 The hook does not see the report at hand-back, so for cells the cap reaches the agent only through the brief text.
+
+## Auto-mode classifier and command chains
+The allow rule matches each subcommand of a chain (`&&`, `;`, `|`) separately. `Bash(git *)` does not cover `git commit … && du -sh`.
+The whole call goes to the classifier; on 11.10 it refused with `[Unrequested Commit in a Connected App]`. Fix: the commit in a git-only call, the rest separately.
+Second layer: the classifier's default rule blocks "when the user's task did not ask for it" (see `claude auto-mode defaults`). Permanent authorization goes in `autoMode.environment`; hygiene alone is not enough.
+Source: https://code.claude.com/docs/en/permissions#compound-commands

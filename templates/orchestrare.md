@@ -124,6 +124,7 @@ session only.
 - Message: one line with what was delivered + the Co-Authored-By trailer.
 - `git push -u origin HEAD` on the current branch — on master/main too, and in a worktree.
   Never `--force`, `--amend`, rebase; push rejected → report it, don't insist.
+- The commit Bash call contains ONLY git commands (status/add/commit/push/log). Anything else (du, ls, echo) drops the call out of the allow rule and sends it to the classifier — PATTERNS «Auto-mode classifier and command chains».
 - HANDOFF.md is not part of the task commit (`/handoff` commits it). The final report gives
   the hash and what to check on live.
 
