@@ -328,6 +328,10 @@ rap_case("explorer-max 6500 chars -> block (over 6000)", True, needle="6000",
          agent_id="rm2", meta_agent_type="explorer-max-opus", msg="x" * 6500)
 rap_case("explorer 2500 chars -> block (over 2000)", True, needle="2000",
          agent_id="rm3", agent_type="explorer", msg="x" * 2500)
+rap_case("cell-explorer-max 5000 chars -> allow (substring)", False,
+         agent_id="rm4", agent_type="cell-explorer-max-h55-high", msg="x" * 5000)
+rap_case("cell-scribe 5000 chars -> block (over 2000)", True, needle="2000",
+         agent_id="rm5", agent_type="cell-scribe-x", msg="x" * 5000)
 
 # ---------------------------------------------------------------- effort-phase gate
 EPH_HOOK = os.path.join(HOOKS, "effort-phase.sh")

@@ -55,7 +55,7 @@ def audit_ok(text):
     return bool(m) and m.group(1) == m.group(2)
 
 
-limit = LIMIT_EXPLORER_MAX if agent_type.startswith("explorer-max") else LIMIT
+limit = LIMIT_EXPLORER_MAX if "explorer-max" in agent_type else LIMIT  # 🔴 cells are named cell-explorer-max-* — PATTERNS «raport-lung: cap by substring»
 if len(last) <= limit:
     if agent_type.startswith("auditor") and audit_ok(last):
         marker_dir = os.environ.get("CLAUDE_HOOKS_DIR", "/tmp/claude-hooks")

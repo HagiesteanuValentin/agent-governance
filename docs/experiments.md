@@ -762,3 +762,40 @@ Full table (min–max, turns, tokens, peak context): `docs/dosar/bench-haiku/sum
 - Auditors had ±1 uncertainty on partial coverage of multi-part facts.
 - Runners launched cells one at a time, but Agent started async; duration comes from the jsonl (`collect.py`), not the runner's clock.
 - n=3 per cell; scribe-T2 and explorer-T1 have high dispersion.
+
+## bench-haiku-max6k (11.10)
+
+Question: in bench-haiku (10.10) Haiku explorer-max cells cut themselves at ~2k characters. Does Haiku 5.5 high pass the explorer-max role when the brief states the 6000 cap explicitly?
+
+### Setup
+
+- Arms: `h55-high` (`claude-haiku-5-5`) vs `s55-medium` (`claude-sonnet-5-5`), role explorer-max, same 3 tasks as bench-haiku (T1–T3), 3 runs per arm → 18 cells, all OK, 0 missing_meta.
+- Quality: blind audit by `auditor` (Opus 5.5 medium), one agent per task, `ref/` from 10.10 reused.
+- Decision rule: same as bench-haiku (Haiku wins only if median "corect" ≥ baseline on every task, no extra unacceptable, no extra false facts).
+- Results table: `~/workflow/experimente/bench-haiku-max6k/summary.md`.
+
+### Results (median, min–max in brackets)
+
+| task | arm | cost $ | dur s | corect | false | unacc. | report chars (3 runs) |
+|---|---|---|---|---|---|---|---|
+| T1 | h55-high | 0.017 (0.015–0.020) | 146 (113–150) | 4.0 (3.0–5.0) | 0 | 0 | 6801 / 1868 / 3281 |
+| T1 | s55-medium | 0.213 (0.163–0.277) | 69 (54–74) | 5.0 (5.0–5.0) | 0 | 0 | 4935 / 9443 / 5623 |
+| T2 | h55-high | 0.014 (0.009–0.016) | 86 (51–95) | 5.0 (5.0–5.0) | 0 | 0 | 5814 / 4761 / 5039 |
+| T2 | s55-medium | 0.098 (0.071–0.146) | 34 (29–36) | 4.0 (4.0–4.0) | 2 | 0 | 4863 / 4026 / 4411 |
+| T3 | h55-high | 0.018 (0.018–0.021) | 112 (102–118) | 4.0 (3.0–5.0) | 0 | 1 | 6996 / 8361 / 7720 |
+| T3 | s55-medium | 0.212 (0.169–0.252) | 62 (42–63) | 5.0 (5.0–5.0) | 0 | 0 | 8820 / 5455 / 7064 |
+
+- T2: Sonnet had 2 false facts (46/47 files instead of 49).
+- T3: the Haiku unacceptable is a false NOT FOUND on the source code at /pachete.
+- On 10.10 Haiku reports were 1838–2457 characters; only one cell now (T1 run 2) still cut itself at ~2k despite the brief line.
+
+### Confounds
+
+- both arms re-run with the 6000 cap stated explicitly in the brief; on 10.10 the hook never saw the cell reports (handback), on 11.10 the substring fix made it compress 3 Sonnet cells to <6000 while 7 other reports >6000 went through untouched
+- The raport-lung hook (with the substring fix) intervened on 3 Sonnet cells (T1 run 1 10371→4935, T1 run 3 9889→5623, T3 run 2 7639→5455), 3 times each, asking for compression to 6000; 0 interventions on Haiku. 7 other reports >6000 passed without intervention (ended by handback, the hook does not see them).
+- The T3 reference may diverge (promo-site has uncommitted CLAUDE.md/INFRA.md).
+- n=3 per cell.
+
+### Verdict
+
+By the rule (bench-haiku, `docs/experiments.md:732`): Haiku does NOT pass (T1 and T3 corect 4 < 5; T3 also 1 extra unacceptable). explorer-max stays Sonnet 5.5 medium. Final role decision is Vali's.

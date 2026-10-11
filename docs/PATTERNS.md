@@ -255,3 +255,7 @@ Fix (text-based): the prompt hook exits untouched when the prompt starts with `<
 The peer channel (`<agent-message>` / "Another Claude session sent a message:", PING, SubagentHandback relays) also fires UserPromptSubmit.
 The hook ignores both forms only as a prefix (a human quoting the tag mid-text still counts), plus `origin.kind`/`turnOrigin` == `peer`.
 Tests 20-23 in `hooks/test-autonom.sh` (peer text, PING, marker kept, origin peer) — fixed 09.24.
+
+## raport-lung: cap by substring
+The 6000 cap is chosen when `agent_type` contains `explorer-max` (substring, not prefix): bench cells are named `cell-explorer-max-*`.
+The hook does not see the report at hand-back, so for cells the cap reaches the agent only through the brief text.
