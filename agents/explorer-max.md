@@ -1,6 +1,6 @@
 ---
 name: explorer-max
-description: Explorer with a long report (≤6k characters) for table/list answers that don't fit in 1.5k. Same model as explorer (Sonnet 5.5 medium), maxTurns 60. Read-only.
+description: Explorer with a long report (≤6k characters) for table/list answers that don't fit in 1.5k. Sonnet 5.5 medium (not Haiku, like explorer), maxTurns 60. Read-only.
 model: claude-sonnet-5-5
 effort: medium
 maxTurns: 60
