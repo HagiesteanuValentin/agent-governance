@@ -1192,6 +1192,10 @@ def parse_file(path, label, tool_names, tool_inputs, chain=None):
                 grp["texts"].append(b["text"])
             elif b.get("type") == "tool_use":
                 grp["tools"].append(b.get("name") or "?")
+                # 🔴 agent report also arrives via tool_use SubagentHandback (input.message), not only a text block — PATTERNS «SubagentHandback and final_text»
+                hb = b.get("input") if b.get("name") == "SubagentHandback" else None
+                if isinstance(hb, dict) and isinstance(hb.get("message"), str):
+                    grp["texts"].append(hb["message"])
                 bid = b.get("id")
                 # a missing id keeps its slot: tool_names[k] must stay tool_ids[k]
                 grp["tool_ids"].append(bid if isinstance(bid, str) else None)

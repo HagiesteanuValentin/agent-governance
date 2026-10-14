@@ -265,3 +265,8 @@ The allow rule matches each subcommand of a chain (`&&`, `;`, `|`) separately. `
 The whole call goes to the classifier; on 11.10 it refused with `[Unrequested Commit in a Connected App]`. Fix: the commit in a git-only call, the rest separately.
 Second layer: the classifier's default rule blocks "when the user's task did not ask for it" (see `claude auto-mode defaults`). Permanent authorization goes in `autoMode.environment`; hygiene alone is not enough.
 Source: https://code.claude.com/docs/en/permissions#compound-commands
+
+## SubagentHandback and final_text
+Since 12.10 agents deliver their report as a `tool_use SubagentHandback` block; the text is in `input.message`, not in a `text` block.
+`session_metrics.py` read only `text` blocks, so `final_text` was empty and `agent_no_report` fired falsely on scribe/auditor runs.
+The handback message is appended to `texts` once; `final_report_chars` and `long_agent_report` then work unchanged.

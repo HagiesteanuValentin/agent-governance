@@ -165,6 +165,8 @@ see DECIZII «v1.4.1») and added `tool_results_read`, `late_first_edit`, an int
   above 2 avoidable calls. Sub-type `residual_poll`: a note after the harness re-notified an
   already-notified agent — always avoidable, reported separately since the cause is the
   harness, not the model.
+- `turns`: `system/turn_duration` lines from the main JSONL (one turn = one full main reply,
+  with all its tools); `user_prompts` = Vali's messages; `main_api_calls` = API calls.
 - `batchable_bash`: runs of ≥3 consecutive small Bash calls in main that could have been one
   call.
 - `plan_echo`: an `ExitPlanMode` result in main large enough that the plan is being paid for
