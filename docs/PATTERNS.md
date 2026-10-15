@@ -270,3 +270,6 @@ Source: https://code.claude.com/docs/en/permissions#compound-commands
 Since 12.10 agents deliver their report as a `tool_use SubagentHandback` block; the text is in `input.message`, not in a `text` block.
 `session_metrics.py` read only `text` blocks, so `final_text` was empty and `agent_no_report` fired falsely on scribe/auditor runs.
 The handback message is appended to `texts` once; `final_report_chars` and `long_agent_report` then work unchanged.
+SubagentStop fires only after "Report delivered to your caller.", so a block there just burns a turn: agent-aee00c1d (aerom-site) handed back, was blocked, and its shortened text reached no one.
+The cap (2000; 6000 for `explorer-max*`) is therefore enforced by `hooks/handback-cap.sh` in PreToolUse on `SubagentHandback` (deny, resend compressed).
+`raport-lung.sh` reads the handback from the agent transcript and never blocks when the last report is a handback; the audit-ok marker still uses its text.

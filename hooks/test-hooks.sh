@@ -333,6 +333,43 @@ rap_case("cell-explorer-max 5000 chars -> allow (substring)", False,
 rap_case("cell-scribe 5000 chars -> block (over 2000)", True, needle="2000",
          agent_id="rm5", agent_type="cell-scribe-x", msg="x" * 5000)
 
+def handback_use(msg):
+    return {"type": "tool_use", "id": "hb1", "name": "SubagentHandback",
+            "input": {"message": msg}}
+
+tp_hb = jsonl("proj-rap/s-rap-hb.jsonl",
+              [assistant([{"type": "text", "text": "working"}]),
+               assistant([handback_use("x" * 3000)])])
+rc, out, err = call(RAP_HOOK, {"session_id": "s-rap-hb", "transcript_path": tp_hb,
+                               "agent_type": "implementer"})
+results.append(("raport-lung: last assistant is handback 3000 -> no block",
+                rc == 0 and out == "" and not err, "rc=%d out=%r" % (rc, out[:60])))
+sub_hb = jsonl("proj-rap/s-rap-hb2/subagents/agent-rm6.jsonl",
+               [assistant([handback_use("x" * 3000)])])
+tp_main = write("proj-rap/s-rap-hb2.jsonl", ["{}"])
+rc, out, err = call(RAP_HOOK, {"session_id": "s-rap-hb2", "transcript_path": tp_main,
+                               "agent_id": "rm6", "agent_type": "implementer",
+                               "last_assistant_message": "y" * 3000})
+results.append(("raport-lung: agent transcript ends in handback -> no block",
+                rc == 0 and out == "" and not err, "rc=%d out=%r" % (rc, out[:60])))
+
+# ---------------------------------------------------------------- handback-cap (PreToolUse)
+HB_HOOK = os.path.join(HOOKS, "handback-cap.sh")
+
+def hb_in(n, agent_type):
+    return {"session_id": "s-hb", "tool_name": "SubagentHandback", "agent_id": "hb",
+            "agent_type": agent_type, "tool_input": {"message": "x" * n}}
+
+case("handback-cap: implementer 2500 -> deny", HB_HOOK, hb_in(2500, "implementer"),
+     "deny", "cap is 2000")
+case("handback-cap: implementer 500 -> allow", HB_HOOK, hb_in(500, "implementer"), "allow")
+case("handback-cap: explorer-max 5000 -> allow", HB_HOOK, hb_in(5000, "explorer-max"), "allow")
+case("handback-cap: explorer-max 6500 -> deny", HB_HOOK, hb_in(6500, "explorer-max"),
+     "deny", "cap is 6000")
+p_bad = subprocess.run(["bash", HB_HOOK], input="not json", text=True, capture_output=True)
+results.append(("handback-cap: invalid stdin -> exit 0, no output",
+                p_bad.returncode == 0 and not p_bad.stdout.strip(), "rc=%d" % p_bad.returncode))
+
 # ---------------------------------------------------------------- effort-phase gate
 EPH_HOOK = os.path.join(HOOKS, "effort-phase.sh")
 

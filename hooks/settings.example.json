@@ -87,6 +87,16 @@
         ]
       },
       {
+        "_note": "sub-agents: a SubagentHandback message over the cap (2000; 6000 for explorer-max*) is denied before delivery, with an order to resend only the compressed report",
+        "matcher": "SubagentHandback",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$HOME/.claude/hooks/handback-cap.sh"
+          }
+        ]
+      },
+      {
         "_note": "main session, every tool: context guard scoped to main",
         "matcher": "*",
         "hooks": [
