@@ -67,9 +67,13 @@ Every section of the target appears in the plan: either as an item, or as one li
 number, a presence/absence of a selector, a contrast ratio. "Looks better" is not an
 acceptance.
 
-## Report, at most 1,500 characters
+## Report, at most 12,000 characters, hard limit 15,000 (hook)
 
 ```
+SUMMARY FOR THE OPERATOR (≤10,000 characters): a 2-3 line intro (what the target is today,
+the direction you chose); then grouped SHOULD / COULD / MAYBE, one line per item — what
+changes and why, with the item number. Plain language (reader: a junior DevOps on a
+phone); no code, no selectors, no line numbers.
 SHOULD <n> / COULD <n> / MAYBE <n>
 1. <top SHOULD, one line>
 2. <one line>

@@ -164,17 +164,16 @@ Forbidden: commit, push, any change outside the concepts and plan files, screens
 path other than the one in the project's recipe.
 
 Phase B report — DATA for the orchestrator AND the human-readable summary for the operator;
-the orchestrator does not read the plan file to produce one. At most 2,000 characters in
-total. Fixed format, in this order:
+the orchestrator does not read the plan file to produce one. At most 12,000 characters in
+total, hard limit 15,000 (hook). Fixed format, in this order:
 PLAN: <path> — <n> MUST / <n> SHOULD / <n> COULD, <n> rejected
 SYNTHESIS: 3 lines — the backbone concept · what you borrowed · the "notices X" sentence
-SUMMARY FOR THE OPERATOR: first line is "What you'll see differently: …"; then exactly the
-format of step 4 in polish.md — group the approved items by visible element, one line per
-element in plain language with the item numbers in brackets; MUST/SHOULD/COULD only as group
-headings; no technical terms; at most 15 lines.
+SUMMARY FOR THE OPERATOR (≤10,000 characters): a 2-3 line intro (what the target is today,
+the direction you chose); then, per section/component of the target, a block: 1 title line
++ 1 line per MUST/SHOULD/COULD item — what changes and why, with the item number. Plain
+language (reader: a junior DevOps on a phone); no code, no selectors, no line numbers.
 CUT/ADDED BY YOU: one line each for what you added beyond the brief; then the rejections
-numbered as in the plan, `R1 <what> — <reason>` … `Rn`, ≤60 characters each, within the
-2,000 cap (or "none")
+numbered as in the plan, `R1 <what> — <reason>` … `Rn`, ≤60 characters each (or "none")
 MOTION: the numbers of the items marked `(motion)` / "none"
 UNCLEAR / BLOCKING: list or "none"
 READ BEYOND DOSSIER: <file:range, …> / none

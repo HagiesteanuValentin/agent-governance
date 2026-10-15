@@ -56,6 +56,9 @@ your head. The flow, in order:
    image retouching, filter) gets a 5-minute PROOF on the real file, with the result in the
    item; otherwise the item is marked "feasibility unproven" and main treats it
    as a question, not as an item.
+   Every design-lead brief (either lead) includes the line: "If the arguments name only the
+   target (no constraints), you have full freedom within the brand/design sources; the
+   operator writes only the target and what must NOT change."
    LONG ROUTE — 2a, then 2b ∥ 2c, then 2d; no text from you between them:
    2a. `explorer` → writes `docs/polish/<slug>.dossier.md` (≤3,000 characters): the target's
        paths with line counts, direct imports (one level), for every relevant section from
@@ -116,10 +119,9 @@ your head. The flow, in order:
 4. The operator's OK. You do NOT read `docs/polish/<target-slug>.md` (no `cat`, `sed`, or
    `wc`) to produce this summary. Plan from the expert: before the summary show the 3
    `SYNTHESIS:` lines from the report. Show the operator, verbatim, the SUMMARY FOR THE
-   OPERATOR section from the design-lead's own report — it already groups the items by
-   visible element (button, card, menu, section spacing…), one line per element in plain
-   language with the item numbers in brackets, MUST/SHOULD/COULD as group headings, no
-   technical terms, at most 15 lines — plus its CUT/ADDED BY YOU line and the plan path.
+   OPERATOR section from the design-lead's own report — intro, then one block per
+   section/component, one plain-language line per item (what + why) — plus its CUT/ADDED
+   BY YOU line and the plan path.
    Plan from the expert: also copy verbatim the `R1…Rn` rejections list from the report. Vali
    revives a rejection by writing its number ("R3"); you send it to the live expert as a new item (`SendMessage`, counts toward the ceiling below).
    After its summary add ONE line of your own: "Cut/added by main: P<n> (reason) /

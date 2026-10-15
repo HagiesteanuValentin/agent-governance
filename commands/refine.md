@@ -80,7 +80,9 @@ your head. The flow, in order:
    the operator's prompt verbatim · the target · the paths of the target's files (at most 6;
    above that only the line ranges from the dossier) · the dossier path · the measurements
    path · the three PNG paths · the spec sections (file + heading, to be read with `Read`
-   `offset`/`limit`) · the plan path `docs/refine/<slug>.md`.
+   `offset`/`limit`) · the plan path `docs/refine/<slug>.md` · the line "If the arguments
+   name only the target (no constraints), you have full freedom within the brand/design
+   sources; the operator writes only the target and what must NOT change."
    Ceilings in the brief: at most 5 reads beyond the dossier, each ≤80 lines, reported under
    `READ BEYOND DOSSIER`. Forbidden for it: browser, scripts, `Edit`, extra screenshots,
    commit/push, DECISIONS in full.
@@ -104,7 +106,9 @@ your head. The flow, in order:
    `CHANGED: <items + lines>` — a second full read is refused. Fails again → `AskUserQuestion`.
    You mark `CUT` only on items that contradict the spec; you do not rewrite items.
 
-5. The operator chooses the items (SHOULD / COULD / MAYBE). Then implementation briefs as in
+5. Show the operator, verbatim, the SUMMARY FOR THE OPERATOR section from the refiner's
+   report; do not read docs/refine/<slug>.md for it. The operator chooses the items
+   (SHOULD / COULD / MAYBE). Then implementation briefs as in
    Effort: after the operator's approval, run `bash ~/.claude/hooks/effort-phase.sh low </dev/null`
    (ignore its JSON line; the WARN comes on this same result), then print «You: /effort low»
    on its own line and wait for the reply before the first brief.

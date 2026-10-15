@@ -259,6 +259,7 @@ Tests 20-23 in `hooks/test-autonom.sh` (peer text, PING, marker kept, origin pee
 ## raport-lung: cap by substring
 The 6000 cap is chosen when `agent_type` contains `explorer-max` (substring, not prefix): bench cells are named `cell-explorer-max-*`.
 The hook does not see the report at hand-back, so for cells the cap reaches the agent only through the brief text.
+The 15000 tier applies when `agent_type` contains `design-lead` or `refiner`, tested before `explorer-max`; cells `cell-dle-a/b` lack the substring and stay at 2000.
 
 ## Auto-mode classifier and command chains
 The allow rule matches each subcommand of a chain (`&&`, `;`, `|`) separately. `Bash(git *)` does not cover `git commit … && du -sh`.

@@ -328,6 +328,16 @@ rap_case("explorer-max 6500 chars -> block (over 6000)", True, needle="6000",
          agent_id="rm2", meta_agent_type="explorer-max-opus", msg="x" * 6500)
 rap_case("explorer 2500 chars -> block (over 2000)", True, needle="2000",
          agent_id="rm3", agent_type="explorer", msg="x" * 2500)
+rap_case("design-lead-expert 14000 -> allow (under 15000)", False,
+         agent_id="rp1", agent_type="design-lead-expert", msg="x" * 14000)
+rap_case("design-lead-expert 15500 -> block (over 15000)", True, needle="15000",
+         agent_id="rp2", agent_type="design-lead-expert", msg="x" * 15500)
+rap_case("refiner-complex 14000 -> allow", False,
+         agent_id="rp3", agent_type="refiner-complex", msg="x" * 14000)
+rap_case("cell-refiner-x 14000 -> allow (substring)", False,
+         agent_id="rp4", meta_agent_type="cell-refiner-x", msg="x" * 14000)
+rap_case("scribe 2500 -> block (over 2000)", True, needle="2000",
+         agent_id="rp5", agent_type="scribe", msg="x" * 2500)
 rap_case("cell-explorer-max 5000 chars -> allow (substring)", False,
          agent_id="rm4", agent_type="cell-explorer-max-h55-high", msg="x" * 5000)
 rap_case("cell-scribe 5000 chars -> block (over 2000)", True, needle="2000",
@@ -366,6 +376,12 @@ case("handback-cap: implementer 500 -> allow", HB_HOOK, hb_in(500, "implementer"
 case("handback-cap: explorer-max 5000 -> allow", HB_HOOK, hb_in(5000, "explorer-max"), "allow")
 case("handback-cap: explorer-max 6500 -> deny", HB_HOOK, hb_in(6500, "explorer-max"),
      "deny", "cap is 6000")
+case("handback-cap: design-lead-expert 14000 -> allow", HB_HOOK, hb_in(14000, "design-lead-expert"), "allow")
+case("handback-cap: design-lead-expert 15500 -> deny", HB_HOOK, hb_in(15500, "design-lead-expert"),
+     "deny", "cap is 15000")
+case("handback-cap: refiner-complex 14000 -> allow", HB_HOOK, hb_in(14000, "refiner-complex"), "allow")
+case("handback-cap: cell-refiner-x 14000 -> allow", HB_HOOK, hb_in(14000, "cell-refiner-x"), "allow")
+case("handback-cap: scribe 2500 -> deny", HB_HOOK, hb_in(2500, "scribe"), "deny", "cap is 2000")
 p_bad = subprocess.run(["bash", HB_HOOK], input="not json", text=True, capture_output=True)
 results.append(("handback-cap: invalid stdin -> exit 0, no output",
                 p_bad.returncode == 0 and not p_bad.stdout.strip(), "rc=%d" % p_bad.returncode))

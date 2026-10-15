@@ -21,7 +21,7 @@ def usage():
             "cache_creation_input_tokens": 0}
 
 
-def session(agent_content):
+def session(agent_content, agent_type="auditor"):
     root = tempfile.mkdtemp(prefix="hb-")
     main = os.path.join(root, SID + ".jsonl")
     sub = os.path.join(root, SID, "subagents")
@@ -32,7 +32,7 @@ def session(agent_content):
         {"type": "assistant", "timestamp": "2026-10-12T10:01:00Z", "session_id": SID,
          "message": {"id": "m1", "model": "claude-fable-5-1", "usage": usage(),
                      "content": [{"type": "tool_use", "id": "t_imp", "name": "Agent",
-                                  "input": {"subagent_type": "auditor",
+                                  "input": {"subagent_type": agent_type,
                                             "description": "audit", "prompt": "p"}}]}},
         {"type": "user", "timestamp": "2026-10-12T10:05:00Z", "session_id": SID,
          "toolUseResult": {"agentId": "imp1"},
@@ -44,7 +44,7 @@ def session(agent_content):
         for r in recs:
             f.write(json.dumps(r) + "\n")
     with open(os.path.join(sub, "agent-imp1.meta.json"), "w") as f:
-        json.dump({"agentType": "auditor", "description": "audit", "toolUseId": "t_imp"}, f)
+        json.dump({"agentType": agent_type, "description": "audit", "toolUseId": "t_imp"}, f)
     with open(os.path.join(sub, "agent-imp1.jsonl"), "w") as f:
         f.write(json.dumps({"type": "assistant", "timestamp": "2026-10-12T10:02:00Z",
                             "isSidechain": True, "session_id": "imp1",
@@ -53,8 +53,8 @@ def session(agent_content):
     return root, main
 
 
-def analyzed(agent_content):
-    root, main = session(agent_content)
+def analyzed(agent_content, agent_type="auditor"):
+    root, main = session(agent_content, agent_type)
     try:
         pricing = sm.load_pricing(os.path.join(os.path.dirname(HERE), "pricing.json"))
         return sm.analyze(main, pricing, versions=[{"name": "v", "from": "2026-10-01T00:00"}])
@@ -93,3 +93,17 @@ def test_handback_without_string_message_adds_nothing():
                    "input": {"message": 5}}])
     assert a["workers"][0]["final_report_chars"] == 0
     assert len(no_report_flags(a)) == 1
+
+
+def long_report_flags(a):
+    return [f for f in a["flags"] if f["code"] == "long_agent_report"]
+
+
+def test_design_lead_13000_is_under_plan_lead_cap():
+    a = analyzed([handback("x" * 13000)], "design-lead-expert")
+    assert long_report_flags(a) == []
+
+
+def test_scribe_2500_is_flagged():
+    a = analyzed([handback("x" * 2500)], "scribe")
+    assert len(long_report_flags(a)) == 1

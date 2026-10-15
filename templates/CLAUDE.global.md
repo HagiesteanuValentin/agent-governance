@@ -32,7 +32,7 @@ If I want details, I ask.
 - Don't read files under `tool-results/` (the hook blocks it): ask an agent for a missing
   fact instead.
 - Don't re-read files you just wrote; read a target file once.
-- Agent report: 1.5k characters soft, 2k hard — past 2k the hook rejects the report.
+- Agent report: 1.5k characters soft, 2k hard — past 2k the hook rejects the report; design-lead*/refiner*: 12k soft, 15k hard.
 - No commit, push, seed, or calls to real services unless the brief explicitly asks for it.
 - The Explore, Plan, general-purpose and fork agents are forbidden: they inherit the
   session's model.
