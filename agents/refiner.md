@@ -39,7 +39,7 @@ you have no `Agent` tool. No code in the plan: at most a selector, a token name,
 You may ask for ONE extra crop, through the report line `CROP NEEDED: <selector> <breakpoint>`
 — once, never twice.
 
-## The plan format (`docs/refine/<slug>.md`, ≤10,000 characters)
+## The plan format (`docs/refine/<slug>.md`, ≤12,000 characters soft, hard limit 15,000)
 
 `## Diagnosis` — 5 to 8 lines: what is missing for the target to read as premium, with numbers
 from the measurements.
@@ -67,17 +67,14 @@ Every section of the target appears in the plan: either as an item, or as one li
 number, a presence/absence of a selector, a contrast ratio. "Looks better" is not an
 acceptance.
 
-## Report, at most 12,000 characters, hard limit 15,000 (hook)
+## Report, at most 1,500 characters
 
 ```
-SUMMARY FOR THE OPERATOR (≤10,000 characters): a 2-3 line intro (what the target is today,
-the direction you chose); then grouped SHOULD / COULD / MAYBE, one line per item — what
-changes and why, with the item number. Plain language (reader: a junior DevOps on a
+SUMMARY FOR THE OPERATOR (fits inside the 1,500-character report): a 2-3 line intro (what
+the target is today, the direction you chose); then one line per SHOULD item — what changes
+and why, with the item number; COULD / MAYBE only as counts. Plain language (reader: a junior DevOps on a
 phone); no code, no selectors, no line numbers.
 SHOULD <n> / COULD <n> / MAYBE <n>
-1. <top SHOULD, one line>
-2. <one line>
-3. <one line>
 CHANGED: <items + line ranges written, for the review>
 READ BEYOND DOSSIER: <file:range, …> / none
 CROP NEEDED: <selector> <breakpoint> / -

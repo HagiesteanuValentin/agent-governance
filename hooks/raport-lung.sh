@@ -1,13 +1,12 @@
 #!/bin/bash
-# 🔴 design-lead|refiner = 15000, explorer-max = 6000, rest = 2000 — docs/RECIPES.md «SubagentStop hook test»
+# 🔴 explorer-max* = 6000, rest = 2000 — docs/RECIPES.md «SubagentStop hook test»
 LIMIT=2000
 LIMIT_EXPLORER_MAX=6000
-LIMIT_PLAN_LEAD=15000
 input=$(cat)
-python3 - "$input" "$LIMIT" "$LIMIT_EXPLORER_MAX" "$LIMIT_PLAN_LEAD" <<'PY'
+python3 - "$input" "$LIMIT" "$LIMIT_EXPLORER_MAX" <<'PY'
 import json, os, re, sys
 d = json.loads(sys.argv[1])
-LIMIT, LIMIT_EXPLORER_MAX, LIMIT_PLAN_LEAD = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+LIMIT, LIMIT_EXPLORER_MAX = int(sys.argv[2]), int(sys.argv[3])
 if d.get("stop_hook_active"):
     sys.exit(0)
 last = d.get("last_assistant_message") or ""
@@ -75,8 +74,7 @@ def audit_ok(text):
     return bool(m) and m.group(1) == m.group(2)
 
 
-limit = (LIMIT_PLAN_LEAD if ("design-lead" in agent_type or "refiner" in agent_type)
-         else LIMIT_EXPLORER_MAX if "explorer-max" in agent_type else LIMIT)  # 🔴 tested before explorer-max; cells cell-* inherit by substring — PATTERNS «raport-lung: cap by substring»
+limit = LIMIT_EXPLORER_MAX if "explorer-max" in agent_type else LIMIT  # 🔴 cells are named cell-explorer-max-* — PATTERNS «raport-lung: cap by substring»
 if len(last) <= limit:
     if agent_type.startswith("auditor") and audit_ok(last):
         marker_dir = os.environ.get("CLAUDE_HOOKS_DIR", "/tmp/claude-hooks")

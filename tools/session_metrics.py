@@ -78,7 +78,6 @@ THRESHOLDS = {
     "full_read_lines": 300,          # lines returned by a Read without offset/limit
     "long_agent_report": 2000,       # chars of a worker's final message
     "long_agent_report_explorer_max": 6000,  # hooks/raport-lung.sh: explorer-max* cap
-    "long_agent_report_plan_lead": 15000,    # hooks/raport-lung.sh: design-lead/refiner cap
     "long_brief": 7000,              # chars of Agent.input.prompt
     "max_implementer_runs": 3,       # implementer + implementer-complex + implementer-max + implementer-sonnet + scripter + scripter-complex per session
     "max_live_agents": 6,             # hard cap on concurrently running sub-agents; over it = parallel_over_cap
@@ -211,7 +210,7 @@ RECOMMENDATION = {
     "full_read_big_file": "{detail} - fine for the implementer on its own target; give the "
                           "explorer/auditor line ranges instead.",
     "image_in_main": "{detail} - read the downscaled `-mic` copy, and late in the session.",
-    "long_agent_report": "{detail} - soft/hard cap 1.5k/2k (explorer-max: 4.5k/6k; design-lead/refiner: 12k/15k), "
+    "long_agent_report": "{detail} - soft cap 1.5k, hard cap 2k (explorer-max*: 4.5k/6k), "
                          "fixed format.",
     "long_brief": "{detail} - over 7k the brief belongs in a plan file; the prompt is path "
                   "+ section.",
@@ -273,11 +272,7 @@ RECOMMENDATION = {
 
 def report_limit_for(agent_type):
     # 🔴 explorer-max* = 6000, restul 2000 — docs/RECIPES.md «SubagentStop hook test»
-    if not isinstance(agent_type, str):
-        return THRESHOLDS["long_agent_report"]
-    if "design-lead" in agent_type or "refiner" in agent_type:  # 🔴 substring, tested before explorer-max — PATTERNS «raport-lung: cap by substring»
-        return THRESHOLDS["long_agent_report_plan_lead"]
-    if "explorer-max" in agent_type:
+    if isinstance(agent_type, str) and agent_type.startswith("explorer-max"):
         return THRESHOLDS["long_agent_report_explorer_max"]
     return THRESHOLDS["long_agent_report"]
 

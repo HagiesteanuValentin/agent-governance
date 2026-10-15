@@ -41,8 +41,8 @@ at most 5, each ≤80 lines, listed in the report under `READ BEYOND DOSSIER`.
    "OK" line under "Dimensions without items". Do not skip dimensions.
 5. Write the plan to the given file, in the fixed format. Then the final report: the plan
    path · the MUST/SHOULD/COULD item counts · the SUMMARY FOR THE OPERATOR in the format
-   below · what you cut/added yourself; total at most 12,000 characters, hard limit 15,000
-   (hook).
+   below · what you cut/added yourself; total
+   ≤2,000 characters.
 
 Dimensions (mandatory checklist):
 - Typography: scale, hierarchy, line-height, line width, truncation.
@@ -98,7 +98,7 @@ structural item. MUST stays a visible defect or clear inconsistency only.
 ## Questions for the orchestrator
 - only if a taste/direction decision blocks an item; otherwise "none"
 
-Ceilings: the file ≤ 8,000 characters. If it does not fit, cut from COULD, not from MUST.
+Ceilings: the file ≤ 12,000 characters (soft), hard limit 15,000; the ceiling buys synthesis, not sprawl. If it does not fit, cut from COULD, not from MUST.
 No code in the plan (at most a selector or a token name). No refactors outside the target.
 No proposals already rejected in DECISIONS.
 
@@ -106,12 +106,12 @@ Forbidden: commit, push, any change outside the plan file, screenshots to any pa
 the one in the project's recipe.
 
 The final answer is DATA for the orchestrator AND the human-readable summary for the operator —
-the orchestrator does not read the plan file to produce one. At most 12,000 characters in
-total, hard limit 15,000 (hook). Fixed format, in this order:
+the orchestrator does not read the plan file to produce one. At most 2,000 characters in total.
+Fixed format, in this order:
 PLAN: <path> — <n> MUST / <n> SHOULD / <n> COULD, <n> rejected
-SUMMARY FOR THE OPERATOR (≤10,000 characters): a 2-3 line intro (what the target is today,
+SUMMARY FOR THE OPERATOR (fits inside the 2,000-character report): a 2-3 line intro (what the target is today,
 the direction you chose); then, per section/component of the target, a block: 1 title line
-+ 1 line per MUST/SHOULD/COULD item — what changes and why, with the item number. Plain
++ 1 line per MUST/SHOULD item — what changes and why, with the item number; COULD only as counts. Plain
 language (reader: a junior DevOps on a phone); no code, no selectors, no line numbers.
 CUT/ADDED BY YOU: one line each for what you rejected or added beyond the brief (or "none")
 READ BEYOND DOSSIER: <file:range, …> / none / (short route: not applicable)

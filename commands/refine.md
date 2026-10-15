@@ -91,7 +91,7 @@ your head. The flow, in order:
    Once only. Resuming the `orchestrator` = a new scripter; it counts in its 3-run cap.
 
 4. Adversarial review (you). First `wc -c` on the plan — the refiner has no Bash and cannot
-   check its own ceiling; the plan is ≤10,000 characters. Then read the plan ONCE. Check, in
+   check its own ceiling; the plan is ≤12,000 characters (soft), hard 15,000. Then read the plan ONCE. Check, in
    this order:
    1. Every SHOULD quotes a number from the measurements or a screenshot.
    2. Every section of the page appears — as an item, or as "OK, no change + reason".

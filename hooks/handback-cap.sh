@@ -2,13 +2,12 @@
 # 🔴 SubagentStop runs after the handback is delivered; the cap must be enforced in PreToolUse — PATTERNS «SubagentHandback and final_text»
 LIMIT=2000
 LIMIT_EXPLORER_MAX=6000
-LIMIT_PLAN_LEAD=15000
 input=$(cat)
-python3 - "$input" "$LIMIT" "$LIMIT_EXPLORER_MAX" "$LIMIT_PLAN_LEAD" <<'PY' 2>/dev/null
+python3 - "$input" "$LIMIT" "$LIMIT_EXPLORER_MAX" <<'PY' 2>/dev/null
 import json, os, sys
 try:
     d = json.loads(sys.argv[1])
-    LIMIT, LIMIT_EXPLORER_MAX, LIMIT_PLAN_LEAD = int(sys.argv[2]), int(sys.argv[3]), int(sys.argv[4])
+    LIMIT, LIMIT_EXPLORER_MAX = int(sys.argv[2]), int(sys.argv[3])
     if d.get("tool_name") != "SubagentHandback":
         sys.exit(0)
     ti = d.get("tool_input") if isinstance(d.get("tool_input"), dict) else {}
@@ -27,8 +26,7 @@ try:
                     agent_type = json.load(f).get("agentType") or ""
             except (OSError, ValueError):
                 pass
-    limit = (LIMIT_PLAN_LEAD if ("design-lead" in agent_type or "refiner" in agent_type)
-             else LIMIT_EXPLORER_MAX if "explorer-max" in agent_type else LIMIT)  # 🔴 tested before explorer-max; cells cell-* inherit by substring — PATTERNS «raport-lung: cap by substring»
+    limit = LIMIT_EXPLORER_MAX if "explorer-max" in agent_type else LIMIT
     n = len(msg)
     if n <= limit:
         sys.exit(0)
