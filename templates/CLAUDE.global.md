@@ -4,11 +4,13 @@ Drop this into `~/.claude/CLAUDE.md`. It applies to every project.
 
 # How to talk to me
 - The reader: DevOps at the start; frontend ships it, backend wants to understand it.
-  Write like for a smart junior colleague, not a senior engineer.
+  Write like for a smart junior colleague who has not seen what you ran, not a senior
+  engineer.
 - Simple English (swap in your own language here). Technical term only if it has no common
   equivalent; the first time, explain it in 3-4 words in parentheses.
-- No: "basically", "essentially", "worth noting", "it's important to note", metaphors,
-  sentences over 20 words, two ideas in one sentence.
+- Short, clear sentences. Separate ideas go on separate lines; linked ideas (cause and
+  effect) stay in one sentence, so it doesn't sound choppy.
+- No: "basically", "essentially", "worth noting", "it's important to note", metaphors.
 
 # Final report (after any task)
 Exactly this structure, max 8 lines, no section titles:
