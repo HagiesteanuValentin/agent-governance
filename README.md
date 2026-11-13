@@ -12,16 +12,16 @@ orchestrator, v1.12 analyzer false flags + PING ≥40 min, v1.13 user /effort ad
 target, explorers on web, bolder /polish, v1.14 scripter debugs on a slice) are tracked in `tools/versions.json`
 and the CHANGELOG, if present.
 v1.8.1 (2026-09-09) changes nothing in the governance itself: only the analyzer (`tools/session_metrics.py`) was fixed so it stops reporting waste that wasn't there (false `big_tool_result_main` on image reads, false `batchable_bash` on non-mutating chains).
-Phase-based effort is back (plan medium / implementation low; as of v1.8.2 a PreToolUse gate
+Phase-based effort was back until v1.20 (plan medium / implementation low; as of v1.8.2 a PreToolUse gate
 blocks tools until claude_code_king runs `/effort <target>` and types go, Claude Code
 2.1.260), the advisor is now mandatory on a wide set of triggers (a-f) and
 re-reads the plan in round 2, `bash-mare.sh` nudges main on the 3rd consecutive small Bash
 call (2 lines).
 v1.9 (2026-09-22): a lot of 12 cell runs (r5–r7) shows Opus 5.5 low as the new implementer default (better quality, ~55% of Opus 5's cost; medium adds nothing on the "simplu" task). Auditor-medium can replace high on mechanical drift but still misses logic traps (I7) like high does.
-call, Fable 5.1 pricing and 5m/1h cache billing are corrected in the analyzer, the `/refine`
-skill (agents `refiner` / `refiner-complex`, both Fable 5.1) ships for single-page changes,
-and `orchestrare.md` is kept under 10 KB. Phase-based effort now also runs inside `/polish`
-and `/refine` (both commands run the `effort-phase.sh` hook), and the `/refine` scripter
+call, Fable 5.2 pricing (8/40) and 5m/1h cache billing are corrected in the analyzer, the `/refine`
+skill (agents `refiner` / `refiner-complex`, both Fable 5.2) ships for single-page changes,
+and `orchestrare.md` is kept under 10 KB. Phase-based effort (`effort-phase.sh`) was
+removed in v1.20; main stays on medium. The `/refine` scripter
 brief asks for line ranges plus per-project measurement scripts. Metrics from
 2026-09-05T14:45 (local time) onward are the ones that count for v1.8.
 
@@ -231,7 +231,7 @@ Judged over ≥3 real sessions with `/rate`, $ spent by main per phase, and the 
 `metrics-local`, compared against medium-throughout sessions; conclusion goes in
 `docs/experiments.md` «T-v17».
 
-**Known limitations**: switching effort currently needs a manual `/effort low` — the
+**Known limitations** (before v1.20, when phase effort was removed): switching effort needed a manual `/effort low` — the
 running session's settings.json is not reloaded live, this was measured, not assumed; no
 evidence yet either way for running main itself on low effort.
 

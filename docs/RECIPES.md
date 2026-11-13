@@ -143,6 +143,7 @@ fields (effort, main $ %, scripter) automatically — re-analyze with
 For chronological TRENDS after a migration: `--trends`.
 
 ## Effort by phase (v1.7)
+Removed in v1.20 (hook deleted); kept as history.
 Exact flow: 1) you approve the plan → the `ExitPlanMode` hook writes `low` into settings and
 injects `effort: settings->low`; 2) on the first successful tool call, the `check` hook
 injects, once, `WARN effort effective=medium settings=low -> You: /effort low`; 3) main stops

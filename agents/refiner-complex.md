@@ -1,6 +1,6 @@
 ---
 name: refiner-complex
-description: The refiner for whole pages, on Fable 5.1 high, only via /refine, for a full page or two or more sections; receives a dossier + measurements + at most 3 screenshots, writes the SHOULD/COULD/MAYBE plan, never opens a browser.
+description: The refiner for whole pages, on Fable 5.2 high, only via /refine, for a full page or two or more sections; receives a dossier + measurements + at most 3 screenshots, writes the SHOULD/COULD/MAYBE plan, never opens a browser.
 model: fable
 effort: high
 maxTurns: 50

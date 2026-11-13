@@ -31,6 +31,7 @@ sesiunii. Înlocuit: vezi «Effort hook is per-session only». Capcană: `claude
 settings=medium la SessionEnd-ul lui → deny neașteptat la mijlocul sesiunii.
 
 ## Effort hook is per-session only
+Removed in v1.20 (hook deleted); kept as history.
 `~/.claude/settings.json` is shared by every open session and Claude Code does not reload it
 live, so writing the effort there only leaks one session's phase into the others. The target
 lives in `${CLAUDE_JOB_DIR:-/tmp}/effort-target-<sid>` and is compared with `effort.level`
@@ -241,6 +242,7 @@ on the previous one, so such a chain stays batchable. Name-position matching kee
 / `>&`), so a read-only `... >/dev/null` still qualifies as batchable.
 
 ## effort hold for /polish and /refine
+Removed in v1.20 (hook deleted); kept as history.
 Step 1 of /polish and /refine runs `effort-phase.sh hold` (marker `effort-hold-<sid>`); while it
 exists, `low` from the ExitPlanMode hook skips the target. Env sid (`$CLAUDE_CODE_SESSION_ID`,
 inherited by sub-agents) serves ONLY `hold` and the step-5 release (manual `low` with the marker);

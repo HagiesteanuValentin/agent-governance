@@ -8,9 +8,6 @@ your head. The flow, in order:
    `refine: <page|section> → refiner-complex|refiner`
    `refiner-complex` for a whole page or two or more sections; `refiner` for one section or
    one element. Mixed signals → `refiner-complex`. Slug: the target, lowercased, dashes.
-   Effort: run `bash ~/.claude/hooks/effort-phase.sh medium </dev/null && bash ~/.claude/hooks/effort-phase.sh hold </dev/null` in the same Bash as
-   the first command of step 1 (ignore its JSON line); if that result carries `WARN effort`,
-   print «You: /effort medium» and wait.
 
 1. Preparation (no agents). At most 3 commands (`ls`, `grep -rl <name>` — file lists only) →
    the list of the target's paths. Then name the spec sections: file + heading from the
@@ -109,9 +106,6 @@ your head. The flow, in order:
 5. Show the operator, verbatim, the SUMMARY FOR THE OPERATOR section from the refiner's
    report; do not read docs/refine/<slug>.md for it. The operator chooses the items
    (SHOULD / COULD / MAYBE). Then implementation briefs as in
-   Effort: after the operator's approval, run `bash ~/.claude/hooks/effort-phase.sh low </dev/null`
-   (ignore its JSON line; the WARN comes on this same result), then print «You: /effort low»
-   on its own line and wait for the reply before the first brief.
    /polish step 5: you WRITE `<scratchpad>/brief-N.md` from the approved items (the item
    numbers + the plan path + the script as the verifier, the "after" numbers) and launch ONE
    new `orchestrator` with the plan `docs/refine/<slug>.md`, the briefs, the run-log, the

@@ -460,6 +460,14 @@ def test_versions_table_cache_columns_are_dashes_without_data():
     assert blank.count("|") == empty[2].count("|") == row.count("|"), blank
 
 
+def test_fable_5_2_rates_and_5_1_unchanged():
+    pricing = sm.load_pricing(os.path.join(os.path.dirname(HERE), "pricing.json"))
+    r52 = sm.rates_for(pricing, "claude-fable-5-2")
+    r51 = sm.rates_for(pricing, "claude-fable-5-1")
+    assert (r52["input"], r52["output"]) == (8.0, 40.0), r52
+    assert (r51["input"], r51["output"]) == (10.0, 50.0), r51
+
+
 if __name__ == "__main__":
     failed = 0
     for name, fn in sorted(globals().items()):

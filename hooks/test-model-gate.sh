@@ -125,7 +125,7 @@ start_payload = {"session_id": "s1", "transcript_path": OPUS, "source": "startup
                  "cwd": TMP}
 ss_home = tempfile.mkdtemp(prefix="ss-home-", dir=TMP)
 shutil.copytree(os.path.expanduser("~/.claude"), os.path.join(ss_home, ".claude"),
-                ignore=lambda d, n: [x for x in n if not (x.endswith(".md") or x in ("settings.json", "v17-effort-auto"))] if d == os.path.expanduser("~/.claude") else n)
+                ignore=lambda d, n: [x for x in n if not (x.endswith(".md") or x == "settings.json")] if d == os.path.expanduser("~/.claude") else n)
 ss_env = {"HOME": ss_home, "CLAUDE_JOB_DIR": ss_home}
 env_opus = dict(ss_env, GOV_MODEL="claude-opus-5", CLAUDE_PROJECT_DIR=TMP)
 env_fable = dict(ss_env, GOV_MODEL="claude-fable-5-1", CLAUDE_PROJECT_DIR=TMP)

@@ -1,6 +1,6 @@
 ---
 name: refiner
-description: The refiner, on Fable 5.1 medium, only via /refine, for one section or element; receives a dossier + measurements + at most 3 screenshots, writes the SHOULD/COULD/MAYBE plan, never opens a browser.
+description: The refiner, on Fable 5.2 medium, only via /refine, for one section or element; receives a dossier + measurements + at most 3 screenshots, writes the SHOULD/COULD/MAYBE plan, never opens a browser.
 model: fable
 effort: medium
 maxTurns: 40

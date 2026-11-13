@@ -1,10 +1,10 @@
-# Orchestration v1.8 — delta on top of orchestrare.md (advisor + effort phases)
+# Orchestration v1.8 — delta on top of orchestrare.md (advisor)
 
 Drop this into `~/.claude/orchestrare-v17.md`; `hooks/session-start.sh v17` injects it. The
 base rules in `orchestrare.md` still apply; this file only adds/overrides what follows.
 
 ## Advisor trigger — at PLAN time, before ExitPlanMode
-Call the `advisor` Agent MANDATORY when any: (a) ≥2 briefs carry JS/TS logic · (b) hooks,
+The `advisor` Agent is required when any: (a) ≥2 briefs carry JS/TS logic · (b) hooks,
 live settings/config, data migration · (c) the user writes risky/complex/advisor · (d) any
 implementer-complex, implementer-max, or scripter-complex brief · (e) ≥3 briefs · (f)
 implementers in parallel or worktree. Optional only at 1–2 scribe/simple
@@ -23,8 +23,8 @@ lines marked "scope+" are not applied — list them in one line for the user at 
 live-agent cap and against the 3-explorer budget. Over either -> AskUserQuestion.
 
 ## Main in the implementation phase
-The `orchestrator` agent executes; main never reads `git diff` directly and launches no
-worker. Advisor is MANDATORY when an orchestrator HAND-BACK is: logic DEVIATIONS left after a
+The `orchestrator` agent executes; main reads its report, not `git diff`, and leaves
+workers to it. Advisor is required when an orchestrator HAND-BACK is: logic DEVIATIONS left after a
 SendMessage · "unclear/risky" touching logic · the verifier failing again · an escalation to
 implementer-complex/-max. SendMessage the advisor the question plus the run-log path, then
 answer the SAME orchestrator. Every other rule in `orchestrare.md` still holds.
@@ -34,6 +34,5 @@ HARD CAP: at most 6 live agents at once, any type (was 4) — the user's call, 0
 context is small, parallelizing helps. The plan-time conditions (disjoint file lists, one
 build, no cross-brief dependency) still apply; do not parallelize for the count's sake.
 
-## Effort per phase
-Main effort: `medium` constant (guard `~/.claude/v17-effort-auto` removed 2026-10-15; `effort-phase.sh` stays inert without it). `/effort` is user-only; main never asks for it.
-Reason: DECIZII «v1.18 — efort pe faze oprit din nou».
+## Effort
+Main stays on `medium`; only the user changes `/effort`, main doesn't ask (DECIZII «v1.20»).

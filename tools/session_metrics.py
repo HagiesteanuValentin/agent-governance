@@ -42,7 +42,7 @@ BROWSER_THRESHOLD_DEFAULT = 0.5  # share of main tool calls above which the sess
 VERSION_OLDER = "older"
 
 AGENTS_DIR_DEFAULT = "~/.claude/agents"
-AS_MODEL_DEFAULT = "claude-fable-5-1"
+AS_MODEL_DEFAULT = "claude-fable-5-2"
 ROT_AT_DEFAULT = 0.35            # operator threshold, not an Anthropic figure
 WINDOW_DEFAULT = 1_000_000
 NO_QUALITY = ("no quality claim — the threshold is the operator's, not Anthropic's")
@@ -104,7 +104,6 @@ THRESHOLDS = {
     "late_first_edit_reads": 15,     # reading calls before the first write
     "main_read_before_agent": 20000, # chars main read itself before launching any agent
     "edit_via_bash_calls": 2,        # heredoc writes into source files, with no Edit/Write
-    "effort_lag_turns": 3,           # main turns after ExitPlanMode still not on low
     "cache_rewrite_pct": 50,         # share of the call's context that is a rewrite
     "cache_rewrite_prev_tokens": 30000,  # cached context that existed on the previous call
     "cache_rewrite_max_gap_s": 3600,     # over an hour the cache expires legitimately
@@ -161,8 +160,6 @@ FLAG_TEXT = {
                                 "before the next brief",
     "advisor_trigger_b_missed": "plan touches hooks/config/migration and no advisor was "
                                 "called before ExitPlanMode (heuristic on the plan text)",
-    "effort_lag_high": "the low phase started too many turns after ExitPlanMode",
-    "no_low_phase": "v1.7 session with a plan approved and no low turn",
 }
 
 # base gravity per code; wasted tokens can only push it up (see severity_of)
@@ -180,9 +177,7 @@ SEVERITY_BASE = {
     "fable_launched_worker": "high",
     "orchestrator_no_runlog": "high",
     "advisor_mandatory_missed": "high",
-    "no_low_phase": "high",
     "advisor_trigger_b_missed": "medium",
-    "effort_lag_high": "medium",
     "agent_read_plan_whole": "medium",
     "edit_via_bash": "medium",
     "big_tool_result_main": "medium",
@@ -2234,18 +2229,6 @@ def v17_block(main_doc, workers, docs_by_scope, tool_inputs, pricing, version,
                               "called before ExitPlanMode (heuristic on the plan text)",
                               {"at": turns[i]["at"], "turn": i}, 0))
         break
-    for k, lag in enumerate(lags):
-        if lag is not None and lag > THRESHOLDS["effort_lag_turns"]:
-            new_flags.append(flag("effort_lag_high", "main",
-                                  "%d main turns after ExitPlanMode #%d before the first low "
-                                  "turn (warn %d)"
-                                  % (lag, k + 1, THRESHOLDS["effort_lag_turns"]),
-                                  {"lag": lag}, 0))
-            break
-    if is_v17 and exit_pos and not low_pos:
-        new_flags.append(flag("no_low_phase", "main",
-                              "v1.7 session with ExitPlanMode and no low turn at all",
-                              None, 0))
 
     # ---- the plan echoed back as a tool_result, re-sent on every later turn
     echo = None

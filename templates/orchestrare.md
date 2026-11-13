@@ -49,7 +49,7 @@ session only.
 4. At the notification: read the run-log SUMMARY once (Read, limit 150; the ANNEX only for
    flagged reports, with offset) + `git diff --stat` → verdict (see Audit).
 5. HAND-BACK → answer by SendMessage to the SAME orchestrator, ≤3 per task; past that →
-   AskUserQuestion. You see a deviation → SendMessage the orchestrator, never a worker.
+   AskUserQuestion. You see a deviation → SendMessage the orchestrator; workers die at hand-back.
    Its children are dead after a hand-back: a re-send there means a new agent (~5k). A brief
    that appears AFTER launch = a new orchestrator; SendMessage is only for hand-back on the
    same brief (doesn't contradict the "ONE orchestrator" rule at point 2).
@@ -101,14 +101,14 @@ session only.
 - Hand-backs: ≤3 SendMessage answers to the orchestrator per task; past that → AskUserQuestion.
 - The orchestrator keeps ≤2 re-sends per brief (3 runs total) and ≤6 live agents; it hands
   back instead of deciding past them.
-- Explorers: no numeric cap — main launches as many as it needs, never reads solo; but
-  surgically: each with one precise question and its own area, never two on the same source.
-- Past a cap (4th run, past 6 live agents): ask me with AskUserQuestion: how many agents, what
+- Explorers: no cap; main delegates reading to keep its context small. Each: one precise
+  question, own area, one per source. Target known + answer <3k → main reads.
+- Past a cap (4th run, past 6 live agents): AskUserQuestion: how many agents, what
   model, why the cap isn't enough. The approval holds only for the current task.
 
 ## Audit = verdict on the run-log
 - The orchestrator's auditors read every diff; main reads the run-log SUMMARY + `git diff
-  --stat`, never `git diff` in full, no `cat` on whole files.
+  --stat` only; full diffs and whole files are the auditors' job.
 - Verdict: OK only when every brief is `OK` or `DEVIATIONS (n), n fixed`, the definition of
   done's verifications ran, and no item is left unverified.
 - When JS/TS/astro logic changed, main launches one final `auditor-complex` on the whole diff
@@ -120,11 +120,11 @@ session only.
   delivery, or a "don't commit" from me → no.
 - Main commits, not the agents (they keep the commit/push prohibition).
 - `git status --short` first; `git add` ONLY the files from the briefs + the ones in
-  `git diff --stat`, never `-A`; the run-log and unknown untracked files stay; name them.
+  `git diff --stat`, by name (`-A` sweeps strays); the run-log and unknown untracked files stay; name them.
 - Message: one line with what was delivered + the Co-Authored-By trailer.
 - `git push -u origin HEAD` on the current branch — on master/main too, and in a worktree.
-  Never `--force`, `--amend`, rebase; push rejected → report it, don't insist.
-- The commit Bash call contains ONLY git commands (status/add/commit/push/log). Anything else (du, ls, echo) drops the call out of the allow rule and sends it to the classifier — PATTERNS «Auto-mode classifier and command chains».
+  Keep history: no `--force`/`--amend`/rebase; rejected push → report, no retry.
+- The commit Bash call contains ONLY git commands (status/add/commit/push/log). Anything else (du, ls, echo) moves the call from the allow rule to the classifier — PATTERNS «Auto-mode classifier and command chains».
 - HANDOFF.md is not part of the task commit (`/handoff` commits it). The final report gives
   the hash and what to check on live.
 

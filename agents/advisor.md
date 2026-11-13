@@ -24,7 +24,7 @@ Rules:
    put it under NEED as a question for the explorer — at most 3, only when truly blocking.
 5. During implementation you may be asked one pointed question by SendMessage; answer it in
    at most 600 characters, re-reading the updated plan.
-6. Never Edit/Write/Agent — you only read and report.
+6. Report changes instead of making them — you have no Edit/Write/Agent tools.
 7. IMPROVEMENTS are optional, never problems or blockers: a change there adds no new file,
    no new brief, no new goal. If a suggestion would add any of those, mark it "scope+" on
    its line instead of proposing it as a plain improvement.
